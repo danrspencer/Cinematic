@@ -2741,42 +2741,62 @@ do
 		-- and Atmosphere hubs keep when each shows, ns.PageTabs splitting their
 		-- shared tab lists by hub.)
 		-- (collapse: each band just its first icon, opening as one of its pages is picked.)
+		-- (sub: a group inside its band, as its own hub's: the Interface hub's
+		-- Combat, Nameplates and Info, the Visions hub's Combat, World and RP,
+		-- 2026-11-19. Each its own band under its section's name, its own line
+		-- in the left list under the section's; colors "Section/sub", as there.)
 		{ name = "Style", collapse = true, colors = { Interface = { 0.35, 0.6, 0.9 }, Visions = { 0.85, 0.3, 0.25 },
-			Atmosphere = { 0.65, 0.45, 0.9 } }, pages = {
+			Atmosphere = { 0.65, 0.45, 0.9 },
+			["Interface/Combat"] = { 0.35, 0.6, 0.9 }, ["Interface/Nameplates"] = { 0.85, 0.55, 0.25 },
+			["Interface/Info"] = { 0.45, 0.75, 0.45 },
+			["Visions/Combat"] = { 0.85, 0.3, 0.25 }, ["Visions/World"] = { 0.35, 0.6, 0.9 },
+			["Visions/RP"] = { 0.7, 0.45, 0.85 } }, pages = {
 			{ "Style General", "Interface\\Icons\\INV_Misc_Gear_08", label = "General" },
 			{ "Style Themes", "Interface\\Icons\\INV_Misc_Gear_08", tabOf = "Style General" }, -- (GeneralStyle.lua: the theme + Quick Settings)
 			{ "Style Overrides", "Interface\\Icons\\INV_Misc_Gear_08", tabOf = "Style General" }, -- (StyleOverrides.lua)
 			{ "Interface Recolor", "Interface\\Icons\\INV_Misc_Gem_01", tabOf = "Style General" }, -- (InterfaceRecolor.lua: the Themes tab's last)
 			-- (Labels without "Style", 2026-11-17: you're in the Style hub. Ids kept.)
 			-- (Interface: Unit Frames' two looks on one icon, its cast bars a tab.)
-			{ "Unit Style", "Interface\\Icons\\INV_Misc_Head_Human_01", label = "Unit Frames", section = "Interface" },
+			{ "Unit Style", "Interface\\Icons\\INV_Misc_Head_Human_01", label = "Unit Frames", section = "Interface",
+				sub = "Combat" },
 			{ "Unit Cast Style", "Interface\\Icons\\Spell_Nature_Lightning", label = "Cast Bars", section = "Interface",
-				tabOf = "Unit Style" }, -- (PlateCastStyle.lua's unit frames' page)
+				sub = "Combat", tabOf = "Unit Style" }, -- (PlateCastStyle.lua's unit frames' page)
 			-- (The personal resource display its own icon, as in the Interface hub: 2026-11-17.)
 			{ "Personal Style", ns.HELP_DISC:gsub("HelpDisc$", "PersonalResources"), label = "Personal Resources",
-				section = "Interface" },
-			{ "Raid Style", "Interface\\Icons\\INV_Misc_GroupNeedMore", label = "Raid Frames", section = "Interface" },
-			{ "Action Style", "Interface\\Icons\\Ability_DualWield", label = "Action Bars", section = "Interface" },
-			-- (Nameplate Style: its Smart tab a second icon of its page's, hidden under it: canvas.hubTabs.)
-			{ "Nameplate Style", "Interface\\Icons\\Ability_Marksmanship", label = "Nameplates", section = "Interface" },
-			{ "Cast Bar Style", "Interface\\Icons\\Spell_Nature_Lightning", label = "Cast Bars", section = "Interface",
-				tabOf = "Nameplate Style" },
-			{ "Name Style", "Interface\\Icons\\INV_Misc_Note_02", label = "Names", section = "Interface" },
+				section = "Interface", sub = "Combat" },
+			{ "Raid Style", "Interface\\Icons\\INV_Misc_GroupNeedMore", label = "Raid Frames", section = "Interface",
+				sub = "Combat" },
+			{ "Action Style", "Interface\\Icons\\Ability_DualWield", label = "Action Bars", section = "Interface",
+				sub = "Combat" },
+			-- (Combat Text in Combat, the fight's numbers, 2026-11-19, user.)
 			{ "Combat Text Style", "Interface\\Icons\\Ability_Warrior_Riposte", label = "Combat Text",
-				section = "Interface" },
+				section = "Interface", sub = "Combat" },
+			-- (Nameplate Style: its Smart tab a second icon of its page's, hidden under it: canvas.hubTabs.)
+			{ "Nameplate Style", "Interface\\Icons\\Ability_Marksmanship", label = "Nameplates", section = "Interface",
+				sub = "Nameplates" },
+			{ "Cast Bar Style", "Interface\\Icons\\Spell_Nature_Lightning", label = "Cast Bars", section = "Interface",
+				sub = "Nameplates", tabOf = "Nameplate Style" },
+			{ "Name Style", "Interface\\Icons\\INV_Misc_Note_02", label = "Names", section = "Interface",
+				sub = "Nameplates" },
 			{ "Bubble Style", "Interface\\Icons\\Ability_Warrior_RallyingCry", label = "Chat Bubbles",
-				section = "Interface" },
-			{ "Tooltip Style", "Interface\\Icons\\INV_Misc_Note_05", label = "Tooltips", section = "Interface" },
-			-- (Visions: the look they share (VisionsStyle.lua), then each Vision's.)
-			{ "Visions Style", "Interface\\Icons\\INV_Misc_Gear_08", label = "All Visions", section = "Visions" },
-			{ "Damage Vision Look", "Interface\\Icons\\Ability_Warrior_Rampage", label = "Damage", section = "Visions" },
-			{ "Vitals Style", "Interface\\Icons\\Spell_Shadow_LifeDrain02", label = "Vitals", section = "Visions" },
-			{ "Quest Talk Style", "Interface\\Icons\\INV_Scroll_02", label = "Quest", section = "Visions" },
-			{ "Quest Item Style", "Interface\\Icons\\INV_Misc_Key_03", section = "Visions", tabOf = "Quest Talk Style" },
-			{ "Roll Style", "Interface\\Icons\\INV_Misc_Dice_02", label = "Roll", section = "Visions" },
+				section = "Interface", sub = "Info" },
+			{ "Tooltip Style", "Interface\\Icons\\INV_Misc_Note_05", label = "Tooltips", section = "Interface",
+				sub = "Info" },
+			-- (Visions: the look they share (VisionsStyle.lua), in no group, then each Vision's in its Visions hub group.)
+			-- (The Visions hub's General icon, not Style General's gear: 2026-11-19.)
+			{ "Visions Style", "Interface\\Icons\\INV_Misc_Book_11", label = "All Visions", section = "Visions" },
+			{ "Damage Vision Look", "Interface\\Icons\\Ability_Warrior_Rampage", label = "Damage", section = "Visions",
+				sub = "Combat" },
+			{ "Vitals Style", "Interface\\Icons\\Spell_Shadow_LifeDrain02", label = "Vitals", section = "Visions",
+				sub = "Combat" },
+			{ "Quest Talk Style", "Interface\\Icons\\INV_Scroll_02", label = "Quest", section = "Visions", sub = "World" },
+			{ "Quest Item Style", "Interface\\Icons\\INV_Misc_Key_03", section = "Visions", sub = "World",
+				tabOf = "Quest Talk Style" },
+			{ "Roll Style", "Interface\\Icons\\INV_Misc_Dice_02", label = "Roll", section = "Visions", sub = "World" },
 			{ "Emote Vision Style", "Interface\\Icons\\Spell_Holy_PrayerOfFortitude", label = "Emote",
-				section = "Visions" },
-			{ "Card Styles", "Interface\\Icons\\INV_Misc_Book_09", label = "Card Types", section = "Visions" }, -- (CardsPage.lua)
+				section = "Visions", sub = "RP" },
+			{ "Card Styles", "Interface\\Icons\\INV_Misc_Book_09", label = "Card Types", section = "Visions",
+				sub = "RP" }, -- (CardsPage.lua)
 			-- (Atmosphere: the effects' looks.)
 			{ "Tint Style", "Interface\\Icons\\INV_Misc_Gem_Variety_02", label = "Tint", section = "Atmosphere" },
 			{ "Letterbox Style", "Interface\\Icons\\Spell_Shadow_ShadesOfDarkness", label = "Letterbox",
@@ -2951,23 +2971,48 @@ do
 	-- pages is shown, faded otherwise), its name above in the same color.
 	local function PaintBands(hub)
 		if not hub.bands then return end
+		local current = hub.current and Lit(hub.current)
 		for _, band in pairs(hub.bands) do
-			local lit = hub.current and band.tiles[Lit(hub.current)]
-			local c = lit and GOLD or hub.colors and hub.colors[band.section] or PLAIN
+			local lit = current and band.tiles and band.tiles[current]
+			local c = lit and GOLD or hub.colors and (hub.colors[band.section] or hub.colors[band.parent]) or PLAIN
 			band:SetColorTexture(c[1], c[2], c[3], lit and 0.14 or 0.08)
 			for _, line in ipairs(band.edges) do line:SetColorTexture(c[1], c[2], c[3], lit and 0.45 or 0.25) end
 			if lit then band.label:SetTextColor(c[1], c[2], c[3])
 			else band.label:SetTextColor(c[1] * 0.6 + 0.15, c[2] * 0.6 + 0.15, c[3] * 0.6 + 0.15) end
 		end
+		-- (A section's name over its groups' bands: gold while one of its pages shows.)
+		for _, head in ipairs(hub.heads or {}) do
+			local lit = current and current.section == head.section
+			local c = lit and GOLD or hub.colors and hub.colors[head.section] or PLAIN
+			if lit then head:SetTextColor(c[1], c[2], c[3])
+			else head:SetTextColor(c[1] * 0.6 + 0.15, c[2] * 0.6 + 0.15, c[3] * 0.6 + 0.15) end
+			head.line:SetColorTexture(c[1], c[2], c[3], lit and 0.6 or 0.45)
+		end
 	end
 
-	-- (key: the section, or the place of a run of pages in none, its band unnamed)
-	local function Band(hub, key, section)
+	-- (A section's name over its groups (page.sub), a line after it out to its
+	-- last band's end; one each time it starts a row.)
+	local function Head(hub, i)
+		hub.heads = hub.heads or {}
+		local head = hub.heads[i]
+		if head then return head end
+		head = hub.frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+		head.searchSkip = true
+		head.line = hub.frame:CreateTexture(nil, "BORDER")
+		head.line:SetHeight(1)
+		hub.heads[i] = head
+		return head
+	end
+
+	-- (key: the section ("Section/sub" for a group in it), or the place of a run
+	-- of pages in none, its band unnamed. section: its color's key; label: the
+	-- name over it; parent: its section, for the color when it has none.)
+	local function Band(hub, key, section, label, parent)
 		hub.bands = hub.bands or {}
 		local band = hub.bands[key]
 		if band then return band end
 		band = hub.frame:CreateTexture(nil, "BACKGROUND")
-		band.section = section
+		band.section, band.parent = section, parent
 		band.edges = {}
 		for i, sides in ipairs({ { "TOPLEFT", "TOPRIGHT" }, { "BOTTOMLEFT", "BOTTOMRIGHT" },
 			{ "TOPLEFT", "BOTTOMLEFT" }, { "TOPRIGHT", "BOTTOMRIGHT" } }) do
@@ -2979,7 +3024,7 @@ do
 		end
 		band.label = hub.frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
 		band.label:SetPoint("BOTTOMLEFT", band, "TOPLEFT", 2, 2)
-		band.label:SetText(section and L[section] or "")
+		band.label:SetText(label and L[label] or "")
 		band.label.searchSkip = true
 		hub.bands[key] = band
 		return band
@@ -2994,50 +3039,112 @@ do
 		local runs = {}
 		for _, tile in ipairs(hub.tiles) do
 			local run = runs[#runs]
-			if not run or run.section ~= tile.section then
-				run = { section = tile.section }
+			if not run or run.section ~= tile.section or run.sub ~= tile.sub then
+				run = { section = tile.section, sub = tile.sub }
 				runs[#runs + 1] = run
 			end
 			run[#run + 1] = tile
 		end
+		-- (A section with groups in it (page.sub: the Style hub's, 2026-11-19):
+		-- its name in a row of its own over them, each group's band named for
+		-- the group, closer together than the sections.)
+		-- (Then every section's name goes up there, Atmosphere's too, its band
+		-- unnamed; sections further apart than the groups in one.)
+		local HEAD = 0
+		for _, run in ipairs(runs) do
+			if run.sub then HEAD = LABEL_H end
+		end
+		local headed = {}
+		for _, run in ipairs(runs) do
+			if HEAD > 0 and run.section then headed[run.section] = true end
+		end
+		local SUB_GAP, HEAD_GAP = 6, 22
+		local function Gap(before, run)
+			if HEAD == 0 then return SECTION_GAP end
+			return before.section == run.section and SUB_GAP or HEAD_GAP
+		end
 		-- (hub.collapse: a band shows just its first icon till one of its pages
-		-- is picked, the rest coming out then; the Style hub's, 2026-11-17.)
+		-- is picked, the rest coming out then; the Style hub's, 2026-11-17.
+		-- With groups: a section none of whose pages is picked shows just its
+		-- first icon, unnamed under the section's name, its other groups put
+		-- away; the picked one's section shows each group's first, 2026-11-19.)
 		local count = #hub.tiles
 		if hub.collapse then
 			local lit = hub.current and Lit(hub.current)
+			local litSection = lit and lit.section
+			local kept, seen = {}, {}
 			for _, run in ipairs(runs) do
 				local open = not run.section
 				for _, tile in ipairs(run) do
 					if tile == lit then open = true end
 				end
-				if not open then
-					for i = #run, 2, -1 do
+				local shut = headed[run.section] and run.section ~= litSection
+				if shut and seen[run.section] then
+					-- (a later group of a shut section: all of it put away)
+					for i = #run, 1, -1 do
 						run[i]:Hide()
 						run[i] = nil
 						count = count - 1
 					end
+				else
+					if not open then
+						for i = #run, 2, -1 do
+							run[i]:Hide()
+							run[i] = nil
+							count = count - 1
+						end
+					end
+					run.shut = shut
+					seen[run.section or false] = true
+					kept[#kept + 1] = run
 				end
 			end
+			runs = kept
 		end
 		-- (all but the icons themselves: gaps, band padding, the page's edges)
-		local fixed = EDGE * 2 + (#runs - 1) * SECTION_GAP
-		for _, run in ipairs(runs) do fixed = fixed + (#run - 1) * TILE_GAP + BAND_PAD * 2 end
+		local fixed = EDGE * 2
+		for index, run in ipairs(runs) do
+			fixed = fixed + (#run - 1) * TILE_GAP + BAND_PAD * 2 + (index > 1 and Gap(runs[index - 1], run) or 0)
+		end
 		local size = math.max(MIN_TILE, math.min(TILE, math.floor((width - fixed) / math.max(1, count))))
 		local high = size + BAND_PAD * 2
 		local x, y = EDGE, -BAR - EDGE
 		local used = {}
+		local heads, head = 0, nil
 		-- (pages in no section: a band of their own too, with no name)
 		for index, run in ipairs(runs) do
 			local wide = #run * (size + TILE_GAP) - TILE_GAP + BAND_PAD * 2
-			local band = Band(hub, run.section or index, run.section)
+			local key = run.section and (run.sub and run.section .. "/" .. run.sub or run.section) or index
+			-- (In a section with groups: a group's band named for it, one in none
+			-- (All Visions) or a shut section's unnamed under the section's name.
+			-- Named each layout: a band shut one time, open the next.)
+			local label = (not run.shut and run.sub) or (not headed[run.section] and run.section) or nil
+			local band = Band(hub, key, run.sub and key or run.section, label, run.section)
+			band.label:SetText(label and L[label] or "")
 			-- (A name wider than its few icons: the next band starts past the
 			-- name, so the two names never run together.)
 			local room = math.max(wide, band.label:GetStringWidth() + 4)
-			if x > EDGE and x + room > width - EDGE then
-				x, y = EDGE, y - LABEL_H - high - TILE_GAP
+			local at = index > 1 and x + Gap(runs[index - 1], run) or x
+			if x > EDGE and at + room > width - EDGE then
+				x, y, head = EDGE, y - HEAD - LABEL_H - high - TILE_GAP, nil
+			else
+				x = at
+			end
+			if headed[run.section] then
+				if not head or head.section ~= run.section then
+					heads = heads + 1
+					head = Head(hub, heads)
+					head.section, head.x1 = run.section, x
+					head:SetText(L[run.section])
+					head:ClearAllPoints()
+					head:SetPoint("TOPLEFT", hub.frame, "TOPLEFT", x + 2, y - 1)
+				end
+				head.x2, head.y = x + room, y
+			else
+				head = nil
 			end
 			band:ClearAllPoints()
-			band:SetPoint("TOPLEFT", hub.frame, "TOPLEFT", x, y - LABEL_H)
+			band:SetPoint("TOPLEFT", hub.frame, "TOPLEFT", x, y - HEAD - LABEL_H)
 			band:SetSize(wide, high)
 			band.tiles, used[band] = {}, true
 			for i, tile in ipairs(run) do
@@ -3047,7 +3154,7 @@ do
 				tile:SetPoint("TOPLEFT", band, "TOPLEFT", BAND_PAD + (i - 1) * (size + TILE_GAP), -BAND_PAD)
 				tile:Show()
 			end
-			x = x + room + SECTION_GAP
+			x = x + room
 		end
 		-- (a band left over from an earlier layout, pages since added: put away)
 		for _, band in pairs(hub.bands or {}) do
@@ -3056,9 +3163,23 @@ do
 			band.label:SetShown(shown)
 			for _, line in ipairs(band.edges) do line:SetShown(shown) end
 		end
+		-- (The sections' names: a line after each out to its last band's end,
+		-- none where the name is as wide; ones left from a wider layout put away.)
+		for i, each in ipairs(hub.heads or {}) do
+			local shown = i <= heads
+			each:SetShown(shown)
+			local from = each.x1 and each.x1 + each:GetStringWidth() + 8
+			local lineShown = shown and from < each.x2 - 2
+			each.line:SetShown(lineShown or false)
+			if lineShown then
+				each.line:ClearAllPoints()
+				each.line:SetPoint("LEFT", hub.frame, "TOPLEFT", from, each.y - LABEL_H / 2)
+				each.line:SetWidth(each.x2 - from)
+			end
+		end
 		PaintBands(hub)
 		hub.host:ClearAllPoints()
-		hub.host:SetPoint("TOPLEFT", hub.frame, "TOPLEFT", 0, y - LABEL_H - high - BELOW)
+		hub.host:SetPoint("TOPLEFT", hub.frame, "TOPLEFT", 0, y - HEAD - LABEL_H - high - BELOW)
 		hub.host:SetPoint("BOTTOMRIGHT")
 	end
 
@@ -3575,7 +3696,8 @@ do
 						if each.name == hub.under then under = each.label or each.name end
 					end
 					local path = {}
-					for _, step in ipairs({ under or false, hub.label or hub.name, page.section or false, page.label or english }) do
+					for _, step in ipairs({ under or false, hub.label or hub.name, page.section or false, page.sub or false,
+							page.label or english }) do
 						if step then path[#path + 1] = L[step] end
 					end
 					canvas.hubPath = path
@@ -3601,6 +3723,7 @@ do
 						-- (hub.plain: one row, no bands; the band kept for the left list's lines and the tour)
 						tile.band = tab.section or page.section
 						tile.section = not hub.plain and tile.band or nil
+						tile.sub = tile.band and (tab.sub or page.sub) or nil -- (its group in its band: the Style hub's)
 						tile.onSelect, tile.resetContent = tab.onSelect, tab.resetContent
 						-- (noDot: no switch on its icon, its page's under another's;
 						-- switchLabel: the name its off card gives that switch.)
@@ -3745,6 +3868,17 @@ do
 							bands[band] = true
 							Line(bandKey, L[band], hub.name, tile.english)
 							menu.fold[bandKey] = true
+						end
+						-- (A group in the band (tile.sub, the Style hub's): a line of its
+						-- own under the band's, its icons' lines under it, 2026-11-19.)
+						if tile.sub then
+							local subKey = bandKey .. "/" .. tile.sub
+							if not bands[subKey] then
+								bands[subKey] = true
+								Line(subKey, L[tile.sub], bandKey, tile.english)
+								menu.fold[subKey] = true
+							end
+							bandKey = subKey
 						end
 						Line(bandKey .. "/" .. tile.english, label, bandKey, tile.english)
 					menu.lineOf[hub.name .. "|" .. tile.english] = bandKey .. "/" .. tile.english
