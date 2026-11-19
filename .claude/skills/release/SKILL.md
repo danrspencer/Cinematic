@@ -1,7 +1,7 @@
 ---
 name: release
 description: The user typed /release. Gather everything uncommitted in C:\dev\Cinematic, run the checks, review it (with `full`, also find missing translations and guidebook updates), and stop for the user's review; on their go-ahead, commit it in player-readable commits, push, tag the next version and push the tag (the GitHub Action uploads to CurseForge).
-argument-hint: "[quick|full] [version, default next patch] [anything to leave out or note]"
+argument-hint: "[quick|full] [nogame] [version, default next patch] [anything to leave out or note]"
 disable-model-invocation: true
 ---
 
@@ -22,6 +22,9 @@ Three modes, picked by the first word after /release:
   player-facing commits since the last commit that touched `docs/`
   (`git log -1 --format=%h -- docs/`), not just this diff.
 - **`/release quick`**: skips almost all of it: see "Quick release" at the end.
+
+`nogame` anywhere after /release skips the in-game reminder (step 3)
+without asking.
 
 ## Phase 1: gather, check, review (no commits)
 
@@ -50,13 +53,25 @@ Three modes, picked by the first word after /release:
    once-only update on the user's own saved settings; then it reads the last
    in-game `/cine prerelease` runs from the saved settings. It must end
    `prerelease: all passed`. Each FAIL line is a finding.
-   - **In game**: before the review, ask the user to run `/cine prerelease`
-     on Forever and on retail (each in its own code block), /reload, and say
-     "check log"; then `python -I Tools/prerelease.py --game` shows each
-     run's NEW FAIL lines (passed last time, fail now), and
-     `CinematicDB.prereleaseLog` in `CinematicDev.lua` has the whole run.
-     A run older than this release's changes doesn't count; if the user
-     skips it, say so in the review.
+   - **In-game reminder** (not in `/release quick`, and not when the words
+     after /release say `nogame`): right after starting the offline run,
+     look at `python -I Tools/prerelease.py --game` for each client's last
+     run and its date, then ask with AskUserQuestion, saying when each last
+     ran (or "never"):
+     - **Run it now (Recommended)**: give the commands, each in its own
+       code block: `/cine prerelease` on Forever, then on retail, then
+       `/reload`. Don't wait: carry on with phase 1 while they run (about
+       6 minutes each); the review's stop (step 8) reminds them to say
+       "check log" with their answer.
+     - **Skip it this time**: carry on; the review says "in-game check
+       skipped".
+     - **Already ran it**: read the results now (below).
+     Reading results: `python -I Tools/prerelease.py --game` shows each run's
+     NEW FAIL lines (passed last time, fail now); `CinematicDB.prereleaseLog`
+     in that client's `CinematicDev.lua` has the whole run (screenshots are
+     named there). A run from before the last code change in this release
+     doesn't count: say so and offer to skip or run again. Each NEW FAIL is
+     a finding; "still failing" lines are listed once, briefly.
    - A NEW line in an offline sweep: a setting erroring on the stand-in. A
      real error is a finding; stand-in noise (a stub's nil) is saved with
      `python -I Tools/offline/run.py Tools/offline/sweep.lua <client> --update`
@@ -120,6 +135,9 @@ Three modes, picked by the first word after /release:
    - the version it will be (vX.Y.Z),
    - each planned commit: subject + its files,
    - check results (pass, or the exact failure),
+   - in game: each client's NEW FAIL lines, or "skipped", or "running:
+     say check log with your answer" (then phase 2 starts by reading them,
+     and stops again if there's a NEW FAIL),
    - `full` only: translations, how many keys missing / stale, per language,
    - `full` only: guidebook, each page and what it needs (one line each),
    - review findings, worst first, each with file:line and a proposed fix,
@@ -131,7 +149,10 @@ Three modes, picked by the first word after /release:
 
 ## Phase 2: on the user's go-ahead
 
-9. Apply any fixes they agreed to and re-run step 3 on those files.
+9. If the in-game runs were going at the review, read them first (step 3's
+   "Reading results"). A NEW FAIL: show it and ask (fix it first, release
+   anyway, or stop) before anything else, and end the turn there.
+   Then apply any fixes they agreed to and re-run step 3 on those files.
 
 9a. **Profile snapshots**: once all code edits are done, run
     `python -I Tools/offline/run.py Tools/offline/check.lua --update < /dev/null`,
