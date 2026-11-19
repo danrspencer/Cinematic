@@ -4695,6 +4695,34 @@ STEPS[#STEPS + 1] = function()
 		for _, point in pairs(ns.db.profileResetPoints or {}) do Brown(point) end
 		ns.db.combatTextNatureBrownV1 = true
 	end
+	-- Combat Text Style's General tab is one table now (2026-11-19): who draws
+	-- your damage, your heals and your pet's, ours, the game's or none. Our
+	-- numbers off went to the game's (none where the game's were hidden, or
+	-- XP hidden with them); both drawn went to ours. Your pet's switched off
+	-- went to none. Saved profiles too. Once.
+	if not ns.db.combatTextWhoDrawsV1 then
+		local function Who(t)
+			if type(t) ~= "table" then return end
+			if t.combatTextNumbers == false then
+				local by = (t.combatTextHideGame == false and not t.hideWorldText) and "game" or "none"
+				t.combatTextDamageBy, t.combatTextHealBy, t.combatTextPetBy = by, by, by
+			end
+			if t.combatTextPetGame == true then t.combatTextPetBy = "game" end
+			if t.ct_pet_Show == false then
+				t.combatTextPetBy, t.ct_pet_Show = "none", nil
+			end
+			t.combatTextNumbers, t.combatTextHideGame, t.combatTextPetGame = nil, nil, nil
+		end
+		Who(ns.db)
+		for _, saved in pairs(ns.db.profiles or {}) do
+			if type(saved) == "table" then
+				Who(saved)
+				Who(saved.settings)
+			end
+		end
+		for _, point in pairs(ns.db.profileResetPoints or {}) do Who(point) end
+		ns.db.combatTextWhoDrawsV1 = true
+	end
 end
 
 -- Runs them all, each on its own: an error is logged and reported (the

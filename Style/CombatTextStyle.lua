@@ -27,7 +27,9 @@ local _, ns = ...
 local DEFAULTS = ns.DEFAULTS
 DEFAULTS.combatTextStyle = false      -- the page's Enable Page
 DEFAULTS.combatTextNumbers = true     -- our numbers over nameplates
-DEFAULTS.combatTextHideGame = true    -- the game's damage and healing numbers off (its CVars) while the page is on
+DEFAULTS.combatTextDamageBy = "ours"  -- who draws your damage: "ours", "game" (the game's own) or "none"
+DEFAULTS.combatTextHealBy = "ours"    -- who draws your heals
+DEFAULTS.combatTextPetBy = "ours"     -- who draws your pet's damage
 DEFAULTS.combatTextFont = "game"      -- "game": the game's floating text font; else a Style font
 DEFAULTS.combatTextEdge = "game"      -- "game" (a drop shadow, as the game's), "both" (an edge too), "edge", "none"
 DEFAULTS.combatTextSize = 1           -- times the game's size (All texts' Size)
@@ -267,6 +269,7 @@ end
 local SLIDE = 0.15
 local ROOM_SPREAD = 1.7
 local function Rank(node, cast)
+	if node.pet then return 3 end -- (your pet's, crits too: never in the way of yours)
 	if node.crit then return 1 end
 	if node.word then return 4 end
 	if cast ~= nil or node.id == "ability" then return 2 end
@@ -497,6 +500,8 @@ end
 local GONE_Y = 60 -- (pixels above the screen's middle)
 -- (Our Last hit stays on screen off: they go, as they used to. The Kill
 -- text, which went there too, is gone since 2026-11-18: the player's call.)
+local GONE_WAIT = 0.06 -- (seconds a gone plate's numbers wait for it back: a fight's start, the same instant)
+local goneWait = {}  -- [plate] = { guid, at }: gone, its numbers waiting
 local function LetGo(plate)
 	local x, y
 	for index = #live, 1, -1 do
@@ -677,8 +682,15 @@ end
 -- melee: a swing (a physical hit, or a miss, dodge, parry...). id, via,
 -- tag: which text (Spawn). school: a spell's or heal's, to find its cast by
 -- (TakeCast); nil for one that never has one (a swing, a miss).
+-- (A hit drawn late, its plate back a moment on (TargetHit): matched to the
+-- log as of when it landed, so the wait doesn't leave it out.)
+local claimAt
 local function Claim(plate, unit, amount, id, via, melee, tag, school)
 	local hit = { plate, unit, amount, melee = melee, id = id, via = via, tag = tag, school = school }
+	-- (Your target as it landed: a pet's hit is checked a moment on, and a
+	-- target switched just after it (seen 2026-11-19) left an imp's out.)
+	local okTarget, onTarget = pcall(UnitIsUnit, unit, "target")
+	hit.onTarget = okTarget and Plain(onTarget) and onTarget and true or nil
 	local crit = NODE[id] and NODE[id].crit
 	local color = { 1, 1, 1 } -- (for the trace's "white" only)
 	if id ~= "swing" and id ~= "swingCrit" and id ~= "swingGlance" then color = CT.SPELL end
@@ -686,7 +698,7 @@ local function Claim(plate, unit, amount, id, via, melee, tag, school)
 		local cast = school and TakeCast(school, GetTime())
 		return Spawn(plate, unit, amount, id, via, nil, tag, nil, cast)
 	end
-	local now = GetTime()
+	local now = claimAt or GetTime()
 	if melee and swingAt == now and swingPlate == plate then
 		Trace(("hit %s (swing) goes with the swing before it"):format(TraceUnit(unit, color, crit)))
 		return Mine(hit)
@@ -701,11 +713,12 @@ local function Claim(plate, unit, amount, id, via, melee, tag, school)
 	ns.WakeFeatureLoop(holder)
 end
 
+local Unclaimed -- (below: a hit no line came for, your pet's or someone else's)
 local function OnLine()
 	local now = GetTime()
 	Fresh(owed, now)
 	if owed[1] then Trace("line for a heal on you") table.remove(owed, 1) return end -- (a heal on you, already here)
-	while pending[1] and now - pending[1].at > HOLD do table.remove(pending, 1) end
+	while pending[1] and now - pending[1].at > HOLD do Unclaimed(table.remove(pending, 1), now) end
 	if pending[1] then
 		Trace("line for a waiting hit")
 		local first = table.remove(pending, 1)
@@ -737,13 +750,80 @@ local function OnOwnHit(action)
 	if not took then owed[#owed + 1] = now end
 end
 
--- Hits held past HOLD with no line: someone else's.
+-- Your pet's hits (2026-11-19): no log line comes with them (a warlock's imp,
+-- recorded), so a hit held past HOLD with none is your pet's when you have
+-- one, it's on your target (as it landed) or your pet's, and it was physical
+-- (its swing) or came with one of your pet's casts just finished before it
+-- (a Firebolt, after its flight); its misses aren't shown. The rest: someone
+-- else's.
+local PET_WAIT = 2.5 -- (seconds a pet's finished cast waits for its hit)
+local petCasts = {}
+local petWatch = CreateFrame("Frame")
+pcall(petWatch.RegisterUnitEvent, petWatch, "UNIT_SPELLCAST_SUCCEEDED", "pet")
+petWatch:SetScript("OnEvent", function()
+	local now = GetTime()
+	while petCasts[1] and now - petCasts[1] > PET_WAIT do table.remove(petCasts, 1) end
+	if #petCasts < 6 then petCasts[#petCasts + 1] = now end
+end)
+local function PetHit(hit, now)
+	local node = NODE[hit.id]
+	if not node or node.word then return false end
+	-- (A heal is never your pet's: a groupmate's on a friend you target.)
+	if CT.Kind(hit.id) == "heal" then return false end
+	if ns.CombatTextBy and ns.CombatTextBy("pet") ~= "ours" then return false end -- (the game's draws them, or none show)
+	local function Is(a, b)
+		local ok, same = pcall(UnitIsUnit, a, b)
+		if not ok then return "error" end
+		if not Plain(same) then return "secret" end
+		return same and true or false
+	end
+	local okPet, has = pcall(UnitExists, "pet")
+	local pet = okPet and Plain(has) and has and true or false
+	-- (On your pet's target, or yours: the game may not say whom an imp is
+	-- casting at, and it casts at yours. A recording, 2026-11-19: every
+	-- Firebolt left out with the pet's target check alone.)
+	local petTarget, yourTarget = Is(hit[2], "pettarget"), hit.onTarget or Is(hit[2], "target")
+	while petCasts[1] and now - petCasts[1] > PET_WAIT do table.remove(petCasts, 1) end
+	local cast = petCasts[1] and true or false
+	local record = ns.combatTextRecord
+	if record then
+		record(("pet check: pet=%s on pet's target=%s on your target=%s physical=%s pet cast waiting=%s"):format(
+			tostring(pet), tostring(petTarget), tostring(yourTarget), tostring(hit.melee and true or false), tostring(cast)))
+	end
+	if not pet or not (petTarget == true or yourTarget == true) then return false end
+	-- (In a group, a groupmate's spell on your target looks the same: only
+	-- the pet's own target counts there.)
+	local grouped = (IsInGroup and IsInGroup()) or (IsInRaid and IsInRaid())
+	if grouped and petTarget ~= true then return false end
+	-- (A mob someone else pulled: their hits, never your pet's.)
+	local okTap, tapped = pcall(UnitIsTapDenied, hit[2])
+	if okTap and Plain(tapped) and tapped then return false end
+	-- (A swing: no cast comes before it, so it's your pet's only when it can't
+	-- be anyone else's: solo, on your target. In a group a groupmate's swing
+	-- looks the same, so none count there. The player's call, 2026-11-19: only
+	-- your own and your pet's numbers, ever.)
+	if hit.melee then return not grouped end
+	if cast then
+		table.remove(petCasts, 1)
+		return true
+	end
+	return false
+end
+-- A hit no line came for: your pet's, else someone else's (left out).
+Unclaimed = function(hit, now)
+	if hit[1] and hit[2] and PetHit(hit, now) then
+		Trace("PET'S: no line, on your pet's target")
+		local crit = NODE[hit.id] and NODE[hit.id].crit
+		return Spawn(hit[1], hit[2], hit[3], crit and "petCrit" or "pet", hit.via, nil, hit.tag)
+	end
+	ns.combatTextWhose.others = ns.combatTextWhose.others + 1
+	Trace("LEFT OUT")
+	traceDue = traceDue or now + 1
+end
+-- Hits held past HOLD with no line: your pet's, or someone else's.
 local function DropUnclaimed(now)
 	while pending[1] and now - pending[1].at > HOLD do
-		table.remove(pending, 1)
-		ns.combatTextWhose.others = ns.combatTextWhose.others + 1
-		Trace("LEFT OUT")
-		traceDue = traceDue or now + 1
+		Unclaimed(table.remove(pending, 1), now)
 	end
 end
 
@@ -766,28 +846,62 @@ local function KeepLog()
 	end
 end
 
--- The game's own damage and healing numbers off while the page is on (its
--- Turn off tick): their CVars, at once, yours put back as the page goes off.
--- (Not its XP: no CVar has it; that's Hide all, the blank font.)
-local GAME_NUMBERS = ns.CVarSet("Game's damage numbers off", "Combat Text Style (combatTextHideGame)", {
-	playerWins = true,
-	values = {
-		floatingCombatTextCombatDamage = "0",
-		floatingCombatTextCombatHealing = "0",
-		floatingCombatTextPetMeleeDamage = "0",
-		floatingCombatTextPetSpellDamage = "0",
-		floatingCombatTextCombatDamage_v2 = "0",
-		floatingCombatTextCombatHealing_v2 = "0",
-		floatingCombatTextPetMeleeDamage_v2 = "0",
-		floatingCombatTextPetSpellDamage_v2 = "0",
-	},
-})
-
-ns.COMBAT_TEXT_GAME_NUMBERS = GAME_NUMBERS -- (Core.lua lets go at logout)
+-- Who draws each kind of number (the General tab's table, 2026-11-19): ours,
+-- the game's or none, for your damage, your heals and your pet's. The game's
+-- own numbers are its CVars: off while a row is ours or none, on while it's
+-- the game's (on even if yours had them off), yours put back as the page goes
+-- off and at logout. (Not its XP: no CVar has it; that's the XP row, the
+-- blank font, which hides all the game's numbers with it.)
+local GAME_CVARS = {
+	damage = { "floatingCombatTextCombatDamage", "floatingCombatTextCombatDamage_v2" },
+	heal = { "floatingCombatTextCombatHealing", "floatingCombatTextCombatHealing_v2" },
+	pet = { "floatingCombatTextPetMeleeDamage", "floatingCombatTextPetSpellDamage",
+		"floatingCombatTextPetMeleeDamage_v2", "floatingCombatTextPetSpellDamage_v2" },
+}
+local BY_KEY = { damage = "combatTextDamageBy", heal = "combatTextHealBy", pet = "combatTextPetBy" }
+local GAME_SETS = {}
+for kind, cvars in pairs(GAME_CVARS) do
+	local function Values(value)
+		local values = {}
+		for _, cvar in ipairs(cvars) do values[cvar] = value end
+		return values
+	end
+	GAME_SETS[kind] = {
+		off = ns.CVarSet("Game's " .. kind .. " numbers off", "Combat Text Style (" .. BY_KEY[kind] .. ")",
+			{ playerWins = true, values = Values("0") }),
+		on = ns.CVarSet("Game's " .. kind .. " numbers on", "Combat Text Style (" .. BY_KEY[kind] .. ": the game's)",
+			{ playerWins = true, values = Values("1") }),
+	}
+end
+local GAME_NUMBERS = GAME_SETS.damage.off
+ns.COMBAT_TEXT_GAME_NUMBERS = GAME_NUMBERS -- (Core.lua lets go at logout; the rest, below)
+local letGo = CreateFrame("Frame")
+letGo:RegisterEvent("PLAYER_LOGOUT")
+letGo:SetScript("OnEvent", function()
+	for _, sets in pairs(GAME_SETS) do
+		pcall(ns.ApplyCVarSet, sets.off, false)
+		pcall(ns.ApplyCVarSet, sets.on, false)
+	end
+end)
+-- Who draws a kind: "ours", "game" or "none". Your pet's can be "group"
+-- (the user's ask, 2026-11-19): ours alone, the game's in a group or raid.
+local function By(kind)
+	local value = Value(BY_KEY[kind])
+	if value == "group" and kind == "pet" then
+		return ((IsInGroup and IsInGroup()) or (IsInRaid and IsInRaid())) and "game" or "ours"
+	end
+	return (value == "game" or value == "none") and value or "ours"
+end
+ns.CombatTextBy = By
 
 -- After a setting changes (the page), and every two seconds.
 function ns.RefreshCombatTextStyle()
-	ns.ApplyCVarSet(GAME_NUMBERS, (PageOn() and ns.db.combatTextHideGame) and true or false)
+	local on = PageOn()
+	for kind, sets in pairs(GAME_SETS) do
+		local by = By(kind)
+		ns.ApplyCVarSet(sets.off, on and by ~= "game")
+		ns.ApplyCVarSet(sets.on, on and by == "game")
+	end
 	KeepLog()
 	TraceFlush()
 	if not On() then
@@ -795,6 +909,14 @@ function ns.RefreshCombatTextStyle()
 		wipe(pending)
 	end
 end
+
+-- (Your pet's "group": joining or leaving one switches the game's pet
+-- numbers at once, not at the next two-second refresh.)
+local groupWatch = CreateFrame("Frame")
+groupWatch:RegisterEvent("GROUP_ROSTER_UPDATE")
+groupWatch:SetScript("OnEvent", function()
+	if Value(BY_KEY.pet) == "group" then ns.RefreshCombatTextStyle() end
+end)
 
 ns.FeatureLoop(holder, function(...)
 	DropUnclaimed(GetTime())
@@ -917,8 +1039,14 @@ local function TakeLongCast(now)
 	return false
 end
 local function Physical(then_)
-	local at = GetTime()
-	C_Timer.After(0, function() then_(castAt == at) end)
+	local held = claimAt
+	local at = held or GetTime()
+	C_Timer.After(0, function()
+		local was = claimAt
+		claimAt = held
+		then_(castAt == at)
+		claimAt = was
+	end)
 end
 
 -- A hit's text: a swing's (glancing or not), an ability's, or a spell's by
@@ -942,20 +1070,36 @@ local function CritText(hit)
 end
 
 local flagsSeen = {}
-local function OnHit(unit, action, flag, amount, school)
+-- A hit's kind, school and flag as one key (the plate's and your target's
+-- copy of one hit share it: TargetHit).
+local function HitKey(action, flag, school)
+	return tostring(action) .. "/" .. (Plain(school) and tostring(school) or "?") .. "/" .. (Plain(flag) and tostring(flag) or "?")
+end
+local targetHits = {} -- [hit key] = when your target's plate had it
+-- spot: a hit on your target with no plate at all (a critter, which the
+-- game gives none: seen 2026-11-19, a Rabbit), { plate = where it's drawn,
+-- enemy = whether it was one as it was hit }.
+local function OnHit(unit, action, flag, amount, school, spot)
 	local record = ns.combatTextRecord
 	if not On() or not Plain(unit) or not Plain(action) then
 		if record then record("plate hit skipped: numbers off, or a secret unit or kind") end
 		return
 	end
-	local get = C_NamePlate and C_NamePlate.GetNamePlateForUnit
-	local ok, plate = pcall(get or error, unit)
-	if not ok or not plate or (plate.IsForbidden and plate:IsForbidden()) then
-		if record then record(("plate hit %s %s skipped: no plate, or locked"):format(unit, action)) end
-		return
+	local plate = spot and spot.plate
+	if not plate then
+		local get = C_NamePlate and C_NamePlate.GetNamePlateForUnit
+		local ok
+		ok, plate = pcall(get or error, unit)
+		if not ok or not plate or (plate.IsForbidden and plate:IsForbidden()) then
+			if record then record(("plate hit %s %s skipped: no plate, or locked"):format(unit, action)) end
+			return
+		end
 	end
+	local okTarget, isTarget = pcall(UnitIsUnit, unit, "target")
+	if okTarget and Plain(isTarget) and isTarget then targetHits[HitKey(action, flag, school)] = GetTime() end
 	local okEnemy, enemy = pcall(UnitCanAttack, "player", unit)
 	enemy = okEnemy and Plain(enemy) and enemy
+	if spot then enemy = spot.enemy end
 	if not Wanted(unit, enemy) then
 		if record then record(("plate hit %s %s skipped: no combat log, in a group, not your target"):format(unit, action)) end
 		return
@@ -1048,6 +1192,75 @@ driver:SetScript("OnEvent", ns.Profiled("Combat text plates", function(_, event,
 		local loaded = C_AddOns and C_AddOns.IsAddOnLoaded or IsAddOnLoaded
 		ns.combatTextBlocked = loaded and loaded("ForeverCombatText") and "ForeverCombatText" or nil
 		for i = 1, 40 do Listen("nameplate" .. i) end
+		-- Your target's hits too, for one that came with no plate hit: as a
+		-- fight starts the game takes every plate away and brings it back in
+		-- the same instant, and a hit landing then (a pull's Immolate, seen
+		-- 2026-11-19) came for your target alone. A frame on, its plate back:
+		-- drawn there, unless the plate had it after all.
+		local onTarget = CreateFrame("Frame")
+		if pcall(onTarget.RegisterUnitEvent, onTarget, "UNIT_COMBAT", "target") then
+			-- (No plate at all, a critter's: drawn where a dying mob's last hit
+			-- goes, above the screen's middle; the game says nowhere else.)
+			local noPlate = CreateFrame("Frame", nil, holder)
+			noPlate:SetSize(1, 1)
+			noPlate:SetPoint("CENTER", holder, "CENTER", 0, GONE_Y)
+			onTarget:SetScript("OnEvent", ns.Profiled("Combat text", function(_, _, _, action, flag, amount, school)
+				if not On() or not Plain(action) then return end
+				-- (You as your target: your own hits' listener has those.)
+				local okSelf, isSelf = pcall(UnitIsUnit, "target", "player")
+				if okSelf and Plain(isSelf) and isSelf then return end
+				local at, key = GetTime(), HitKey(action, flag, school)
+				-- (Whether it's an enemy as it's hit, and which mob: a critter killed
+				-- by it is gone a frame on, and you may switch target meanwhile.)
+				local okEnemy, enemy = pcall(UnitCanAttack, "player", "target")
+				enemy = okEnemy and Plain(enemy) and enemy and true or false
+				local okGuid, guid = pcall(UnitGUID, "target")
+				guid = okGuid and Plain(guid) and guid or nil
+				-- (Its own plate, looked for again and again: at a pull it can take
+				-- more than a frame to come back, and the first hit went above the
+				-- screen's middle, 2026-11-19. Only after 0.4 s with none, there.)
+				local tries = 0
+				local function Late(hitUnit, spot)
+					claimAt = at
+					local ok, why = pcall(OnHit, hitUnit, action, flag, amount, school, spot)
+					claimAt = nil
+					if not ok then geterrorhandler()(why) end
+				end
+				local function Try()
+					if targetHits[key] == at then return end
+					local record = ns.combatTextRecord
+					for i = 1, 40 do
+						local plateUnit = "nameplate" .. i
+						local same
+						if guid then
+							local okSame, its = pcall(UnitGUID, plateUnit)
+							same = okSame and Plain(its) and its == guid
+						else
+							local okSame, isIt = pcall(UnitIsUnit, plateUnit, "target")
+							same = okSame and Plain(isIt) and isIt
+						end
+						if same then
+							if record then
+								record(("hit on your target came with no plate hit: drawn on %s, its plate back after %.2f s")
+									:format(plateUnit, GetTime() - at))
+							end
+							return Late(plateUnit)
+						end
+					end
+					tries = tries + 1
+					if tries < 8 then return C_Timer.After(0.05, Try) end
+					-- (Only an enemy's, a critter's: a friend you target has no plate
+					-- with friendly plates off, and its heals aren't drawn mid-screen.)
+					if not enemy then
+						if record then record("hit on your target came with no plate hit, none came in 0.4 s, not an enemy: left out") end
+						return
+					end
+					if record then record("hit on your target came with no plate hit, and none came in 0.4 s: drawn above the screen's middle") end
+					Late("target", { plate = noPlate, enemy = enemy })
+				end
+				C_Timer.After(0, Try)
+			end))
+		end
 		-- Whose hit: the log's lines, and the hits on you and your pet that own theirs.
 		local log = CreateFrame("Frame")
 		logListening = pcall(log.RegisterEvent, log, "COMBAT_LOG_MESSAGE")
@@ -1064,14 +1277,56 @@ driver:SetScript("OnEvent", ns.Profiled("Combat text plates", function(_, event,
 		return
 	end
 	if not Plain(unit) then return end
+	-- A plate going isn't always its mob gone: as a fight starts the game takes
+	-- every plate away and brings it back in the same instant, and a pull's
+	-- Immolate crit, drawn on its plate, was moved above the screen's middle
+	-- (2026-11-19). So its numbers wait GONE_WAIT for the same mob's plate:
+	-- back, they go on it; not, they're let go (a kill).
+	local get = C_NamePlate and C_NamePlate.GetNamePlateForUnit
+	local okGuid, guid = pcall(UnitGUID, unit)
+	guid = okGuid and Plain(guid) and guid or nil
 	if event == "NAME_PLATE_UNIT_ADDED" then
 		Listen(unit)
-	elseif event == "NAME_PLATE_UNIT_REMOVED" then
-		local get = C_NamePlate and C_NamePlate.GetNamePlateForUnit
 		local ok, plate = pcall(get or error, unit)
-		if ok and plate then
+		-- (The game reuses plates: this one, gone a moment ago for another mob,
+		-- lets that mob's numbers go now, before this one's hits come.)
+		local before = ok and plate and goneWait[plate]
+		if before and before.guid ~= guid then
+			goneWait[plate] = nil
 			LetGo(plate)
 		end
+		if not guid then return end
+		for old, went in pairs(goneWait) do
+			if went.guid == guid then
+				goneWait[old] = nil
+				if ok and plate then
+					local moved = 0
+					for _, number in ipairs(live) do
+						if number.plate == old then
+							number.plate, number.unit, number.anchor = plate, unit, plate
+							moved = moved + 1
+						end
+					end
+					local record = ns.combatTextRecord
+					if record and moved > 0 then record(("its plate came back: %d number(s) stay on it"):format(moved)) end
+				else
+					LetGo(old)
+				end
+			end
+		end
+	elseif event == "NAME_PLATE_UNIT_REMOVED" then
+		local ok, plate = pcall(get or error, unit)
+		if not (ok and plate) then return end
+		if not guid then return LetGo(plate) end
+		local at = GetTime()
+		goneWait[plate] = { guid = guid, at = at }
+		C_Timer.After(GONE_WAIT, function()
+			local went = goneWait[plate]
+			if went and went.at == at then
+				goneWait[plate] = nil
+				LetGo(plate)
+			end
+		end)
 	end
 end))
 
@@ -1080,7 +1335,7 @@ function ns.CombatTextStateLine()
 	local db = ns.db
 	local parts = {}
 	for _, key in ipairs({ "styleGeneral", "combatTextStyle", "combatTextNumbers", "combatTextFont", "combatTextEdge",
-		"combatTextSize", "combatTextHideGame", "hideWorldText" }) do
+		"combatTextSize", "combatTextDamageBy", "combatTextHealBy", "combatTextPetBy", "hideWorldText" }) do
 		parts[#parts + 1] = key .. "=" .. tostring(db[key])
 	end
 	-- (And every text turned off, and those with anything of their own.)
@@ -1123,7 +1378,7 @@ end
 -- the text itself if it's one the game sends (a crit through its group's
 -- first hit, a miss with a swing).
 -- layer: the frame to draw it in (Spawn).
-local SAMPLE_VIA = { swingCrit = "swing", spellCrit = "spellNature", healCrit = "heal" }
+local SAMPLE_VIA = { swingCrit = "swing", spellCrit = "spellNature", healCrit = "heal", pet = "swing", petCrit = "spellFire" }
 -- cast: its spell's cast in seconds (a long cast's bigger, CastSize).
 function ns.CombatTextSample(frame, id, layer, via, cast)
 	local node = NODE[id]

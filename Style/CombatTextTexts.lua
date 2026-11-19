@@ -96,6 +96,13 @@ local NODES = {
 		sample = "46", damage = true },
 	{ id = "spellMiss", parent = "spell", label = "Misses", tip = "Spells and abilities that didn't land, in the game's words.",
 		misses = true },
+	-- (Your pet's hits, 2026-11-19: smaller than yours to start, each in its
+	-- hit's color (a swing's white, a Firebolt's Fire), as viaGroup: its look
+	-- first, then the hit's.)
+	{ id = "pet", parent = "damage", label = "Your pet", tip = "Your pet's hits, smaller than yours.",
+		own = { Text = { Size = 0.7 } }, pet = true, viaGroup = true, sample = "9", damage = true },
+	{ id = "petCrit", parent = "pet", label = "Pet crits", tip = "Your pet's crits.", crit = true, critOf = "pet",
+		pet = true, sample = "18", damage = true },
 	{ id = "heal", parent = "all", label = "Heals", tip = "Your heals on friendly nameplates.",
 		own = { Color = Color(HEAL) }, theme = "heal", sample = "18" },
 	{ id = "healCrit", parent = "heal", label = "Heal crits", tip = "Your heals' crits.", crit = true, sample = "37" },
@@ -140,7 +147,7 @@ local NODE = {}
 for index, node in ipairs(NODES) do
 	node.index = index
 	NODE[node.id] = node
-	if node.crit and not node.critOf then node.own = { Place = CRIT_PLACE, Motion = CRIT_MOTION } end
+	if node.crit and (not node.critOf or node.pet) then node.own = { Place = CRIT_PLACE, Motion = CRIT_MOTION } end
 	if node.misses then node.own = { Place = { Y = 0, X = 0, Start = "name" } } end
 end
 CT.NODE = NODE
@@ -219,7 +226,7 @@ end
 -- its own parent; a school's crit row: its own hit, critOf).
 local function Parent(id, via)
 	local node = NODE[id]
-	if node.crit and not node.critOf and via and NODE[via] then return via end
+	if (node.crit or node.viaGroup) and not node.critOf and via and via ~= id and NODE[via] then return via end
 	return node.parent
 end
 CT.Parent = Parent
@@ -228,7 +235,7 @@ CT.Parent = Parent
 local function Up(step, via)
 	local node = NODE[step]
 	local up = Parent(step, via)
-	if node.crit and not node.critOf then via = nil end
+	if (node.crit or node.viaGroup) and not node.critOf then via = nil end
 	return up, via
 end
 -- Gives the value and the text it's from ("all" for All texts').
@@ -294,9 +301,31 @@ local function SwitchOn(key, sample)
 	if value == nil then value = DEFAULTS[key] end
 	return value ~= false
 end
+-- Which row of the General tab's Who draws the numbers a text is under:
+-- your pet's, your heals or your damage (misses with it).
+local function Kind(id)
+	local step = id
+	for _ = 1, 12 do
+		local node = NODE[step]
+		if not node then break end
+		if node.pet then return "pet" end
+		if step == "heal" then return "heal" end
+		if step == "damage" then return "damage" end
+		step = node.parent
+	end
+	return "damage"
+end
+CT.Kind = Kind
+local BY_KEY = { damage = "combatTextDamageBy", heal = "combatTextHealBy", pet = "combatTextPetBy" }
+CT.BY_KEY = BY_KEY
 function CT.Shows(id, _, sample) -- (_: the hit, unused: a crit has its own switch)
 	local db = ns.db
 	if not db or db[TEXTS_TAB] == false then return false end
+	-- (Its row drawn by the game, or none: not ours. The preview plays them all.)
+	-- (ns.CombatTextBy: your pet's "group" is ours alone, the game's in a group.)
+	local kind = id ~= "all" and Kind(id)
+	local by = kind and (ns.CombatTextBy and ns.CombatTextBy(kind) or Value(BY_KEY[kind]) or "ours")
+	if not sample and kind and by ~= "ours" then return false end
 	if not SwitchOn(Key(id, "Show"), sample) then return false end
 	local child, step = NODE[id], NODE[id].parent
 	for _ = 1, 10 do

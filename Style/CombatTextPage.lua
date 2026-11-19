@@ -18,7 +18,7 @@ local CT = ns.CombatTexts
 local MIX = { { 0, "spellFire", nil, 2.5 }, { 0.35, "swing" }, { 0.7, "spellFrost", nil, 0 },
 	{ 1.0, "spellCrit", "spellFire", 2.5 }, { 1.02, "swing" }, { 1.05, "spellShadow" },
 	{ 1.35, "spellShadow" }, { 1.7, "swingCrit" }, { 2.0, "spellArcane" }, { 2.3, "ability" }, { 2.6, "spellNature" },
-	{ 2.85, "missDodge" }, { 3.1, "spellHoly" }, { 3.4, "spellMissResist" } }
+	{ 2.45, "pet" }, { 2.85, "missDodge" }, { 3.1, "spellHoly" }, { 3.4, "spellMissResist" } }
 local HEALS = { { 0, "heal", nil, 2.5 }, { 0.6, "heal", nil, 0 }, { 1.2, "healCrit", nil, 1.5 }, { 2.0, "heal" },
 	{ 2.05, "heal" } }
 local CRIT_WITH = { swing = "swingCrit", ability = "spellCrit", spell = "spellCrit", heal = "healCrit" }
@@ -204,20 +204,29 @@ function ns.CreateCombatTextStylePanel(kit)
 	end
 
 	-- General ------------------------------------------------------------------
-	-- What a new player asks, in order (2026-11-18, the player's call): is it
-	-- on, and the game's own numbers, which ours stand in for. How they look
-	-- (a look to start from, then each text): the Look tab.
-	local general = stack:Header(content, L["Show"])
-	rows.Check("combatTextNumbers", L["Show your damage and healing over nameplates"],
-		L["Your own hits and heals; your pet's count as yours, the game doesn't say which of you hit."])
-
-	stack:Header(content, L["The game's own numbers"])
-	rows.Check("combatTextHideGame", L["Hide the game's damage and healing numbers"],
-		L["So you don't see both: the game's and ours."])
-	local allLabel = L["Hide all the game's floating text, XP too"]
-	local all = rows.Check("hideWorldText", allLabel,
-		L["Hides all the game's floating text, XP too; needs a full game restart."])
-	-- (Its label adds a reminder while the tick isn't what the game draws yet.)
+	-- Who draws the numbers (2026-11-19, the player's design): a row for each
+	-- kind, your damage, your heals, your pet's, and the game's XP, each ours,
+	-- the game's own or none. Your pet's has a note: in a group ours show only
+	-- its spells (its swings look the same as your group's). XP none blanks
+	-- the game's font, so its numbers go too: The game's leaves the other rows
+	-- while it's set, and picking it with a row on The game's asks first.
+	-- How ours look: the Look tab.
+	local general = stack:Header(content, L["Who draws the numbers"])
+	stack:Note(content, L["Ours follow the Look tab. The game's are the game's own, as it draws them."], 560)
+	-- (group: your pet's fourth cell, Game's in groups, 110 wide; the row
+	-- ends at 620, inside the page's 600-plus width.)
+	local COL = { ours = 210, game = 310, none = 410, group = 510 }
+	local head = CreateFrame("Frame", nil, content)
+	head:SetSize(600, 16)
+	stack:Add(head, "label")
+	for column, words in pairs({ ours = L["Ours"], game = L["The game's"], none = L["None"] }) do
+		local label = kit.Label(head, "GameFontDisableSmall", words)
+		label:SetPoint("CENTER", head, "LEFT", COL[column] + 48, 0) -- (over its column's buttons, 96 wide)
+		label.searchSkip = true
+	end
+	local function GetDB() return ns.GetDB() or {} end
+	local function XpHidden() return GetDB().hideWorldText and true or false end
+	-- (The XP row's restart: the tick isn't what the game draws yet.)
 	local function RestartPending()
 		local db = ns.db or {}
 		local wanted = db.hideWorldText and db.combatTextStyle and db.styleGeneral ~= false and true or false
@@ -225,25 +234,178 @@ function ns.CreateCombatTextStylePanel(kit)
 		if live == nil then live = ns.blankWorldFont ~= nil end
 		return wanted ~= live
 	end
-	local allRefresh = all.Refresh
-	all.Refresh = function(self, ...)
-		if allRefresh then allRefresh(self, ...) end
-		local text = self.Text or self.text
-		if text then
-			text:SetText(RestartPending()
-				and allLabel .. " |cffff8040" .. L["(restart the game to apply)"] .. "|r" or allLabel)
+	local function Applied()
+		Changed()
+		if ns.RefreshCombatTextStyle then ns.RefreshCombatTextStyle() end
+		kit.Refresh()
+	end
+	-- A choice in a row: a segment, as the Quick settings' (picked: warmer,
+	-- gold words, a gold line under), at its column; usable() false: greyed,
+	-- offTip saying why (the user's ask, 2026-11-19: The game's greyed while
+	-- XP is None, not gone).
+	local function Cell(line, words, column, tip, click, lit, usable, offTip, width)
+		local button = CreateFrame("Button", nil, line)
+		local back = button:CreateTexture(nil, "BACKGROUND")
+		back:SetAllPoints()
+		local under = button:CreateTexture(nil, "ARTWORK")
+		under:SetPoint("BOTTOMLEFT")
+		under:SetPoint("BOTTOMRIGHT")
+		under:SetHeight(2)
+		under:SetColorTexture(1, 0.82, 0, 1)
+		local glow = button:CreateTexture(nil, "HIGHLIGHT")
+		glow:SetAllPoints()
+		glow:SetColorTexture(1, 1, 1, 0.07)
+		local text = button:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+		text:SetPoint("CENTER", 0, 1)
+		text:SetText(words)
+		button:SetSize(width or 96, 22)
+		-- (Words wider than the cell: the small font, the words set again after
+		-- it: a font changed under set words shows boxes for Russian.)
+		if text:GetStringWidth() > (width or 96) - 8 then
+			text:SetFontObject("GameFontHighlightSmall")
+			text:SetText(words)
+		end
+		button:SetPoint("LEFT", line, "LEFT", COL[column], 0)
+		button.searchLabel = words
+		kit.Tooltip(button, tip)
+		button:SetScript("OnEnable", function(self) self:SetAlpha(1) end)
+		button:SetScript("OnDisable", function(self) self:SetAlpha(0.4) end)
+		button:SetScript("OnClick", click)
+		button.Refresh = function(self)
+			local can = not usable or usable()
+			self.liveTip = not can and offTip or nil
+			local on = lit()
+			back:SetColorTexture(on and 0.2 or 0.1, on and 0.17 or 0.1, on and 0.08 or 0.12, 0.95)
+			under:SetShown(on)
+			if on then text:SetTextColor(1, 0.82, 0) else text:SetTextColor(0.85, 0.85, 0.85) end
+			self:SetEnabled(can and rows.On(GetDB()) and true or false)
+		end
+		kit.AddControl(button)
+		return button
+	end
+	-- A note under a row, from the Ours column, in its color.
+	local function RowNote(r, g, b)
+		local holder = CreateFrame("Frame", nil, content)
+		holder:SetSize(600, 30)
+		stack:Add(holder, "label")
+		local note = holder:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+		note:SetPoint("TOPLEFT", holder, "TOPLEFT", COL.ours, 0)
+		note:SetWidth(330)
+		note:SetJustifyH("LEFT")
+		note:SetTextColor(r, g, b)
+		note.searchSkip = true
+		return holder, note
+	end
+	local WHO = {
+		{ "combatTextDamageBy", L["Your damage"], L["Your hits on enemies."] },
+		{ "combatTextHealBy", L["Your heals"], L["Your heals on friendly nameplates."] },
+		{ "combatTextPetBy", L["Your pet's damage"], L["Your pet's hits on enemies."], pet = true },
+	}
+	-- (The setting as saved: your pet's "group" stays "group" here.)
+	local function By(key)
+		local value = GetDB()[key]
+		if value == "group" and key == "combatTextPetBy" then return value end
+		return (value == "game" or value == "none") and value or "ours"
+	end
+	-- (A row on The game's, or Game's in groups: hiding XP would blank them.)
+	local function UsesGame(key) local by = By(key) return by == "game" or by == "group" end
+	for _, row in ipairs(WHO) do
+		local key = row[1]
+		local line = CreateFrame("Frame", nil, content)
+		line:SetSize(620, 26)
+		line.settingKey = key -- (/cine find)
+		stack:Add(line, "label")
+		local name = kit.Label(line, "GameFontHighlight", row[2])
+		name:SetPoint("LEFT", line, "LEFT", 0, 0)
+		kit.Tooltip(line, row[3])
+		if row.pet then
+			-- (Its own tooltip: what the warning is, 2026-11-19.)
+			local warn = CreateFrame("Frame", nil, line)
+			warn:SetSize(16, 16)
+			warn:SetPoint("LEFT", name, "RIGHT", 6, 0)
+			warn:EnableMouse(true)
+			local icon = warn:CreateTexture(nil, "OVERLAY")
+			icon:SetAllPoints()
+			icon:SetTexture("Interface\\DialogFrame\\UI-Dialog-Icon-AlertNew")
+			kit.Tooltip(warn, L["In a group, ours show only your pet's spells, not its swings."])
+		end
+		local function Pick(value) return function() GetDB()[key] = value Applied() end end
+		Cell(line, L["Ours"], "ours", L["Ours, in the Look tab's look."], Pick("ours"),
+			function() return By(key) == "ours" end)
+		Cell(line, L["The game's"], "game", L["The game's own numbers, as it draws them."], Pick("game"),
+			function() return By(key) == "game" end, function() return not XpHidden() end,
+			L["Set XP and other floating text to The game's first: with it on None the game draws none of its numbers."])
+		Cell(line, L["None"], "none", L["No numbers for these."], Pick("none"),
+			function() return By(key) == "none" end)
+		if row.pet then
+			Cell(line, L["Game's in groups"], "group",
+				L["Ours when you're on your own; the game's own, every pet hit, in a group or raid."], Pick("group"),
+				function() return By(key) == "group" end, function() return not XpHidden() end,
+				L["Set XP and other floating text to The game's first: with it on None the game draws none of its numbers."], 110)
+			local holder, note = RowNote(1, 0.83, 0.62)
+			holder.Refresh = function()
+				local grouped = (IsInGroup and IsInGroup()) or (IsInRaid and IsInRaid())
+				note:SetText(grouped and L["You're in a group: only your pet's spells show now. Its swings look the same as your group's."]
+					or L["In a group, ours show only your pet's spells: its swings look the same as your group's. The game's shows every pet hit, in its own look."])
+				note:SetShown(By(key) == "ours")
+			end
+			kit.AddControl(holder)
 		end
 	end
-	-- (The restart warning only when it takes one: back to what the game
-	-- draws already, it closes any warning still up instead.)
-	all:HookScript("OnClick", function(self)
-		self:Refresh()
+	-- The XP row: the game's floating text (XP gained, and all its numbers
+	-- with it: one font), shown or none. None asks first while a row is on
+	-- The game's: those would draw nothing.
+	local function SetXpHidden(hidden)
+		GetDB().hideWorldText = hidden
+		Applied()
+		if RestartPending() then StaticPopup_Show("CINEMATIC_WORLD_TEXT_RESTART") else StaticPopup_Hide("CINEMATIC_WORLD_TEXT_RESTART") end
+	end
+	StaticPopupDialogs.CINEMATIC_CT_XP_CONFLICT = {
+		text = L["Hiding XP hides all the game's floating text, so these would show nothing: %s."],
+		button1 = L["Switch them to ours"], button2 = CANCEL or L["Cancel"],
+		OnAccept = function()
+			for _, row in ipairs(WHO) do
+				if UsesGame(row[1]) then GetDB()[row[1]] = "ours" end
+			end
+			SetXpHidden(true)
+		end,
+		timeout = 0, whileDead = true, hideOnEscape = true, preferredIndex = 3,
+	}
+	local xp = CreateFrame("Frame", nil, content)
+	xp:SetSize(600, 26)
+	xp.settingKey = "hideWorldText" -- (/cine find)
+	stack:Add(xp, "label")
+	local xpName = kit.Label(xp, "GameFontHighlight", L["XP and other floating text"])
+	xpName:SetPoint("LEFT", xp, "LEFT", 0, 0)
+	Cell(xp, L["The game's"], "game", L["The game's floating text: XP gained and the rest."],
+		function() SetXpHidden(false) end, function() return not XpHidden() end)
+	Cell(xp, L["None"], "none", L["Hides all the game's floating text, its numbers too; needs a full game restart."],
+		function()
+			if XpHidden() then return end
+			local using = {}
+			for _, row in ipairs(WHO) do
+				if UsesGame(row[1]) then using[#using + 1] = row[2] end
+			end
+			if using[1] then
+				StaticPopup_Show("CINEMATIC_CT_XP_CONFLICT", table.concat(using, ", "))
+			else
+				SetXpHidden(true)
+			end
+		end, function() return XpHidden() end)
+	local xpHolder, xpNote = RowNote(0.62, 0.62, 0.62)
+	xpHolder.Refresh = function()
 		if RestartPending() then
-			StaticPopup_Show("CINEMATIC_WORLD_TEXT_RESTART")
+			xpNote:SetTextColor(1, 0.55, 0.25)
+			xpNote:SetText(XpHidden()
+				and L["Restart the game to apply. With it hidden the game draws none of its numbers, so The game's is greyed in the rows above."]
+				or L["Restart the game to apply: until then the game's floating text stays hidden."])
 		else
-			StaticPopup_Hide("CINEMATIC_WORLD_TEXT_RESTART")
+			xpNote:SetTextColor(0.62, 0.62, 0.62)
+			xpNote:SetText(XpHidden() and L["With it hidden the game draws none of its numbers, so The game's is greyed in the rows above."]
+				or L["None hides all of the game's floating text, its numbers too, and takes a game restart."])
 		end
-	end)
+	end
+	kit.AddControl(xpHolder)
 	Into(1, general)
 
 	-- Texts ----------------------------------------------------------------------
@@ -267,8 +429,11 @@ function ns.CreateCombatTextStylePanel(kit)
 	local HITS = { "swing", "swingGlance", "ability", "spell", "heal" }
 	local CRITS = { "swingCrit", "spellCrit", "healCrit" }
 	local SWINGS = { swing = true, swingCrit = true, miss = true } -- (No swings: what it turns off)
+	-- (Your pet's rows aren't in Shows: their own row, Pet hits.)
 	local function AllShow()
-		for _, node in ipairs(CT.NODES) do Set(node.id, "Show", nil) end
+		for _, node in ipairs(CT.NODES) do
+			if not node.pet then Set(node.id, "Show", nil) end
+		end
 	end
 	local function Schools(color)
 		for _, node in ipairs(CT.NODES) do
@@ -290,6 +455,12 @@ function ns.CreateCombatTextStylePanel(kit)
 		CT.Field("all", setting).set(on and 0.75 or ns.DEFAULTS[CT.Key("all", setting)])
 	end
 	local function ScaleIs(setting, value) return CT.Get("all", setting) == value end
+	-- (Pet hits: how big ours are. Who draws them, the game or none: the
+	-- General tab's Your pet's damage.)
+	local function PetOurs() return (ns.CombatTextBy and ns.CombatTextBy("pet") or "ours") == "ours" end
+	local function PetAs(size)
+		CT.Field("pet", "Size").set(size or (CT.Usual("pet", "Size")))
+	end
 	local function PlaceAs(value) ns.GetDB()[CT.Key("all", "Together")] = value end
 	local function PlaceIs(value) return (CT.Value(CT.Key("all", "Together")) or "side") == value end
 	-- By hit kind (2026-11-18): swings smaller (or shorter), spells and heals
@@ -320,7 +491,7 @@ function ns.CreateCombatTextStylePanel(kit)
 		} },
 		{ L["Shows"], {
 			{ L["Everything"], L["Every text on."], AllShow, function()
-				for _, node in ipairs(CT.NODES) do if ShowsOff(node.id) then return false end end
+				for _, node in ipairs(CT.NODES) do if not node.pet and ShowsOff(node.id) then return false end end
 				return true
 			end, L["Every text is on."], {} },
 			{ L["Crits and misses"], L["Only your crits and misses; plain hits and heals off."], function()
@@ -337,7 +508,7 @@ function ns.CreateCombatTextStylePanel(kit)
 				for id in pairs(SWINGS) do Set(id, "Show", false) end
 			end, function()
 				for _, node in ipairs(CT.NODES) do
-					if ShowsOff(node.id) ~= (SWINGS[node.id] or false) then return false end
+					if not node.pet and ShowsOff(node.id) ~= (SWINGS[node.id] or false) then return false end
 				end
 				return true
 			end, L["Swings and swing crits are off: switch them back in the table."], { "damage", "swing" } },
@@ -352,6 +523,13 @@ function ns.CreateCombatTextStylePanel(kit)
 				function() return PlaceIs("top") end, "", {} },
 			{ L["Make room"], L["Crits and your casts in the middle; the rest move aside."], function() PlaceAs("room") end,
 				function() return PlaceIs("room") end, "", {} },
+		} },
+		-- (Pet hits, 2026-11-19: small to start, or as big as yours.)
+		{ L["Pet hits"], {
+			{ L["Small"], L["Your pet's hits smaller than yours."], function() PetAs(nil) end,
+				function() return PetOurs() and CT.Get("pet", "Size") == 0.7 end, "", { "damage", "pet" } },
+			{ L["Same as yours"], L["Your pet's hits as big as yours."], function() PetAs(1) end,
+				function() return PetOurs() and CT.Get("pet", "Size") == 1 end, "", { "damage", "pet" } },
 		} },
 		{ L["Size"], {
 			{ L["The game's"], L["As big as the game's numbers."], function() Scale("Size", false) Kind("Size", false) end,
@@ -379,16 +557,21 @@ function ns.CreateCombatTextStylePanel(kit)
 	local Unfold -- (the table's: below)
 	-- (Reset all, at the heading's right.)
 	local resetAll = ns.PanelButton(content)
-	resetAll:SetText(L["Reset all to the game's"])
+	-- (Reset, 2026-11-19: everything on this tab back to how it starts, the
+	-- texts' looks, which show, and All texts' own few: placement, tags, the
+	-- last hit. Was "Reset all to the game's", which left placement as it was.)
+	resetAll:SetText(L["Reset"])
 	local resetWords = resetAll:GetFontString()
-	resetAll:SetSize(math.max(140, (resetWords and resetWords:GetStringWidth() or 120) + 24), 22)
+	resetAll:SetSize(math.max(90, (resetWords and resetWords:GetStringWidth() or 60) + 24), 22)
 	resetAll:SetPoint("LEFT", lookTop, "LEFT", 400, 0)
-	kit.Tooltip(resetAll, L["Every text back to the game's look, and all of them on."])
+	kit.Tooltip(resetAll, L["Everything on this tab back to how it starts."])
+	local OWN_FEW = { CT.Key("all", "Together"), CT.Key("all", "Tags"), "combatTextKeepLast" }
 	resetAll:SetScript("OnClick", function()
 		for _, node in ipairs(CT.NODES) do
 			CT.Reset(node.id)
 			Set(node.id, "Show", nil)
 		end
+		for _, key in ipairs(OWN_FEW) do ns.GetDB()[key] = ns.DEFAULTS[key] end
 		Changed()
 		kit.Refresh()
 	end)
@@ -396,6 +579,10 @@ function ns.CreateCombatTextStylePanel(kit)
 		local any = false
 		for _, node in ipairs(CT.NODES) do
 			if CT.Changed(node.id) or ShowsOff(node.id) then any = true end
+		end
+		for _, key in ipairs(OWN_FEW) do
+			local value = db()[key]
+			if value ~= nil and value ~= ns.DEFAULTS[key] then any = true end
 		end
 		self:SetEnabled(Ours(db()) and any)
 	end
