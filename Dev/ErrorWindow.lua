@@ -19,13 +19,17 @@ local function Plain(value)
 	return ok and text or "?"
 end
 
-local function Trim(stack)
+-- (Blocked lines keep more: who started it sits under the game's own calls,
+-- 9th line or lower for Settings opening, 2026-11-19.)
+local BLOCKED_STACK_LINES = 18
+local function Trim(stack, kind)
 	if type(stack) ~= "string" then return nil end
 	stack = stack:gsub("Interface[/\\]AddOns[/\\]", "")
+	local max = type(kind) == "string" and kind:find("^blocked") and BLOCKED_STACK_LINES or STACK_LINES
 	local lines = {}
 	for line in stack:gmatch("[^\n]+") do
 		lines[#lines + 1] = "      " .. line
-		if #lines >= STACK_LINES then break end
+		if #lines >= max then break end
 	end
 	return #lines > 0 and table.concat(lines, "\n") or nil
 end
@@ -141,12 +145,13 @@ local function Add(kind, message, stack)
 	local entry = byKey[key]
 	if entry then
 		entry.count, entry.time = entry.count + 1, time()
+		entry.stack = Trim(stack, kind) or entry.stack -- (the newest one's: the same line can come from new places)
 		for i, other in ipairs(entries) do -- (to the top)
 			if other == entry then table.remove(entries, i) break end
 		end
 	else
 		entry = { kind = kind, message = message, count = 1, time = time(),
-			stack = Trim(stack), source = Source(message, stack) }
+			stack = Trim(stack, kind), source = Source(message, stack) }
 		byKey[key] = entry
 		if #entries >= MAX_ENTRIES then
 			local old = table.remove(entries, 1)
@@ -176,6 +181,16 @@ function ns.DevTap(kind, message, stack)
 end
 
 ns.DevErrorWindow = {} -- (BugGrabber's callback owner)
+
+-- How many times a kind of entry came so far, and the newest one's stack
+-- (/cine debug blockedline, BlockedLineTest.lua).
+function ns.DevErrorCount(kind)
+	local count, stack = 0, nil
+	for _, entry in ipairs(entries) do
+		if entry.kind == kind then count, stack = count + entry.count, entry.stack end
+	end
+	return count, stack
+end
 
 -- BugGrabber (when it owns the error handler, ours may never be called).
 local grabbed = false
@@ -209,12 +224,60 @@ watcher:SetScript("OnEvent", function(_, event, a, b)
 	elseif event == "LUA_WARNING" then
 		ns.DevTap("warning", b or a)
 	else
+		watcher.blockedAt = GetTime()
 		ns.DevTap(event == "ADDON_ACTION_FORBIDDEN" and "forbidden" or "blocked",
 			("%s: %s %s"):format(Plain(a), Plain(b), InCombatLockdown() and "(in combat)" or "(out of combat)"),
 			debugstack and debugstack(2, 8, 0))
 	end
 end)
 
+-- The yellow "Interface action failed because of an AddOn" line can come with
+-- no ADDON_ACTION_BLOCKED event at all (Forever: the gamepad SmartNavigation
+-- focus call blocked when Settings is opened from addon code), so the events
+-- above miss it. The game always goes through DisplayInterfaceActionBlockedMessage
+-- for that line, even when it prints it only once a session: hook it and keep
+-- the stack. Skipped when a blocked event already came this frame (that one
+-- calls it too, and is already in the box).
+local displayAt
+if type(_G.DisplayInterfaceActionBlockedMessage) == "function" then
+	hooksecurefunc("DisplayInterfaceActionBlockedMessage", function()
+		local at = GetTime()
+		displayAt = at
+		local stack = debugstack and debugstack(2, 24, 0)
+		local fight = InCombatLockdown() and "(in combat)" or "(out of combat)"
+		C_Timer.After(0, function()
+			if watcher.blockedAt == at then return end
+			ns.DevTap("blocked (no event)", "Interface action failed line, " .. fight, stack)
+		end)
+	end)
+end
+
+-- And the line itself, straight from the chat windows: in case it reaches chat
+-- some other way than the function above (nothing else in the box then). The
+-- game prints it before that function's hook runs, so this waits a frame and
+-- skips lines the hook or a blocked event already put in the box. Old copies
+-- chat history restore puts back at login (UI/ChatCopy.lua, ns.chatRestoring)
+-- are skipped.
+local BLOCKED_TEXT = type(_G.INTERFACE_ACTION_BLOCKED) == "string" and _G.INTERFACE_ACTION_BLOCKED
+	or "Interface action failed because of an AddOn"
+local chatAt
+local function OnChatLine(_, text)
+	if ns.chatRestoring or type(text) ~= "string" or (issecretvalue and issecretvalue(text)) then return end
+	if not text:find(BLOCKED_TEXT, 1, true) then return end
+	local at = GetTime()
+	if chatAt == at then return end -- (the same line in another chat window)
+	chatAt = at
+	local stack = debugstack and debugstack(2, 24, 0)
+	local fight = InCombatLockdown() and "(in combat)" or "(out of combat)"
+	C_Timer.After(0, function()
+		if displayAt == at or watcher.blockedAt == at then return end
+		ns.DevTap("blocked (chat line only)", "Interface action failed line in chat, " .. fight, stack)
+	end)
+end
+for i = 1, (NUM_CHAT_WINDOWS or 10) do
+	local frame = _G["ChatFrame" .. i]
+	if frame and frame.AddMessage then hooksecurefunc(frame, "AddMessage", OnChatLine) end
+end
 -- /cine debug errors: open it by hand.
 function ns.DevErrorWindowShow()
 	window = window or CreateWindow()

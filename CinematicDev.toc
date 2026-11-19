@@ -237,6 +237,7 @@ Dev\CombatTextTest.lua
 Dev\NumberStyleTest.lua
 Dev\CursorReplaceTest.lua
 Dev\LookDockTest.lua
+Dev\BlockedLineTest.lua
 Dev\GradientTest.lua
 Dev\QuestFocusTest.lua
 Dev\PlateFlickerTest.lua

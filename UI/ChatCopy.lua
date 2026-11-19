@@ -513,6 +513,8 @@ end
 
 local function Restore(chatFrame, lines)
 	local timeFormat = TimeFormat()
+	-- (Old copies, not new lines: the dev error box skips them, ErrorWindow.lua.)
+	ns.chatRestoring = true
 	for _, line in ipairs(lines) do
 		local colour = line[3]
 		local text = timeFormat and ("|cff999999[%s]|r %s"):format(date(timeFormat, line[1]), line[2]) or line[2]
@@ -523,6 +525,7 @@ local function Restore(chatFrame, lines)
 			chatFrame:AddMessage(text, nil, nil, nil, line[4] or nil)
 		end
 	end
+	ns.chatRestoring = nil
 	if #lines > 0 then
 		chatFrame:AddMessage(L["Earlier chat is above this line"], 0.6, 0.6, 0.6)
 	end

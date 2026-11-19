@@ -224,6 +224,7 @@ local function PrintDebugHelp()
 	print("  /cine debug deathtest - one run checking the Death Vision page: its menu, Test, sliders and switch, with screenshots (dev copy)")
 	print("  /cine debug resettest [logout] - one run checking what a reset puts back (layouts, plate settings), or with logout the plate settings going back at logout, across a reload (dev copy)")
 	print("  /cine debug cursortest - one run checking Replace cursor icon: your pick over open ground and the UI, the game's own over a mailbox or an NPC, with on-screen steps and Yes/No (dev copy; again to stop)")
+	print("  /cine debug blockedline - one run checking the error box catches the yellow \"Interface action failed\" line, with or without the game's event (dev copy; again to stop)")
 	print("  /cine debug euiswing - one run recording why EllesmereUI's swing timer stays hidden in CineMode (dev copy; again to stop)")
 	print("  /cine debug solo <Addon> [more] - only that addon (its parts and what it needs) and Cinematic load: turns the rest off and reloads; solo off brings them back (dev copy)")
 	print("  /cine debug addontest <Addon> [quick] - one run testing our support for it: every row hidden and shown, and every frame of it on screen covered or not (dev copy; again to stop)")
@@ -1846,6 +1847,10 @@ local function HandleSlash(msg)
 		-- (Dev copy: which way of moving the game's floating combat text works, CombatTextTest.lua.)
 		if ns.CombatTextTest then ns.CombatTextTest(arg:match("^cttest%s*(.*)$"))
 		else ns.Print("/cine debug cttest is in the dev copy only.") end
+	elseif cmd == "debug" and arg == "blockedline" then
+		-- (Dev copy: the error box catches the event-less "Interface action failed" line, BlockedLineTest.lua.)
+		if ns.BlockedLineTest then ns.BlockedLineTest()
+		else ns.Print("/cine debug blockedline is in the dev copy only.") end
 	elseif cmd == "debug" and arg == "lookdock" then
 		-- (Dev copy: a Look panel and the popped preview both in sight on every Style page, LookDockTest.lua.)
 		if ns.LookDockTest then ns.LookDockTest()
