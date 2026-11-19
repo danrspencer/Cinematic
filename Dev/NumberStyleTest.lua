@@ -98,12 +98,15 @@ local function OnSecret(amount)
 	local okMath, quotient = pcall(function() return amount / 1000 end)
 	log(("our own math on it (amount / 1000): %s"):format(okMath and ("works, " .. Show(quotient)) or "refused"))
 	local p = Panel()
-	p.title:SetText("Your hit, in each style (screenshot taken)")
+	p.title:SetText("Your hit in each style: /10 should be a tenth of the top row")
 	for i, style in ipairs(STYLES) do
 		local row = p.rows[i]
 		row.label:SetText(style[1])
 		local shown
-		for _, form in ipairs(style[4] and { FORMS[1] } or FORMS) do
+		-- (Our rules: the "config" form only. "data" doesn't error but drops
+		-- the rules, the game's own style drawn instead: a Forever run of
+		-- 2026-11-19 drew an 11 as 11 in every row, /10 too.)
+		for _, form in ipairs(style[4] and { FORMS[1] } or { FORMS[2] }) do
 			local ok, result = Run(style, amount, form)
 			local formName = style[4] and style[4] or form[1]
 			if ok and result ~= nil then
