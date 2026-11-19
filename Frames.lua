@@ -199,14 +199,24 @@ local function AddOnLoaded(name)
 	return isLoaded and isLoaded(name) and true or false
 end
 
--- Installed, loaded or not (missing ones error or say "MISSING").
-function ns.AddOnInstalled(name)
-	local getInfo = C_AddOns and C_AddOns.GetAddOnInfo or GetAddOnInfo
-	if not getInfo then
-		return false
+-- Installed, loaded or not (missing ones error or say "MISSING"). Kept per
+-- name: the game reads its addon list once a session, and the call cost 1.2 ms
+-- (12 worst) on Forever, ~40% of making the settings pages (profile 2026-11-18).
+do
+	local installed = {}
+	function ns.AddOnInstalled(name)
+		if name == nil then return false end
+		local known = installed[name]
+		if known ~= nil then return known end
+		local getInfo = C_AddOns and C_AddOns.GetAddOnInfo or GetAddOnInfo
+		if not getInfo then
+			return false
+		end
+		local ok, _, _, _, _, reason = pcall(getInfo, name)
+		known = (ok and reason ~= "MISSING") and true or false
+		installed[name] = known
+		return known
 	end
-	local ok, _, _, _, _, reason = pcall(getInfo, name)
-	return ok and reason ~= "MISSING"
 end
 ns.AddOnLoaded = AddOnLoaded
 

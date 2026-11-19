@@ -1698,13 +1698,124 @@ ns.searchPrepare = {} -- pages that fill their rows only when shown: called to f
 -- and so does anything that reads every page: the search (and /cine find),
 -- ns.PageSettings (the profiles), ns.SettingIds. The log says when each is made.
 local lazyPages = { list = {}, waiting = {} }
+-- Made ahead a few ms a frame, not in one go (2026-11-18: the HUD took 351 ms
+-- in one frame, Hover Groups 215, Nameplates 139, a profile showed): the build
+-- runs in a coroutine, stopping at ns.PageBuildStep (at the start of the
+-- widget makers) once BUDGET ms are spent, resumed the next frame. Opened,
+-- searched or read meanwhile: finished there and then. (Waits out fights.)
+lazyPages.BUDGET = 3
+-- Time and garbage between a build's steps, for the profiler: a timed call
+-- around a stop would count the frames between as its own (Profiler.lua).
+lazyPages.pause = { ms = 0, kb = 0 }
+ns.pageBuildPause = lazyPages.pause
+-- (now: stop whatever was spent, for a heavy part next: a builder's own body.)
+function ns.PageBuildStep(now)
+	local job = lazyPages.job
+	if not job or job.finishing or coroutine.running() ~= job.co then return end
+	local spent = debugprofilestop() - job.resumed
+	if spent < (now and 0.5 or lazyPages.BUDGET) then return end
+	-- (Only with no C between here and the build: in Lua 5.1 a yield across a
+	-- pcall, an OnShow or a sort errors. Such a spot: the next few skip the look.)
+	if job.skipLooks > 0 and not now then
+		job.skipLooks = job.skipLooks - 1
+		return
+	end
+	local stack = (debugstack and debugstack(2, 100, 100))
+		or (debug and debug.traceback and debug.traceback()) or "[C]"
+	if stack:find("[C]", 1, true) then
+		job.skipLooks = 3
+		job.blocked = job.blocked + 1
+		job.blockedAt = job.blockedAt or lazyPages.Where(stack)
+		return
+	end
+	job.stopAt = lazyPages.Where(stack)
+	coroutine.yield()
+end
+-- Where a build stopped, for the log: its first few file:line spots, the
+-- innermost first (the profiler's own wrappers left out).
+function lazyPages.Where(stack)
+	local spots = {}
+	for file, line in stack:gmatch("([%w_]+%.lua)%]?:(%d+)") do
+		if file ~= "Profiler.lua" and file ~= "Diagnostics.lua" then
+			spots[#spots + 1] = file .. ":" .. line
+			if #spots == 3 then break end
+		end
+	end
+	return #spots > 0 and table.concat(spots, " < ") or "?"
+end
+-- Runs the job a step (or to its end, finishing); true once made.
+function lazyPages.Run(job, finishing)
+	if finishing then job.finishing = true end
+	local pause = lazyPages.pause
+	repeat
+		if job.pausedAt then
+			pause.ms = pause.ms + (debugprofilestop() - job.pausedAt)
+			pause.kb = pause.kb + math.max(0, collectgarbage("count") - job.pausedKb)
+			job.pausedAt = nil
+		end
+		local from = job.stopAt or "the start"
+		job.resumed = debugprofilestop()
+		local ok, err = coroutine.resume(job.co)
+		local spent = debugprofilestop() - job.resumed
+		job.work, job.steps = job.work + spent, job.steps + 1
+		if spent > job.longest then
+			job.longest, job.longestFrom = spent, from
+			job.longestTo = coroutine.status(job.co) == "dead" and "the end" or job.stopAt
+		end
+		if not ok then
+			local okStack, stack = pcall(debugstack, job.co, 0, 30, 30)
+			pcall(ns.ReportError, err, okStack and stack or nil, true)
+		end
+		if coroutine.status(job.co) == "dead" then
+			if lazyPages.job == job then lazyPages.job = nil end
+			ns.SetOnUpdate(lazyPages.stepper, nil)
+			if ns.Log then
+				ns.Log("load", ("settings page %s made when first needed (%s) in %d ms over %d frames%s,"
+					.. " longest %.1f ms (from %s to %s)%s")
+					:format(job.name, job.why or "?", job.work, job.steps,
+						job.finishing and ", finished at once" or "", job.longest,
+						tostring(job.longestFrom), tostring(job.longestTo),
+						job.blocked > 0 and (", %d stops skipped (C in the way, first at %s)")
+							:format(job.blocked, tostring(job.blockedAt)) or ""))
+			end
+			return true
+		end
+		job.pausedAt, job.pausedKb = debugprofilestop(), collectgarbage("count")
+	until not job.finishing
+	return false
+end
+function lazyPages.Start(name, build, why)
+	local job = { name = name, why = why, co = coroutine.create(build), work = 0, steps = 0, longest = 0,
+		skipLooks = 0, blocked = 0 }
+	lazyPages.job = job
+	lazyPages.stepper = lazyPages.stepper or CreateFrame("Frame")
+	-- (Its own section in a profile: the timed calls stopped inside it stay
+	-- under it, Profiler.lua.)
+	local function Step()
+		if InCombatLockdown() then return end
+		lazyPages.Run(job)
+	end
+	ns.SetOnUpdate(lazyPages.stepper, ns.Profiled and ns.Profiled("Settings page made ahead", Step) or Step)
+	return job
+end
 function lazyPages.Add(canvas, name, build)
 	local made = false
 	local entry = {}
-	local function Make(why)
-		if made then return end
+	local function Make(why, ahead)
+		if made then
+			-- (Being made ahead: done now, unless asked from inside that build.)
+			local job = entry.job
+			if job and lazyPages.job == job and coroutine.running() ~= job.co then
+				lazyPages.Run(job, true)
+			end
+			return
+		end
 		made = true
 		entry.made = true
+		if ahead then
+			entry.job = lazyPages.Start(name, build, why)
+			return
+		end
 		local started = type(debugprofilestop) == "function" and debugprofilestop()
 		ns.Guard(build)
 		local ended = type(started) == "number" and debugprofilestop()
@@ -1740,11 +1851,11 @@ function lazyPages.StartAhead()
 		local casting = (UnitCastingInfo and UnitCastingInfo("player")) or (UnitChannelInfo and UnitChannelInfo("player"))
 		local busy = InCombatLockdown() or (settings and settings:IsShown()) or casting
 			or (UnitOnTaxi and UnitOnTaxi("player")) or (GetUnitSpeed and GetUnitSpeed("player") or 0) > 0
-		still = busy and 0 or still + 1
+		still = (busy or lazyPages.job) and 0 or still + 1
 		if still < 5 then return end
 		for _, entry in ipairs(lazyPages.waiting) do
 			if not entry.made then
-				entry.Make("ahead, standing still")
+				entry.Make("ahead, standing still", true)
 				still = 2
 				return
 			end
@@ -8396,6 +8507,7 @@ end
 -- (greyed while that's ticked); band: its number. The caller places the row
 -- (the label goes with it). Gives the row and the label's widgets.
 function ns.UnitPartRow(content, labelWidth, layout, unit, title, part, same, band, indent)
+	if ns.PageBuildStep then ns.PageBuildStep() end -- (a settings page made ahead: may stop here till the next frame)
 	local key = "unitPart" .. unit .. part[1]
 	RecordKey(content, key)
 	for _, list in ipairs(ns.UnitPartLists()) do
@@ -9191,6 +9303,7 @@ local function CreateCombatPanel()
 				end
 			end
 		end
+		ns.PageBuildStep(true) -- (made ahead: the next frame from here)
 		panel, tabFrames, ShowTab, base = ns.FolderTabs(content, list, function(i) Pick(tabs[i].sections[1]) end, nil,
 			SECTION_WIDTH + 8, FlipTab)
 		-- (Each section is picked by its icon in the hub, HUD_ICONS: the tabs
@@ -9255,12 +9368,14 @@ local function CreateCombatPanel()
 			hudList:SetPoint("TOPLEFT", hudNote, "BOTTOMLEFT", 0, 0)
 			FitContentHeight(content)
 		end
+		ns.PageBuildStep(true) -- (made ahead: the next frame from here)
 		PlaceTop()
 		panel:SetPoint("TOPLEFT", panelTop, "TOPLEFT")
 		-- (On panelTop, not the panel: the panel's bottom hangs on the rows under them.)
 		base:SetPoint("TOPLEFT", panelTop, "TOPLEFT")
 		-- (Addon Frame Links for the unit frames: the Unit Frames icon's Frame
 		-- Links tab, PersonalResources.lua, 2026-11-16.)
+		ns.PageBuildStep(true) -- (made ahead: the next frame from here)
 		Layout()
 
 		canvas:SetScript("OnShow", PageShown(function()
@@ -10920,6 +11035,7 @@ local function CreatePlatesPanel()
 		AddNameRow(targetTop, 2, targetGroup, "YourTarget", L["Names"], nil, targetNameTip)
 		EndSection(targetSection, lastLabel)
 
+		ns.PageBuildStep(true) -- (made ahead: the next frame from here)
 		for _, top in ipairs({ targetTop, columnTop, enemyTop, partsTop, playersTop, npcTop, serviceTop, extrasTop }) do
 			ns.GridDots(content, top.rows or {})
 		end
@@ -10927,6 +11043,7 @@ local function CreatePlatesPanel()
 		-- The tabs, in order: your target's plate and name, enemy nameplates,
 		-- friendly nameplates, friendly plates in dungeons and raids, their parts,
 		-- then names and raid markers.
+		ns.PageBuildStep(true) -- (made ahead: the next frame from here)
 		local list, base, height = {}
 		for i, section in ipairs(sections) do list[i] = { section.tab } end
 		panel, folderTabs, ShowTab, base, height = ns.FolderTabs(content, list, function(i) Pick(sections[i]) end, nil,
@@ -10944,6 +11061,7 @@ local function CreatePlatesPanel()
 		panel:SetPoint("BOTTOMRIGHT", foot, "TOPLEFT", SECTION_WIDTH + 12, -12)
 		-- (On panelTop, not the panel: the panel's bottom hangs on the rows under them.)
 		base:SetPoint("TOPLEFT", panelTop, "TOPLEFT")
+		ns.PageBuildStep(true) -- (made ahead: the next frame from here)
 		LayoutSections()
 
 		canvas:SetScript("OnShow", PageShown(function()
@@ -14035,6 +14153,7 @@ do
 				offscreen.searchLabel = L["Off-screen plates in CineMode"]
 			end
 
+			ns.PageBuildStep(true) -- (made ahead: the next frame from here)
 			stack:Header(content, L["All marks"])
 			-- (Two raises: on a showing plate, and with none; the marks move
 			-- between them as the plate fades, as the quest mark does.)
@@ -14046,6 +14165,7 @@ do
 
 			-- The two parts on frames of their own, each at the top where Show in
 			-- was; the preview (and its spot) on the page, shown with both.
+			ns.PageBuildStep(true) -- (made ahead: the next frame from here)
 			local point, relative, relPoint, x, y = showHeader:GetPoint(1)
 			local hosts = {}
 			for i = 1, 2 do
@@ -14094,6 +14214,7 @@ do
 				ShowPlateTab(ns.ShowInIndex("plates", i == 1 and "Nameplate Style" or "Nameplate Marks"))
 				FitContentHeight(content)
 			end
+			ns.PageBuildStep(true) -- (made ahead: the next frame from here)
 			ShowPart(1)
 
 			canvas:SetScript("OnShow", PageShown(Refresh, content))

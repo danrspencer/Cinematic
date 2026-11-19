@@ -276,6 +276,7 @@ end
 
 -- A new UIPanelButtonTemplate button on parent, in both looks.
 function ns.PanelButton(parent)
+	if ns.PageBuildStep then ns.PageBuildStep() end -- (a settings page made ahead: may stop here till the next frame)
 	return ns.SkinButton(CreateFrame("Button", nil, parent, "UIPanelButtonTemplate"))
 end
 
@@ -654,6 +655,9 @@ for _, name in ipairs({ "SkinButton", "SkinClose", "SkinWindow", "SkinCheck", "S
 	"SkinEditBox", "SkinScroll" }) do
 	local skin = ns[name]
 	ns[name] = function(control, ...)
+		-- (A settings page made ahead may stop here till the next frame: out
+		-- here, as it can't inside the pcall.)
+		if ns.PageBuildStep then ns.PageBuildStep() end
 		local ok, err = pcall(skin, control, ...)
 		if not ok and not reported then
 			reported = true

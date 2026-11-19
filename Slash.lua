@@ -1811,6 +1811,10 @@ local function HandleSlash(msg)
 		-- (Dev copy: the bar gradients, By health and the pop-up palette in one run, GradientTest.lua.)
 		if ns.GradientTest then ns.GradientTest(arg:match("^gradtest%s*(.*)$"))
 		else ns.Print("/cine debug gradtest is in the dev copy only.") end
+	elseif cmd == "debug" and arg:find("^ufdrift") then
+		-- (Dev copy: records the player and target frames through fights, UnitDriftTest.lua.)
+		if ns.UnitDriftTest then ns.UnitDriftTest(arg:match("^ufdrift%s*(.*)$"))
+		else ns.Print("/cine debug ufdrift is in the dev copy only.") end
 	elseif cmd == "debug" and arg:find("^questfocus") then
 		-- (Dev copy: one run recording the Quest tracker's Show just that quest, QuestFocusTest.lua.)
 		if ns.QuestFocusTest then ns.QuestFocusTest(arg:match("^questfocus%s*(.*)$"))

@@ -785,6 +785,7 @@ end
 --     the rules' words, else its rule.grid words).
 -- The row's Refresh and SetEnabled are the page's (it goes in kit.controls).
 function ns.GridRow(kit, parent, labelWidth, layout, spec)
+	if ns.PageBuildStep then ns.PageBuildStep() end -- (a settings page made ahead: may stop here till the next frame)
 	local cols = Columns(layout)
 	local Tooltip, Refresh = kit.Tooltip, kit.Refresh
 	local row = CreateFrame("Frame", nil, parent)
@@ -1247,6 +1248,7 @@ end
 -- the rest: its kit is the page helpers it shares). Returns the last row's
 -- label, to place what comes below.
 function ns.GridTable(content, columnTop, rows, kit)
+	if ns.PageBuildStep then ns.PageBuildStep() end -- (a settings page made ahead: may stop here till the next frame)
 	local LABEL_WIDTH, ROW_HEIGHT, COLUMNS = kit.labelWidth - TABLE_LABEL_TRIM, kit.rowHeight, kit.columns
 	-- (rows.layout: a table of its own columns, ns.GRID_PLACE_COMBAT_LAYOUT's
 	-- Combat and Location only, for the Minimap page's rows, 2026-11-13.)

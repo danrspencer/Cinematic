@@ -42,13 +42,16 @@ local function Stat(list, name)
 	return stat
 end
 
-local function Record(name, isSection, ms, kb)
+-- (parentName: the section it ran under, taken when it started: a call that
+-- stops across frames, a settings page made ahead, ends after its section did.)
+local function Record(name, isSection, ms, kb, parentName)
 	local stat
 	if isSection then
 		stat = Stat(sections, name)
 		run.frameMs = run.frameMs + ms
 	else
-		local parent = Stat(sections, current)
+		if parentName == nil then return end
+		local parent = Stat(sections, parentName)
 		parent.children = parent.children or {}
 		stat = Stat(parent.children, name)
 	end
@@ -62,14 +65,20 @@ local function Record(name, isSection, ms, kb)
 	end
 end
 
-local function Finish(name, isSection, started, memory, ...)
-	local ms = clock() - started
-	local kb = Memory() - memory
-	if isSection then
+-- (A settings page made ahead stops between frames inside timed calls: the
+-- time and garbage while stopped, ns.pageBuildPause, aren't theirs. Options.lua.)
+local noPause = { ms = 0, kb = 0 }
+local function Finish(name, isSection, parentName, started, memory, pausedMs, pausedKb, ...)
+	-- (Only a call inside the build can span a stop: the stepper's own time,
+	-- out on the main thread, is all its own.)
+	local pause = coroutine.running() and ns.pageBuildPause or noPause
+	local ms = clock() - started - (pause.ms - pausedMs)
+	local kb = Memory() - memory - (pause.kb - pausedKb)
+	if isSection and current == name then
 		current = nil
 	end
-	if ns.profiling then
-		Record(name, isSection, ms, kb)
+	if ns.profiling and run then
+		Record(name, isSection, ms, kb, parentName)
 	end
 	return ...
 end
@@ -82,11 +91,13 @@ function ns.Profiled(name, fn)
 		if not ns.profiling then
 			return fn(...)
 		end
-		local isSection = current == nil
+		local parentName = current
+		local isSection = parentName == nil
 		if isSection then
 			current = name
 		end
-		return Finish(name, isSection, clock(), Memory(), fn(...))
+		local pause = coroutine.running() and ns.pageBuildPause or noPause
+		return Finish(name, isSection, parentName, clock(), Memory(), pause.ms, pause.kb, fn(...))
 	end
 	wrappers[wrapped] = true
 	return wrapped
@@ -140,7 +151,7 @@ function ns.ProfileStep(fn, started, memory)
 	local ms = clock() - started
 	local kb = Memory() - memory
 	if ns.profiling then
-		Record(stepNames[fn] or localNames[fn] or "(step)", current == nil, ms, kb)
+		Record(stepNames[fn] or localNames[fn] or "(step)", current == nil, ms, kb, current)
 	end
 end
 
