@@ -622,8 +622,20 @@ local logListening, logTurnedOn
 local logLines = false
 ns.combatTextWhose = { mine = 0, others = 0 }
 
+-- (Retail says its log is restricted (C_CombatLog.IsCombatLogRestricted, true
+-- in and out of fights, 2026-11-19), and a stray line still comes now and
+-- then: one did, and from then on every hit waited for lines that didn't
+-- come, no numbers again. So on retail a restricted log is no log. Retail
+-- only till Forever's answer is known: lines do come there.)
+local function Restricted()
+	if not ns.isRetail then return false end
+	local IsRestricted = ns.Check.Api("C_CombatLog.IsCombatLogRestricted")
+	return IsRestricted ~= nil and ns.Check.True(IsRestricted())
+end
+
 local function LogRunning()
-	if not logListening or not logLines or not (C_CombatLog and C_CombatLog.AreFilteredEventsEnabled) then return false end
+	if not logListening or not logLines or Restricted() then return false end
+	if not (C_CombatLog and C_CombatLog.AreFilteredEventsEnabled) then return false end
 	local ok, on = pcall(C_CombatLog.AreFilteredEventsEnabled)
 	return ok and Plain(on) and on == true
 end
@@ -778,7 +790,27 @@ function off.Fits(school)
 		off.mask = ok and Plain(class) and off.CLASS[class] or false
 	end
 	if not off.mask then return true end
+	-- (Retail, no log to say whose: all of a mixed school must be your class's.
+	-- A druid's Astral (Arcane + Nature) shared Nature with a shaman and showed
+	-- as his, 2026-11-19. Forever, with lines: any part, as before.)
+	if ns.isRetail then return bit.band(school, bit.bnot(off.mask)) == 0 end
 	return bit.band(school, off.mask) ~= 0
+end
+
+-- Retail, no log (2026-11-19, /cine debug whosehit): the game's damage meter
+-- updates as you deal damage or heal (your casts, your DoT ticks) and never
+-- for strangers' hits (none in 25 s of them, standing still), but not once
+-- per hit. So it says whether you're fighting at all: with no update in the
+-- last FOR seconds, a hit isn't yours. (A hit and its update can come in the
+-- same frame either way round: a hit that finds none looks again next frame.)
+local meter = { FOR = 2, at = nil, frame = CreateFrame("Frame") }
+if ns.isRetail and ns.Check.RegisterEvent(meter.frame, "DAMAGE_METER_COMBAT_SESSION_UPDATED") then
+	meter.listening = true
+	meter.frame:SetScript("OnEvent", function() meter.at = GetTime() end)
+end
+function meter.Fighting(now)
+	if not meter.listening then return true end
+	return meter.at ~= nil and now - meter.at <= meter.FOR
 end
 
 local function Claim(plate, unit, amount, id, via, melee, tag, school)
@@ -810,8 +842,18 @@ local function Claim(plate, unit, amount, id, via, melee, tag, school)
 	local color = { 1, 1, 1 } -- (for the trace's "white" only)
 	if id ~= "swing" and id ~= "swingCrit" and id ~= "swingGlance" then color = CT.SPELL end
 	if not LogRunning() then
-		local cast = school and TakeCast(school, GetTime())
-		return Spawn(plate, unit, amount, id, via, nil, tag, nil, cast)
+		local function Show()
+			local cast = school and TakeCast(school, GetTime())
+			return Spawn(plate, unit, amount, id, via, nil, tag, nil, cast)
+		end
+		local now = claimAt or GetTime()
+		if meter.Fighting(now) then return Show() end
+		-- (Its update may come later this frame.)
+		return C_Timer.After(0, function()
+			if meter.Fighting(now) then return Show() end
+			ns.combatTextWhose.others = ns.combatTextWhose.others + 1
+			if ns.combatTextRecord then Trace(("hit %s: you weren't dealing damage (no meter update): left out"):format(tostring(unit))) end
+		end)
 	end
 	local now = claimAt or GetTime()
 	if group.On() then
@@ -1652,10 +1694,12 @@ function ns.CombatTextStateLine()
 	end
 	parts[#parts + 1] = "off=" .. (off[1] and table.concat(off, ",") or "none")
 	parts[#parts + 1] = "own=" .. (own[1] and table.concat(own, ",") or "none")
-	return ("numbers on=%s page on=%s blocked=%s | log listening=%s lines came=%s running=%s turned on by us=%s | shown as yours"
+	return ("numbers on=%s page on=%s blocked=%s | log listening=%s lines came=%s restricted=%s meter=%s running=%s turned on by us=%s | shown as yours"
 		.. " %d, left out %d, showing now %d, waiting %d | game numbers off=%s | scale=%s ramp=%s | font=%s | %s")
 		:format(tostring(On()), tostring(PageOn()), tostring(ns.combatTextBlocked), tostring(logListening),
-		tostring(logLines), tostring(LogRunning()), tostring(logTurnedOn), ns.combatTextWhose.mine, ns.combatTextWhose.others, #live,
+		tostring(logLines), tostring(Restricted()),
+		meter.listening and (meter.at and ("%.1f s ago"):format(GetTime() - meter.at) or "never") or "off",
+		tostring(LogRunning()), tostring(logTurnedOn), ns.combatTextWhose.mine, ns.combatTextWhose.others, #live,
 		#pending, tostring(GAME_NUMBERS.active), tostring(CVarNumber("WorldTextScale_v2", 1)),
 		tostring(CVarNumber("WorldTextRampDuration_v2", 1)), tostring(GAME_FONT), table.concat(parts, " "))
 end
