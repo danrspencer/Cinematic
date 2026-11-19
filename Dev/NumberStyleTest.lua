@@ -7,13 +7,13 @@
 --
 -- One run: (1) every style on plain numbers (22245, 887, 46), results logged
 -- as they are, each with its verdict against what it should give; (2) then
--- it waits for your next hit on a target (hit a training dummy): every style
--- on that hit's amount (secret in a fight), drawn in a panel mid-screen, and
--- a screenshot; secret results can't be read back, so the screenshot is the
--- answer. Everything goes to /cine log ("numbers").
+-- it waits, with no time limit and a lasting box on screen saying what to
+-- do, for a hit with a secret amount on any mob near you: every style on
+-- that amount, drawn in a panel mid-screen, a screenshot, and a DONE box.
+-- Secret results can't be read back, so the screenshot is the answer.
+-- CineMode off for the run. Everything goes to /cine log ("numbers").
 local _, ns = ...
 
-local WAIT = 180 -- seconds to wait for a hit (60 ran out before a first test's fight, 2026-11-19)
 
 -- The rules: the game's own data shape (FormattingUtil's
 -- NUMBER_ABBREVIATION_DATA: breakpoint, abbreviation, significandDivisor,
@@ -118,8 +118,16 @@ local function OnSecret(amount)
 	end
 	p:Show()
 	C_Timer.After(0.5, function() pcall(Screenshot) end)
-	C_Timer.After(20, function() if panel then panel:Hide() end end)
-	ns.TestPrompt("Done. Now /reload, then tell Claude 'check log'.", 20)
+	C_Timer.After(30, function() if panel then panel:Hide() end end)
+end
+
+-- CineMode off for the run (it hides the UI), back on at the end.
+local cineWasOn
+local function CineBack()
+	if cineWasOn and ns.IsCineModeOn and not ns.IsCineModeOn() and Cinematic_ToggleCineMode then
+		Cinematic_ToggleCineMode()
+	end
+	cineWasOn = nil
 end
 
 local function Stop(why)
@@ -127,13 +135,21 @@ local function Stop(why)
 	running:UnregisterAllEvents()
 	running = nil
 	ns.Log("numbers", "stopped: " .. why)
+	CineBack()
 end
 
+-- One run, no time limit: plain numbers at once, then it waits (on screen,
+-- for as long as it takes) for a hit in a fight, tests that, takes the
+-- screenshot and says it's done. Run again to stop it early.
 function ns.NumberStyleTest()
 	if running then
 		Stop("run again")
-		ns.Print("numbers: stopped.")
+		ns.TestPrompt("Numbers test stopped.", 5)
 		return
+	end
+	if ns.IsCineModeOn and ns.IsCineModeOn() and Cinematic_ToggleCineMode then
+		cineWasOn = true
+		Cinematic_ToggleCineMode()
 	end
 	local log = function(text) ns.Log("numbers", text) end
 	log(("start: client %s, AbbreviateNumbers %s, AbbreviateLargeNumbers %s, CreateAbbreviateConfig %s"):format(
@@ -153,16 +169,24 @@ function ns.NumberStyleTest()
 				pass and "PASS" or "FAIL", table.concat(style[3], ", ")))
 		end
 	end
-	-- (2) The next hit on your target, its amount secret in a fight.
+	-- (2) A hit on any mob near you (a plate or your target) with a secret
+	-- amount, as in a fight; a plain one (a fight's first hit can be) waits on.
 	running = CreateFrame("Frame")
-	running:RegisterUnitEvent("UNIT_COMBAT", "target")
-	running:SetScript("OnEvent", function(_, _, _, action, _, amount)
-		if action ~= "WOUND" or amount == nil then return end
-		Stop("got a hit")
+	running:RegisterEvent("UNIT_COMBAT")
+	local plainSeen = 0
+	running:SetScript("OnEvent", function(_, _, unit, action, _, amount)
+		if action ~= "WOUND" or amount == nil or type(unit) ~= "string" then return end
+		if unit ~= "target" and not unit:find("^nameplate") then return end
+		if not Secret(amount) then
+			plainSeen = plainSeen + 1
+			if plainSeen == 1 then log("a hit came with a plain amount: waiting for a secret one") end
+			return
+		end
+		Stop("got a secret hit")
 		local ok, err = pcall(OnSecret, amount)
-		if not ok then ns.Log("numbers", "error: " .. tostring(err)) end
+		if not ok then log("error: " .. tostring(err)) end
+		ns.TestPrompt("NUMBERS TEST DONE (screenshot taken).\n\nNow /reload, then tell Claude 'check log'.", 3600)
 	end)
-	C_Timer.After(WAIT, function() if running then Stop("no hit in " .. WAIT .. " s") ns.Print("numbers: no hit came.") end end)
-	ns.TestPrompt("Plain numbers tested.\nNow hit a training dummy (target it first).\n"
-		.. "Waiting up to 3 minutes; don't /reload till the panel shows.", 10)
+	ns.TestPrompt("NUMBERS TEST: attack a training dummy (or any mob).\n\n"
+		.. "It waits as long as you need, then shows your hit in each style and says DONE.", 3600)
 end
