@@ -691,6 +691,7 @@ local group = {
 	SAME = 0.05,    -- seconds that count as one instant
 	CAP = 30,       -- hits waiting at most (a raid's pull: the oldest go)
 	pending = {}, marks = {}, markCount = 0,
+	swung = {}, -- [plate] = when your last swing on it landed (Off-class: weapon procs)
 }
 function group.On()
 	return ((IsInGroup and IsInGroup()) or (IsInRaid and IsInRaid())) and true or false
@@ -710,9 +711,27 @@ function group.Mark(hit, now)
 	end
 end
 
+-- Whether a waiting hit's plate is still its mob's: the game hands a dead
+-- mob's plate to another, and a number held for its line (In a group:
+-- 0.3 s) went on the new one. Gone (no mob on it now): as before.
+local function StillThere(hit)
+	if not hit.guid or not hit[2] then return true end
+	local ok, now = pcall(UnitGUID, hit[2])
+	if not ok or not Plain(now) or now == nil then return true end
+	return now == hit.guid
+end
+
 local function Mine(hit)
 	if hit.melee then swingAt, swingPlate = hit.at or GetTime(), hit[1] end
 	ns.combatTextWhose.mine = ns.combatTextWhose.mine + 1
+	-- (Your swing on this plate: an off-class weapon proc on it is yours.)
+	if hit.melee and (hit.via == "swing" or hit.via == "swingGlance") and hit[1] then
+		group.swung[hit[1]] = hit.at or GetTime()
+	end
+	if not StillThere(hit) then
+		if ns.combatTextRecord then Trace("yours, but its plate went to another mob while it waited: left out") end
+		return
+	end
 	if hit.school then group.Mark(hit, hit.at or GetTime()) end
 	local cast = hit.school and TakeCast(hit.school, hit.at or GetTime())
 	Spawn(hit[1], hit[2], hit[3], hit.id, hit.via, nil, hit.tag, nil, cast)
@@ -735,7 +754,9 @@ local claimAt
 -- cleave's too, and the log credits the wearer), and (2) a line came for it
 -- that none of your own schools' hits took: it waits HOLD, so they go first.
 -- Several at once: no more than the hits on you, mobs targeting you first.
--- Your wand's shots (Shoot) are yours in any school. No log: (1) alone.
+-- Your wand's shots (Shoot) are yours in any school; so is a weapon proc (a
+-- hit on the mob your swing just landed on, with its own line in its
+-- instant: Fiery Weapon on a warrior). No log: (1) alone.
 local off = {
 	-- Schools each class deals (bits: 2 Holy, 4 Fire, 8 Nature, 16 Frost, 32
 	-- Shadow, 64 Arcane; Physical isn't checked). A class not here: all.
@@ -766,6 +787,9 @@ local function Claim(plate, unit, amount, id, via, melee, tag, school)
 	-- target switched just after it (seen 2026-11-19) left an imp's out.)
 	local okTarget, onTarget = pcall(UnitIsUnit, unit, "target")
 	hit.onTarget = okTarget and Plain(onTarget) and onTarget and true or nil
+	-- (Its mob, for StillThere and In a group's marks.)
+	local okGuid, guid = pcall(UnitGUID, unit)
+	hit.guid = okGuid and Plain(guid) and guid or nil
 	-- (Off-class, a damage's: waits for the hits on you and your own lines.)
 	if school and not melee and CT.Kind(id) ~= "heal" and not off.Fits(school) then
 		local now = claimAt or GetTime()
@@ -801,8 +825,6 @@ local function Claim(plate, unit, amount, id, via, melee, tag, school)
 		end
 		-- (A spell hit or heal: waits with the others for the lines, scored.)
 		if school and not melee then
-			local okGuid, guid = pcall(UnitGUID, unit)
-			hit.guid = okGuid and Plain(guid) and guid or nil
 			hit.at = now
 			local score, why = 0, {}
 			if PeekCast(school, now) then score, why[#why + 1] = score + group.CAST, "cast" end
@@ -946,7 +968,7 @@ local function PetHit(hit, now)
 end
 -- A hit no line came for: your pet's, else someone else's (left out).
 Unclaimed = function(hit, now)
-	if hit[1] and hit[2] and PetHit(hit, now) then
+	if hit[1] and hit[2] and PetHit(hit, now) and StillThere(hit) then
 		Trace("PET'S: no line, on your pet's target")
 		local crit = NODE[hit.id] and NODE[hit.id].crit
 		return Spawn(hit[1], hit[2], hit[3], crit and "petCrit" or "pet", hit.via, nil, hit.tag)
@@ -971,8 +993,10 @@ local function ResolveOff(now, cutoff)
 	for i = #off.pending, 1, -1 do
 		local hit = off.pending[i]
 		-- (A hit on you may come after its shield's: wait for it, a little.)
+		local swung = hit[1] and group.swung[hit[1]]
 		if now - hit.at > HOLD and hit.at < cutoff
-			and (now - hit.at > off.WINDOW or #off.youHit > 0 or #off.wand > 0) then
+			and (now - hit.at > off.WINDOW or #off.youHit > 0 or #off.wand > 0
+				or (swung and math.abs(swung - hit.at) <= off.WINDOW)) then
 			ripe = ripe or {}
 			ripe[#ripe + 1] = table.remove(off.pending, i)
 		end
@@ -985,9 +1009,19 @@ local function ResolveOff(now, cutoff)
 	local running = LogRunning()
 	for _, hit in ipairs(ripe) do
 		local mine
+		local swung = hit[1] and group.swung[hit[1]]
 		if TakeTime(off.wand, hit.at, PET_WAIT) then
 			mine = "your wand"
-		else
+		elseif swung and math.abs(swung - hit.at) <= off.WINDOW and running then
+			-- (A weapon proc, 2026-11-19: Fiery Weapon on a warrior, on the mob
+			-- your swing just landed on (its number 0.3-0.75 s after its line, so
+			-- either side), with its own line in its instant.)
+			Fresh(lines, now, MELEE_HOLD)
+			if TakeTime(lines, hit.at, group.SAME) then
+				mine = ("your swing on it %+.2f s and a spare line (a weapon proc)"):format(swung - hit.at)
+			end
+		end
+		if not mine then
 			local you = TakeTime(off.youHit, hit.at, off.WINDOW)
 			if you and running then
 				Fresh(lines, now, MELEE_HOLD)
