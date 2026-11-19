@@ -260,6 +260,7 @@ Dev\TemplateProbe.lua
 Dev\PreviewMatch.lua
 Dev\PetPlateTest.lua
 Dev\EuiSwingTest.lua
+Dev\EuiCastTest.lua
 Dev\AddonTest.lua
 Dev\EuiCooldownTest.lua
 Dev\BuffFadeTest.lua

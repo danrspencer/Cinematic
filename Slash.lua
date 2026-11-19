@@ -231,6 +231,7 @@ local function PrintDebugHelp()
 	print("  /cine debug euiswing - one run recording why EllesmereUI's swing timer stays hidden in CineMode (dev copy; again to stop)")
 	print("  /cine debug solo <Addon> [more] - only that addon (its parts and what it needs) and Cinematic load: turns the rest off and reloads; solo off brings them back (dev copy)")
 	print("  /cine debug addontest <Addon> [quick] - one run testing our support for it: every row hidden and shown, and every frame of it on screen covered or not (dev copy; again to stop)")
+	print("  /cine debug euicast - one run recording whether EllesmereUI's cast bar shows while you cast, out of a fight, in one and in CineMode (dev copy; again to stop)")
 	print("  /cine debug euicd - one run recording why an icon goes missing from EllesmereUI's cooldown bar (dev copy; again to stop)")
 	print("  /cine debug euicd bars - one run recording why EllesmereUI's whole cooldown bars stay hidden, CineMode off then on, out of and in a fight (dev copy)")
 	print("  /cine debug layoutexport - save the Edit Mode layout you're on as an export string (in the saved settings: /reload after)")
@@ -569,6 +570,9 @@ local function HandleSlash(msg)
 	elseif cmd == "debug" and arg:find("^addontest") then
 		-- (Dev copy: one run testing our support for an addon, AddonTest.lua.)
 		if ns.AddonTest then ns.AddonTest(arg:match("^addontest%s*(.-)%s*$")) else ns.Print("/cine debug addontest is in the dev copy only.") end
+	elseif cmd == "debug" and arg == "euicast" then
+		-- (Dev copy: one run recording EllesmereUI's cast bar while you cast, EuiCastTest.lua.)
+		if ns.EuiCastTest then ns.EuiCastTest() else ns.Print("/cine debug euicast is in the dev copy only.") end
 	elseif cmd == "debug" and arg == "euiswing" then
 		-- (Dev copy: one run recording why EllesmereUI's swing timer stays hidden, EuiSwingTest.lua.)
 		if ns.EuiSwingTest then ns.EuiSwingTest() else ns.Print("/cine debug euiswing is in the dev copy only.") end
