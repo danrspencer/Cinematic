@@ -486,10 +486,21 @@ local function RestChanged()
 	local now = ns.Flag(IsResting())
 	if now == resting then return end
 	resting = now
-	if not now or GetTime() < calmAfter or Fight() then return end
+	if not now then return end
+	-- (Why none, for the log: the quiet after login, a fight, the same place.)
+	if GetTime() < calmAfter then
+		ns.Log("card", ("Rested: none, %.0f s after login (it waits 15)"):format(GetTime() - (calmAfter - 15)))
+		return
+	end
+	if Fight() then ns.Log("card", "Rested: none, in a fight") return end
 	local place = Subzone()
 	if place == "" then place = Zone() end
-	if place == "" or GetTime() - (restedAt[place] or -math.huge) < 600 then return end
+	if place == "" then return end
+	if GetTime() - (restedAt[place] or -math.huge) < 600 then
+		ns.Log("card", ("Rested: none, %s had one %.0f s ago (once every 10 min)"):format(place,
+			GetTime() - restedAt[place]))
+		return
+	end
 	restedAt[place] = GetTime()
 	ns.Cards.Fire("rested", RestedCard(place))
 end

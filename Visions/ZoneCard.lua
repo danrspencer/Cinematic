@@ -45,7 +45,10 @@ end
 -- The game's lines see-through while the card's on (back as they were when
 -- it's turned off, as they next show). The game recolors them as they show:
 -- on Forever a color can carry the alpha, so it's kept clear after each.
-local hooked, fading = {}, false
+-- Put back once, as we stop hiding them: not set to 1 each time the game
+-- shows them, which brought them back over an addon hiding them itself
+-- (DaylightUI's zone title, with our card standing aside, 2026-11-19).
+local hooked, fading, hidden = {}, false, {}
 local function Keep(line)
 	if fading or not Hiding() then return end
 	fading = true
@@ -62,7 +65,13 @@ local function HideGame()
 				hooksecurefunc(line, "SetTextColor", Keep)
 				hooksecurefunc(line, "SetVertexColor", Keep)
 			end
-			line:SetAlpha(on and 0 or 1)
+			if on then
+				line:SetAlpha(0)
+				hidden[line] = true
+			elseif hidden[line] then
+				line:SetAlpha(1)
+				hidden[line] = nil
+			end
 		end
 	end
 end
@@ -138,6 +147,15 @@ local function Shows()
 	discovered = ns.DiscoverHasIt and ns.CardOn("discover") and ns.DiscoverHasIt() or false
 	HideGame()
 	if not On() then return end
+	-- (On with another addon's zone title about: what its Addon Conflicts row
+	-- said, for the log. DaylightUI's and ours both played once, 2026-11-19.)
+	for _, row in ipairs(ns.CONFLICTS or {}) do
+		if row.key == "card:zone" then
+			local pick, picked = ns.ConflictPick(row)
+			ns.Log("card", ("Zone card on with %s about: its own %s, pick %s%s"):format(tostring(row.addon),
+				ns.ConflictTheirsOn(row) and "on" or "off", pick, picked and "" or " (not picked)"))
+		end
+	end
 	local zone = Text(ZoneTextString)
 	local subzone = Shown(SubZoneTextFrame) and Text(SubZoneTextString) or ""
 	if subzone == zone then subzone = "" end

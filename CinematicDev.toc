@@ -220,6 +220,7 @@ Dev\ThresholdTest.lua
 Dev\QuestFocusTest.lua
 Dev\FlickerTest.lua
 Dev\PartyFlickerTest.lua
+Dev\ZoneCardTest.lua
 Dev\NamesTest.lua
 Dev\StyleRevampTest.lua
 Dev\StyleSixTest.lua

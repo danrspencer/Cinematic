@@ -645,6 +645,13 @@ local fights = CreateFrame("Frame")
 fights:RegisterEvent("PLAYER_REGEN_ENABLED")
 fights:SetScript("OnEvent", function() fightAt = GetTime() end)
 
+-- Waits another addon's support adds (Support/): fn(id, card) gives why the
+-- card waits now (another addon's own title on screen), or nil.
+local cardWaits, CARD_WAIT_MAX = {}, 8
+function ns.AddCardWait(fn)
+	cardWaits[#cardWaits + 1] = fn
+end
+
 -- An event's card: card { name, sub, meta, picture..., sound = function()
 -- played with it, delay = seconds before it fires, edge and cine for a
 -- fight's }. force: whatever the page says (a Test, or already asked:
@@ -659,6 +666,31 @@ function ns.Cards.Fire(id, card, force)
 		return true
 	end
 	if not force and not ns.CardAllowed(id, card.edge) then return false end
+	-- (Something else on screen it would land on: it waits, asked again
+	-- every half second, for at most CARD_WAIT_MAX seconds in all.)
+	if not force then
+		card.waitStart = card.waitStart or GetTime()
+		local waited = GetTime() - card.waitStart
+		if waited < CARD_WAIT_MAX then
+			for _, wait in ipairs(cardWaits) do
+				local ok, reason = pcall(wait, id, card)
+				if ok and reason then
+					if not card.waitNoted then
+						card.waitNoted = true
+						ns.Log("card", ("%s waits: %s"):format(id, tostring(reason)))
+					end
+					C_Timer.After(0.5, function() ns.Cards.Fire(id, card, force) end)
+					return true
+				end
+			end
+		end
+		-- (The wait over, or given up: said once, on its way to show.)
+		if card.waitNoted and not card.waitDone then
+			card.waitDone = true
+			ns.Log("card", ("%s: waited %.1f s, %s"):format(id, waited,
+				waited < CARD_WAIT_MAX and "shows now" or "gave up waiting, shows anyway"))
+		end
+	end
 	-- (In a bar, No letterbox: Don't show, and no letterbox up: none.)
 	if not force then
 		local look = card.look or ns.CardLook(id)

@@ -14,7 +14,8 @@ Runs side by side, each a PASS or FAIL line, then one line for all of it:
   (Tools/offline/sweep.lua: new FAIL lines against its baseline);
 - the once-only settings updates on your own saved settings (each client's
   Cinematic.lua and CinematicDev.lua, a copy: nothing is written there),
-  every update run from scratch: none may error.
+  every update run from scratch: none may error;
+- the offline tests of fixed bugs (OFFLINE_TESTS: no FAIL line).
 Then the last /cine prerelease runs on each client, read from the dev
 copy's saved settings (after a /reload): their summary and NEW FAIL lines.
 
@@ -34,6 +35,11 @@ WOW = os.environ.get("CINE_WOW", r"C:\Program Files (x86)\World of Warcraft")
 CLIENTS = {"forever": "_forever_", "retail": "_retail_"}
 PY = sys.executable
 HOME = os.path.expanduser("~")
+# Offline tests of one fixed bug each, PASS/FAIL per check (any FAIL line fails it).
+OFFLINE_TESTS = [
+    ("party flicker (DaylightUI range fade)", "Tools/offline/partyflicker.lua"),
+    ("card wait (Rested card behind DaylightUI's zone title)", "Tools/offline/cardwait.lua"),
+]
 
 
 def lua_files():
@@ -95,6 +101,15 @@ def judge_sweep(ok, output):
     summary = last_line(output, "sweep ")
     detail = summary + ("".join("\n      " + l[:220] for l in new[:8]) if new else "")
     return ok, detail
+
+
+def judge_test(ok, output):
+    lines = [l.strip() for l in output.splitlines()]
+    failed = [l for l in lines if l.startswith("FAIL ")]
+    passed = sum(1 for l in lines if l.startswith("PASS "))
+    if failed or not ok:
+        return False, "; ".join(failed[:4]) or last_line(output)
+    return passed > 0, "%d checks passed" % passed
 
 
 def judge_migrate(ok, output):
@@ -162,6 +177,8 @@ def main():
         jobs.append(Job("offline check (profiles, ids)", lua + ["Tools/offline/check.lua"], judge_check))
         for client in CLIENTS:
             jobs.append(Job("offline sweep, %s" % client, lua + ["Tools/offline/sweep.lua", client], judge_sweep))
+        for name, script in OFFLINE_TESTS:
+            jobs.append(Job(name, lua + [script], judge_test))
         scratch = tempfile.mkdtemp(prefix="cine-prerelease-")
         for client in CLIENTS:
             for name, toc in (("Cinematic.lua", "Cinematic.toc"), ("CinematicDev.lua", "CinematicDev.toc")):

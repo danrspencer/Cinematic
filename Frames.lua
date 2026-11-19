@@ -387,7 +387,10 @@ local function ApplyAlpha(entry)
 	-- The raid frames dim members out of range with an alpha that reads back
 	-- secret on retail: it can't be faded relative to, but while they're
 	-- fully up it's left as it is (written over, every member looked in range).
-	if not (secret and visual == 1 and LOOSE_PART_GROUPS[entry.group]) then
+	-- So is a hooked addon frame's secret alpha that the addon set itself
+	-- since our last write (secretOwn: see ns.OnOwnBoolAlpha).
+	if not (secret and visual == 1 and (LOOSE_PART_GROUPS[entry.group] or entry.secretOwn)) then
+		entry.secretOwn = nil
 		entry.applied = visual * (entry.baseAlpha or 1)
 		-- (The cast bar while it shows Fishing is kept hidden: hideFishingCastBar, Camera.)
 		if entry.frame.cinematicFishingHidden then
@@ -598,14 +601,37 @@ local OnOwnSetAlpha = ns.Profiled("Own SetAlpha hook", function(frame, alpha)
 	end
 	if not (issecretvalue and issecretvalue(alpha)) then
 		entry.baseAlpha = alpha
+		entry.secretOwn = nil
+	else
+		entry.secretOwn = true
 	end
 	entry.applied = set -- (so ApplyAlpha doesn't take it again)
+	ApplyAlpha(entry)
+end)
+
+-- An addon dimming its frame by a secret answer (DaylightUI's range fade on
+-- its party and raid tiles, 5 times a second on Forever): an alpha that reads
+-- back secret. While we don't fade the frame it's left as the addon set it;
+-- written over with full alpha, the tile blinked between dim and full at
+-- every tick (out-of-range party members, a player's clip 2026-11-18). While
+-- we fade it, ours goes straight back on. (On ns: this file is at the 200
+-- locals cap.)
+ns.OnOwnBoolAlpha = ns.Profiled("Own SetAlphaFromBoolean hook", function(frame)
+	local entry = alphaHooked[frame]
+	if not entry or entry.settingAlpha then
+		return
+	end
+	if ns.AlphaTrace then ns.AlphaTrace(entry, "SetAlphaFromBoolean", "secret") end
+	entry.secretOwn = true
 	ApplyAlpha(entry)
 end)
 
 local function HookOwnAlpha(entry)
 	if alphaHooked[entry.frame] == nil then
 		hooksecurefunc(entry.frame, "SetAlpha", OnOwnSetAlpha)
+		if type(entry.frame.SetAlphaFromBoolean) == "function" then
+			hooksecurefunc(entry.frame, "SetAlphaFromBoolean", ns.OnOwnBoolAlpha)
+		end
 	end
 	alphaHooked[entry.frame] = entry
 end

@@ -9,6 +9,11 @@
 -- changing, a screenshot every 5 seconds and a verdict per step: flickers
 -- (gone then back within a second) and how often its alpha was set back and
 -- forth. "partyflicker 3": only that step. Typed again while running: stops.
+-- (2026-11-19, after a run where DaylightUI dimmed with plain SetAlpha only:
+-- its repaints are counted by kind, plain or SetAlphaFromBoolean (secret),
+-- an addon's or ours logged only when the value changes, each party unit's
+-- dead / ghost / in range logged as it changes, and a step 5 for a member
+-- who's dead and far off, the player's clip. "partyflicker 35": those two.)
 -- Dev copy only (CinematicDev.toc).
 local _, ns = ...
 
@@ -23,14 +28,16 @@ local ADDONS = { "DaylightUI", "DaylightUI_UnitFrames", "ElvUI", "EllesmereUI", 
 	"Grid2", "VuhDo", "Cell", "ShadowedUnitFrames", "PitBull4", "Aptechka" }
 
 local STEPS = {
-	{ key = "still", length = 30, cine = false, say = "1/4 CINEMODE OFF: in a party, stand still, mouse away " ..
+	{ key = "still", length = 30, cine = false, say = "1/5 CINEMODE OFF: in a party, stand still, mouse away " ..
 		"from your frames. Watch the party frames: do they blink?" },
-	{ key = "cine", length = 30, cine = true, say = "2/4 CINEMODE ON: stand still, mouse away from your " ..
+	{ key = "cine", length = 30, cine = true, say = "2/5 CINEMODE ON: stand still, mouse away from your " ..
 		"frames. Watch the party frames: do they blink?" },
-	{ key = "range", length = 40, cine = true, say = "3/4 OUT OF RANGE: CineMode on, walk far from a party " ..
+	{ key = "range", length = 40, cine = true, say = "3/5 OUT OF RANGE: CineMode on, walk far from a party " ..
 		"member (or have them walk off), then back. Watch their frame" },
-	{ key = "fight", length = 40, cine = true, say = "4/4 FIGHT: CineMode on, start a fight with your party " ..
+	{ key = "fight", length = 40, cine = true, say = "4/5 FIGHT: CineMode on, start a fight with your party " ..
 		"close by, keep it going. Watch the party frames" },
+	{ key = "ghost", length = 60, cine = true, say = "5/5 DEAD: CineMode on, a party member dies far from you " ..
+		"(or you die and release). Watch their frames: do they blink?" },
 }
 
 local run
@@ -132,14 +139,46 @@ local function Trace(entry, what, value)
 		step.ours = (step.ours or 0) + 1
 	else
 		step.theirs = (step.theirs or 0) + 1
+		local kind = what == "SetAlphaFromBoolean" and "secret" or "plain"
+		step[kind] = (step[kind] or 0) + 1
+		watch[kind] = (watch[kind] or 0) + 1
 		-- (Ours straight after theirs, again and again: a tug of war.)
 		if watch.lastOurs and now - watch.lastOurs < 0.05 then step.tugs = (step.tugs or 0) + 1 end
 	end
 	if what == "ours" then watch.lastOurs = now end
+	-- (Logged when it changes: the same value 5 times a second filled the log.)
+	local said = what .. " " .. Num(value)
+	if watch["last" .. (what == "ours" and "Ours" or "Theirs")] == said then return end
+	watch["last" .. (what == "ours" and "Ours" or "Theirs")] = said
 	step.lines = (step.lines or 0) + 1
 	if step.lines <= MAX_LINES then
 		Log(("%s %.2fs %s %s %s (fade %s, base %s)%s"):format(step.key, now - step.at - READ, watch.label, what,
 			Num(value), Num(entry.alpha), Num(entry.baseAlpha), what == "ours" and "" or (" by " .. Caller())))
+	end
+end
+
+-- Each party unit's state (dead, ghost, connected, in range), logged as it
+-- changes; a secret answer says so.
+local function Ask(fn, ...)
+	if type(fn) ~= "function" then return "?" end
+	local ok, a, b = pcall(fn, ...)
+	if not ok then return "error" end
+	if Secret(a) then return "secret" end
+	if b ~= nil and not Secret(b) and b ~= true then return "unchecked" end
+	return tostring(a)
+end
+local function SampleUnits(step, now)
+	run.unitState = run.unitState or {}
+	for _, unit in ipairs({ "player", "party1", "party2", "party3", "party4" }) do
+		if UnitExists(unit) then
+			local state = ("dead %s, ghost %s, connected %s, in range %s"):format(Ask(UnitIsDead, unit),
+				Ask(UnitIsGhost, unit), Ask(UnitIsConnected, unit),
+				unit == "player" and "-" or Ask(UnitInRange, unit))
+			if state ~= run.unitState[unit] then
+				run.unitState[unit] = state
+				Log(("%s %.2fs unit %s: %s"):format(step.key, now - step.at - READ, unit, state))
+			end
+		end
 	end
 end
 
@@ -161,9 +200,11 @@ local function Sample(step, now)
 				Log(("%s %.2fs %s %s"):format(step.key, now - step.at - READ, watch.label, state))
 			end
 		end
-		-- (Up: shown and drawn over a fifth; secret counts as up. A flicker:
-		-- gone then back within FLICKER_GAP.)
-		local up = visible and (not okE or Secret(drawn) or drawn > 0.2)
+		-- (Up: shown and drawn over a fifth; secret counts as up, and so does
+		-- none at all: a frame under a secret alpha gets no effective alpha,
+		-- the game's raid-style party frames on Forever. A flicker: gone then
+		-- back within FLICKER_GAP.)
+		local up = visible and (not okE or type(drawn) ~= "number" or Secret(drawn) or drawn > 0.2)
 		if watch.up ~= nil and up ~= watch.up then
 			if up and watch.downAt and now - watch.downAt <= FLICKER_GAP then
 				step.flickers = (step.flickers or 0) + 1
@@ -182,8 +223,8 @@ local function Verdict(step)
 	if step.skip then return ("%s: SKIPPED, %s"):format(step.key, step.skip) end
 	if run.count == 0 then return ("%s: FAILED, no party frames found (in a party?)"):format(step.key) end
 	local fight = step.spec.key ~= "fight" and step.fighting and ", a fight came in" or ""
-	local churn = ("addon SetAlpha %d, ours %d, back to back %d, state changes %d"):format(step.theirs or 0,
-		step.ours or 0, step.tugs or 0, step.changes or 0)
+	local churn = ("addon SetAlpha %d (plain %d, secret %d), ours %d, back to back %d, state changes %d"):format(
+		step.theirs or 0, step.plain or 0, step.secret or 0, step.ours or 0, step.tugs or 0, step.changes or 0)
 	if (step.flickers or 0) > 0 then
 		return ("%s: FLICKERED %d times (%s%s)"):format(step.key, step.flickers, churn, fight)
 	end
@@ -206,6 +247,10 @@ local function Finish(stopped)
 	end
 	for _, watch in pairs(run.watched) do
 		if watch.flickers then Log(("frame %s flickered %d times"):format(watch.label, watch.flickers)) end
+		if watch.plain or watch.secret then
+			Log(("frame %s repainted by its addon: plain %d, secret %d"):format(watch.label, watch.plain or 0,
+				watch.secret or 0))
+		end
 	end
 	ns.PadTestBox(stopped and "Test stopped." or "Test done.", "/reload, then say: check log", 1, 0.82, 0)
 	C_Timer.After(20, function() if not run then ns.PadTestBoxHide() end end)
@@ -244,6 +289,9 @@ local function OnUpdate()
 		step.started = true
 		step.at = now
 		FindFrames()
+		-- (Each step logs its first values again.)
+		for _, watch in pairs(run.watched) do watch.lastTheirs, watch.lastOurs = nil, nil end
+		run.unitState = nil
 		Log(("%s start: %d frames watched, CineMode %s, party frames %s"):format(step.key, run.count,
 			tostring(cine), ns.RaidStyleParty and (ns.RaidStyleParty() and "raid style" or "normal") or "?"))
 	end
@@ -261,6 +309,10 @@ local function OnUpdate()
 		FindFrames()
 	end
 	Sample(step, now)
+	if now - (step.unitsAt or 0) >= 0.25 then
+		step.unitsAt = now
+		SampleUnits(step, now)
+	end
 	if now - (step.shotAt or 0) >= SHOT_EVERY then
 		step.shotAt = now
 		step.shots = (step.shots or 0) + 1

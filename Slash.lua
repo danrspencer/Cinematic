@@ -1766,6 +1766,13 @@ local function HandleSlash(msg)
 	elseif cmd == "debug" and arg == "lowmana" then
 		-- (Dev copy: one run recording why low mana doesn't bring your frames up, LowManaTest.lua.)
 		if ns.LowManaTest then ns.LowManaTest() else ns.Print("/cine debug lowmana is in the dev copy only.") end
+	elseif cmd == "debug" and arg == "zonecard" then
+		-- (Dev copy: one run checking a zone change shows one zone title, not two, ZoneCardTest.lua.)
+		if ns.ZoneCardTest then ns.ZoneCardTest() else ns.Print("/cine debug zonecard is in the dev copy only.") end
+	elseif cmd == "debug" and arg:find("^whytest") then
+		-- (Dev copy: one run checking the Why window's tabs against the game, WhyTest.lua.)
+		if ns.WhyTest then ns.WhyTest(arg:match("^whytest%s*(.*)$"))
+		else ns.Print("/cine debug whytest is in the dev copy only.") end
 	elseif cmd == "debug" and arg:find("^hrtest") then
 		-- (Dev copy: one run checking Health & Resources' shares, opacity and fade range, ThresholdTest.lua.)
 		if ns.ThresholdTest then ns.ThresholdTest(arg:match("^hrtest%s*(.*)$"))

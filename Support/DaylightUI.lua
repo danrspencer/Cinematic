@@ -22,11 +22,15 @@ for _, known in ipairs({
 		about = L["its first damage meter window"],
 		names = { "DaylightUIDamageMeter" },
 	},
+	-- (Its second meter became the first of the windows you add, 1.9: any
+	-- number, meters, threat and summaries, each DaylightUIMeterWindow_<id>.
+	-- One row for all of them, as for Details' windows; key kept, so the
+	-- second meter's settings carry over.)
 	{
 		key = "dlMeter2", from = "dlMeters", addon = "DaylightUI_InfoPanel",
-		label = "DaylightUI damage meter 2", short = "DaylightUI meter 2",
-		about = L["its second damage meter window"],
-		names = { "DaylightUIDamageMeter2" },
+		label = "DaylightUI meter windows", short = "DaylightUI windows",
+		about = L["the meter windows you add to it"],
+		patterns = { "^DaylightUIMeterWindow_" },
 	},
 	{
 		key = "dlThreat", addon = "DaylightUI_InfoPanel",
@@ -100,14 +104,24 @@ for _, known in ipairs({
 	table.insert(ns.ADDON_FRAMES, known)
 end
 
--- (Frames those rows fade: left out of the areas below.)
-local OWN_ROWS = {}
+-- (Frames those rows fade, by name or pattern: left out of the areas below.)
+local OWN_ROWS, OWN_PATTERNS = {}, {}
 for _, known in ipairs(ns.ADDON_FRAMES) do
 	if known.suite == "DaylightUI" then
 		for _, name in ipairs(known.names or {}) do
 			OWN_ROWS[name] = true
 		end
+		for _, pattern in ipairs(known.patterns or {}) do
+			OWN_PATTERNS[#OWN_PATTERNS + 1] = pattern
+		end
 	end
+end
+local function OwnRow(name)
+	if OWN_ROWS[name] then return true end
+	for _, pattern in ipairs(OWN_PATTERNS) do
+		if name:find(pattern) then return true end
+	end
+	return false
 end
 
 -- Its fade areas by Standard Frames row: the row and the fade group. Bars
@@ -166,7 +180,7 @@ local function AddAreaFrame(frame, row, group)
 		return
 	end
 	local name = frame:GetName()
-	if name and OWN_ROWS[name] then
+	if name and OwnRow(name) then
 		return
 	elseif name then
 		if not named[name] then
@@ -276,6 +290,18 @@ local function QoLOn(key)
 	end
 end
 ns.WhenAddonLoads("DaylightUI_QoL", function()
+	-- Its zone title showing a place's name as you walk into an inn: our
+	-- Rested card (the inn's name too) waits till it's gone, rather than
+	-- both names at once (the user's pick, 2026-11-19).
+	if ns.AddCardWait then
+		ns.AddCardWait(function(id)
+			local title = _G.DaylightUIZoneTitle
+			if id == "rested" and type(title) == "table" and ns.Flag(title:IsVisible()) then
+				return L["DaylightUI's zone title is showing"]
+			end
+			return nil
+		end)
+	end
 	local function Scene(key)
 		return function() return ns.TriggerRowNow(key) ~= nil end
 	end
