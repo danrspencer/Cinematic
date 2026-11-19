@@ -1,4 +1,4 @@
-# version 1.9.5
+# version 1.9.6
 EnableMouse(false or a variable) in DaylightUI/Book/Fight.lua
 EnableMouse(false or a variable) in DaylightUI/Character/List.lua
 EnableMouse(false or a variable) in DaylightUI/Character/Slots.lua
@@ -39,6 +39,7 @@ EnableMouse(false or a variable) in DaylightUI_QoL/Campfire.lua
 EnableMouse(false or a variable) in DaylightUI_QoL/CursorRing.lua
 EnableMouse(false or a variable) in DaylightUI_QoL/ErrorText.lua
 EnableMouse(false or a variable) in DaylightUI_QoL/Fishing.lua
+EnableMouse(false or a variable) in DaylightUI_QoL/Flight.lua
 EnableMouse(false or a variable) in DaylightUI_QoL/LevelUp.lua
 EnableMouse(false or a variable) in DaylightUI_QoL/RepBanner.lua
 EnableMouse(false or a variable) in DaylightUI_QoL/ZoneTitle.lua
@@ -128,6 +129,8 @@ frame DaylightUIDruidBars
 frame DaylightUIErrorText
 frame DaylightUIFishScene
 frame DaylightUIFlightTimer
+frame DaylightUIFlightWelcome
+frame DaylightUIFlightWelcomeHolder
 frame DaylightUIFrame_
 frame DaylightUIFrame_*
 frame DaylightUIInfoPanel
@@ -208,6 +211,7 @@ hooks QuestInfo_Display
 hooks QuestLogQuests_Update
 hooks QuestMapFrame_ShowQuestDetails
 hooks SendMail
+hooks SendMailFrame_EnableSendMailButton
 hooks SetSendMailShowing
 hooks ShowLegacyChallenge
 hooks SlashCmdList:NEEDROLL

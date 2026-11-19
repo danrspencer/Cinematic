@@ -361,6 +361,17 @@ ns.WhenAddonLoads("DaylightUI_QoL", function()
 		-- (Hide object icons goes with the glow: one row.)
 		if each[1] == "questObjectGlow" then ns.AddFeatureYield("hideObjectIcons", QoLOn(each[2]), row) end
 	end
+	-- Its "Welcome to <place>" as you land from a flight (v1.9.6), against our
+	-- Flight arrival card. It plays only with its flight timer on too (its
+	-- welcome is on unless switched off).
+	ns.AddFeatureYield("card:arrival", function()
+		local dui = DUI()
+		if dui and dui.Get and dui:Get("QoL", "flightTimer") == true and dui:Get("QoL", "flightWelcome") ~= false then
+			return LABEL
+		end
+		return nil
+	end, { key = "card:arrival", addon = LABEL, label = "Flight arrival card", group = "scenes", ours = Card("arrival"),
+		hide = { "DaylightUIFlightWelcome" }, about = "The banner as you land from a flight" })
 end)
 
 -- Its looks against the Style hub's (Addon Conflicts' Style rows: one look

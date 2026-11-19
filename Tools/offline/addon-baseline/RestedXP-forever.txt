@@ -1,0 +1,89 @@
+# version v4.11.37
+EnableMouse(false or a variable) in RXPGuides/GuideWindow.lua
+EnableMouse(false or a variable) in RXPGuides/InventoryManager.lua
+EnableMouse(false or a variable) in RXPGuides/UI/V2/Core.lua
+EnableMouse(false or a variable) in RXPGuides/UI/V2/GuideImporter.lua
+SetIgnoreParentAlpha(true) in RXPGuides/LevelingTracker.lua
+frame $parentBarContainer
+frame $parentButton
+frame $parentCheck
+frame $parentCogwheel
+frame $parentCooldown
+frame $parentGuideName
+frame $parentItemFrame
+frame $parentRXP
+frame $parentRXPTalents
+frame $parentResize
+frame $parentScrollFrame
+frame $parent_
+frame $parent_MenuFrame
+frame $parent_RXPLevelText
+frame $parent_bottomFrame
+frame $parent_frame
+frame $parent_frame_
+frame $parent_levelText
+frame $parent_number
+frame $parent_steps
+frame $parent_title
+frame AuctionFrameTab
+frame RXPDangerFrame
+frame RXPDeleteJunk
+frame RXPFrame
+frame RXPG_ARROW
+frame RXPG_LevelMenuFrame
+frame RXPG_MenuFrame
+frame RXPG_SplitsMenuFrame
+frame RXPGuidesTrainerFrame
+frame RXPInventory_DeleteJunk
+frame RXPItemFrame
+frame RXPItemUpgradesComparison
+frame RXPJunkHandler
+frame RXPLevelSplits
+frame RXPQuestLogCleanupButton
+frame RXPTELEPORTHOME
+frame RXPTELEPORTTO
+frame RXPTargetFrame
+frame RXPTargetFrame_EnemyButton
+frame RXPTargetFrame_EnemyButton*
+frame RXPTargetFrame_FriendlyButton
+frame RXPTargetFrame_FriendlyButton*
+frame RXPV2ScrollBarTemplate
+frame RXPV2ScrollDownButtonTemplate
+frame RXPV2ScrollUpButtonTemplate
+frame RXP_
+frame RXP_*
+frame RXP_MMMenuFrame
+frame RXP_TalentsMenuFrame
+frame RXP_WMMenuFrame
+hooks C_Container:UseContainerItem
+hooks C_Item:UseItemByName
+hooks CastSpellByID
+hooks CastSpellByName
+hooks ContainerFrame_Update
+hooks NotifyInspect
+hooks PlayerTalentFrameTalent_OnEnter
+hooks QuestLog_SetSelection
+hooks SelectQuestLogEntry
+hooks TakeTaxiNode
+hooks TaxiNodeOnButtonEnter
+hooks ToggleAllBags
+hooks ToggleBag
+hooks ToggleQuestLog
+hooks UseAction
+hooks UseContainerItem
+hooks UseItemByName
+hooks WorldMapFrame:OnCanvasScaleChanged
+hooks WorldMapFrame:OnMapChanged
+partial mouse handling in RXPGuides/GuideWindow.lua
+partial mouse handling in RXPGuides/InventoryManager.lua
+partial mouse handling in RXPGuides/map.lua
+sets CVar OutlineEngineMode
+sets CVar RAIDOutlineEngineMode
+sets CVar graphicsOutlineMode
+sets CVar maxfps
+sets CVar nameplateMaxDistance
+sets CVar outlineModeShowLootEffectWhenDisabled
+sets CVar previewTalents
+sets CVar questPOI
+sets CVar raidGraphicsOutlineMode
+sets CVar scriptErrors

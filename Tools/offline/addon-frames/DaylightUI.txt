@@ -1,7 +1,7 @@
 # DaylightUI's named frames that Support/DaylightUI.lua doesn't name, each with
 # why it needs no line there (Tools/addon-check.py check 3). A new frame of
 # its that's in neither = a MISS: decide it (a row, a fade, or here with why).
-# One per line: name or glob (*), a space, why. Checked against v1.9.5,
+# One per line: name or glob (*), a space, why. Checked against v1.9.6,
 # 2026-11-19.
 
 # On screen, faded through its fade areas (Support file AREAS: each area's
@@ -34,6 +34,7 @@ DaylightUIBuffsAnchor 1x1 anchor point: draws nothing
 DaylightUIDebuffsAnchor 1x1 anchor point: draws nothing
 DaylightUIBuffsHolder mover holder the buff bar is placed by: draws nothing
 DaylightUIDebuffsHolder mover holder the debuff bar is placed by: draws nothing
+DaylightUIFlightWelcomeHolder mover holder its landing welcome is placed by: draws nothing (the welcome itself: the Flight arrival card conflict row)
 DaylightUITrackerAnchor anchor point for the game's quest tracker: draws nothing
 DaylightUITooltipAnchor anchor point for tooltips: draws nothing
 

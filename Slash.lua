@@ -224,6 +224,8 @@ local function PrintDebugHelp()
 	print("  /cine debug deathtest - one run checking the Death Vision page: its menu, Test, sliders and switch, with screenshots (dev copy)")
 	print("  /cine debug resettest [logout] - one run checking what a reset puts back (layouts, plate settings), or with logout the plate settings going back at logout, across a reload (dev copy)")
 	print("  /cine debug euiswing - one run recording why EllesmereUI's swing timer stays hidden in CineMode (dev copy; again to stop)")
+	print("  /cine debug solo <Addon> [more] - only that addon (its parts and what it needs) and Cinematic load: turns the rest off and reloads; solo off brings them back (dev copy)")
+	print("  /cine debug addontest <Addon> [quick] - one run testing our support for it: every row hidden and shown, and every frame of it on screen covered or not (dev copy; again to stop)")
 	print("  /cine debug euicd - one run recording why an icon goes missing from EllesmereUI's cooldown bar (dev copy; again to stop)")
 	print("  /cine debug euicd bars - one run recording why EllesmereUI's whole cooldown bars stay hidden, CineMode off then on, out of and in a fight (dev copy)")
 	print("  /cine debug layoutexport - save the Edit Mode layout you're on as an export string (in the saved settings: /reload after)")
@@ -547,6 +549,12 @@ local function HandleSlash(msg)
 	elseif cmd == "debug" and (arg == "resettest" or arg == "resettest logout") then
 		-- (Dev copy: one run checking what a reset puts back, layouts and plate settings, ResetTest.lua.)
 		if ns.ResetTest then ns.ResetTest(arg:match("logout")) else ns.Print("/cine debug resettest is in the dev copy only.") end
+	elseif cmd == "debug" and (arg == "solo" or arg:find("^solo%s")) then
+		-- (Dev copy: only one addon with Cinematic, AddonTest.lua.)
+		if ns.SoloAddons then ns.SoloAddons(arg:match("^solo%s*(.-)%s*$")) else ns.Print("/cine debug solo is in the dev copy only.") end
+	elseif cmd == "debug" and arg:find("^addontest") then
+		-- (Dev copy: one run testing our support for an addon, AddonTest.lua.)
+		if ns.AddonTest then ns.AddonTest(arg:match("^addontest%s*(.-)%s*$")) else ns.Print("/cine debug addontest is in the dev copy only.") end
 	elseif cmd == "debug" and arg == "euiswing" then
 		-- (Dev copy: one run recording why EllesmereUI's swing timer stays hidden, EuiSwingTest.lua.)
 		if ns.EuiSwingTest then ns.EuiSwingTest() else ns.Print("/cine debug euiswing is in the dev copy only.") end

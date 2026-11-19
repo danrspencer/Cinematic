@@ -13658,6 +13658,12 @@ function ns.LeaveAlone(names)
 	end
 end
 
+-- Whether a support file left the frame alone on purpose (the addon test,
+-- Dev/AddonTest.lua: not a missed frame).
+function ns.IsLeftAlone(name)
+	return leftAlone[name] or false
+end
+
 -- A frame its own search found (see ns.AddScanner), unnamed ones too. own and
 -- hook as for ns.FadeWithRow.
 function ns.AddFoundFrame(frame, group, own, hook)

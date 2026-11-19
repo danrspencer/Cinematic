@@ -76,6 +76,7 @@ for f in sorted(os.listdir(support_dir)):
 
 print("## 1. Installed\n")
 scan_dirs = OrderedDict()  # folder name -> path (the first client listed wins: Forever first)
+versions_by_folder = OrderedDict()  # folder name -> {client: version}
 for client, folder in installs:
     name = os.path.basename(folder)
     tocs = [t for t in os.listdir(folder) if t.lower().endswith(".toc")]
@@ -94,7 +95,16 @@ for client, folder in installs:
         if key in meta:
             print(f"    {key}: {meta[key]}")
     scan_dirs.setdefault(name, folder)
+    versions_by_folder.setdefault(name, {})[client] = meta.get("Version", "?")
 print()
+differ = OrderedDict()  # ((client, version), ...) -> its folders
+for name, by_client in versions_by_folder.items():
+    if len(set(by_client.values())) > 1:
+        differ.setdefault(tuple(by_client.items()), []).append(name)
+for pairs, names in differ.items():
+    print(f"**Versions differ** ({', '.join(f'{c} v{v}' for c, v in pairs)}) for {', '.join(names)}. "
+          "Section 2 reads every client's copy; sections 3-6 the first one only.\n")
+print("Is it the latest? `python -I .claude/skills/addon-support/latest_version.py " + ADDON + "`\n")
 
 files = []
 for name, folder in scan_dirs.items():
@@ -195,7 +205,9 @@ for rel, path in files:
     if path.lower().endswith(".xml"):
         for i, line in enumerate(lines, 1):
             for m in XML_FRAME.finditer(line):
-                add("named", f"{rel}:{i}", f"{m.group(1)} {m.group(2)}")
+                # (Not a template: a virtual one is no frame.)
+                if not re.search(r"\bvirtual=\"true\"", line, re.I):
+                    add("named", f"{rel}:{i}", f"{m.group(1)} {m.group(2)}")
         continue
     in_block = False
     for i, line in enumerate(lines, 1):
@@ -284,24 +296,46 @@ print("## 2. Frames it creates\n")
 spec = importlib.util.spec_from_file_location("addon_check", os.path.join(REPO, "Tools", "addon-check.py"))
 check = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(check)
-support_code, support_name = "", None
-for each_name, each_code, each_addons, _ in check.support_files():
-    if any(a.lower() == ADDON.lower() for a in each_addons):
-        support_code, support_name = each_code, each_name
+# (Every Support file for it or one of its parts, together, as addon-check
+# reads them: Questie has three, EllesmereUI one per part.)
+together = [s for s in check.support_files() if any(a.lower().startswith(ADDON.lower()) for a in s[2])]
+support_code = "\n".join(s[1] for s in together)
+support_name = together[0][0] if together else None
 prefixes = {re.match(r"[A-Za-z][A-Za-z0-9]*", ADDON).group(0)} | set(check.EXTRA_PREFIXES.get(ADDON, []))
-made = check.frames_made([(rel, read(path)) for rel, path in files], prefixes)
-accounted = check.load_accounted(support_name) if support_name else None
+lists_found = [check.load_accounted(s[0]) for s in together]
+accounted = None if all(x is None for x in lists_found) else {k: v for x in lists_found if x for k, v in x.items()}
+# Every client's copy on its own (their versions can differ: a frame only
+# one of them makes is still a frame), Libs and Locales left out.
+made, made_in = {}, defaultdict(set)
+for client in sorted({c for c, _ in installs}, key=CLIENTS.index):
+    copy = []
+    for c, folder in installs:
+        if c != client:
+            continue
+        name = os.path.basename(folder)
+        for root, dirs, fnames in os.walk(folder):
+            for f in fnames:
+                if f.lower().endswith((".lua", ".xml")):
+                    path = os.path.join(root, f)
+                    copy.append((name + "/" + os.path.relpath(path, folder).replace("\\", "/"), read(path)))
+    for frame_name, where in check.frames_made(copy, prefixes).items():
+        made.setdefault(frame_name, where)
+        made_in[frame_name].add(client)
 # (Its frames not starting with its name: the plain search's list.)
 for where, what in lists["named"]:
     made.setdefault(what.split(" ", 1)[1], where)
-marks = {n: (check.handled_by(n, support_code, prefixes, accounted) if support_name else None) for n in made}
+clients_seen = {c for c, _ in installs}
+marks = {n: (check.handled_by(n, support_code, prefixes, accounted) if together else None) for n in made}
 open_ones = [n for n in made if not marks[n]]
 print(f"### Named ({len(made)}, {len(open_ones)} UNHANDLED)\n")
 print("UNHANDLED = neither named by the Support file nor in Tools/offline/addon-frames/<Support>.txt: "
       "decide each one (a row, a fade area, or listed with why it needs none). * = a part of a built name "
-      "that can't be read.\n")
+      "that can't be read. (its template's) = a child its template gives it. Static reading misses frames "
+      "built at runtime: /cine debug addontest finds those in game.\n")
 for name in sorted(made, key=lambda n: (marks[n] is not None, n)):
-    print(f"- {name} `{made[name]}` " + (f"({marks[name]})" if marks[name] else "**UNHANDLED**"))
+    only = made_in.get(name, clients_seen)
+    tag = f" (only {', '.join(sorted(only))})" if len(clients_seen) > 1 and only != clients_seen else ""
+    print(f"- {name} `{made[name]}`{tag} " + (f"({marks[name]})" if marks[name] else "**UNHANDLED**"))
 print()
 show("Built names (resolve each pattern: numbered, prefixed, from a variable)", lists["built"])
 show_counts("Unnamed frames, by file (need a scanner or match() if they matter)", {"unnamed CreateFrame"})

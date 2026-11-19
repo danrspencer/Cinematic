@@ -48,6 +48,9 @@ EXTRA_PREFIXES = {
     # frames ERF, cooldowns ECME_, cast line ECL_, minimap EWB_, meters EDM_,
     # data bars EDB_, window skins WSkin; Ellesmere for EllesmereEAB_ and the like.)
     "EllesmereUI": ["Ellesmere", "EUI", "EAB", "ERB_", "ERF", "ECME_", "ECL_", "EWB_", "EDM_", "EDB_", "WSkin"],
+    # (Folder RXPGuides, frames RXPFrame, RXPG_ARROW...: without it the check
+    # saw none of them, till 2026-11-19.)
+    "RXPGuides": ["RXP"],
 }
 # Names a Support file mentions that are built in ways a text search can't
 # find (left out of check 1): "<Support file>": {names}.
@@ -256,23 +259,81 @@ def frames_made(files, prefixes):
         for field, value in FIELD_SET.findall(code):
             fields.setdefault(field, set()).add(value)
     made = {}
+    # (Templates first, from every XML file: a frame made from one gets its
+    # $parent children, in XML or by CreateFrame's template argument.)
+    templates = {}
     for rel, code, xml in codes:
         if xml:
-            for m in XML_NAME.finditer(code):
-                # (A virtual one is a template, not a frame.)
-                tag = code[m.start():code.find(">", m.end()) + 1]
-                if m.group(1).startswith(starts) and not re.search(r"\bvirtual=\"true\"", tag, re.I):
-                    made.setdefault(m.group(1), "%s:%d" % (rel, code.count("\n", 0, m.start()) + 1))
+            xml_frames(rel, code, starts, templates, None)
+    for rel, code, xml in codes:
+        if xml:
+            xml_frames(rel, code, starts, templates, made)
             continue
         for m in MAKE_CALL.finditer(code):
             args = call_args(code, m.end())
             if len(args) < 2:
                 continue
+            where = "%s:%d" % (rel, code.count("\n", 0, m.start()) + 1)
+            inherits = STRING.match(args[3]) if len(args) > 3 else None
             # (The name, or "a and b or nil": each side that could be one.)
             for expr in re.split(r"\s+and\s+|\s+or\s+", args[1]):
                 for name in name_patterns(expr.strip(), fields, starts):
-                    made.setdefault(name, "%s:%d" % (rel, code.count("\n", 0, m.start()) + 1))
+                    made.setdefault(name, where)
+                    for template in (inherits.group(1).split(",") if inherits else ()):
+                        for child in templates.get(template.strip(), ()):
+                            made.setdefault(name + child, where + " (its template's)")
     return made
+
+
+# XML frames, nested: a name with $parent is its parent frame's name and the
+# rest ("$parentBar" in DaylightUIFrame = DaylightUIFrameBar), missed while
+# only whole names were read (till 2026-11-19). A virtual frame is a
+# template: its $parent children are kept (templates: name -> suffixes) and
+# added to each frame made from it.
+XML_TAG = re.compile(r"<(/?)([A-Za-z]\w*)\b([^>]*?)(/?)>", re.S)
+XML_FRAME_TAGS = {"frame", "button", "statusbar", "scrollframe", "checkbutton", "cooldown", "playermodel",
+                  "slider", "editbox", "model", "modelscene", "messageframe", "scrollingmessageframe",
+                  "simplehtml", "colorselect", "gametooltip", "dressupmodel", "cinematicmodel", "tabardmodel"}
+VIRTUAL = re.compile(r"\bvirtual=\"true\"", re.I)
+
+
+def xml_frames(rel, text, starts, templates, made):
+    """made None: collect its templates' $parent children. Else add each named frame to made."""
+    text = re.sub(r"<!--.*?-->", lambda c: "\n" * c.group(0).count("\n"), text, flags=re.S)
+    stack = []  # (tag, resolved name or None, virtual, template it's inside or None)
+    for m in XML_TAG.finditer(text):
+        closing, tag, attrs, self_closing = m.group(1), m.group(2).lower(), m.group(3), m.group(4)
+        if closing:
+            while stack:
+                if stack.pop()[0] == tag:
+                    break
+            continue
+        is_frame = tag in XML_FRAME_TAGS
+        raw = re.search(r"\bname=\"([^\"]+)\"", attrs) if is_frame else None
+        own_virtual = bool(VIRTUAL.search(attrs))
+        virtual = own_virtual or any(e[2] for e in stack)
+        parent = next((e[1] for e in reversed(stack) if e[1]), None)
+        template = next((e[3] for e in reversed(stack) if e[3]), None)
+        name = None
+        if raw:
+            name = raw.group(1)
+            if "$" in name:
+                name = re.sub(r"\$parent", lambda _: parent, name, flags=re.I) if parent else None
+        if raw and own_virtual and "$" not in raw.group(1):
+            template = raw.group(1)
+            templates.setdefault(template, set())
+        elif raw and made is None and template and name and name.startswith(template):
+            # (A child of a template: its name past the template's.)
+            templates[template].add(name[len(template):])
+        if made is not None and name and not virtual and name.startswith(starts):
+            where = "%s:%d" % (rel, text.count("\n", 0, m.start()) + 1)
+            made.setdefault(name, where)
+            for inherit in re.findall(r"\binherits=\"([^\"]+)\"", attrs):
+                for each in inherit.split(","):
+                    for child in templates.get(each.strip(), ()):
+                        made.setdefault(name + child, where + " (its template's)")
+        if not self_closing:
+            stack.append((tag, name if is_frame else None, virtual, template))
 
 
 def accounted_path(support):

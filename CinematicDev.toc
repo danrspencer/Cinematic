@@ -251,6 +251,7 @@ Dev\Sweep.lua
 Dev\Prerelease.lua
 Dev\PreviewWatch.lua
 Dev\EuiSwingTest.lua
+Dev\AddonTest.lua
 Dev\EuiCooldownTest.lua
 Dev\BuffFadeTest.lua
 Dev\SpokenTest.lua

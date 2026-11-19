@@ -1,4 +1,4 @@
-# version 12.11.0
+# version 12.11.1
 EnableMouse(false or a variable) in Questie/Modules/Options/QuestieOptionsControls.lua
 EnableMouse(false or a variable) in Questie/Modules/QuestieNameplate.lua
 EnableMouse(false or a variable) in Questie/Modules/Tracker/TrackerBaseFrame.lua
