@@ -4723,6 +4723,30 @@ STEPS[#STEPS + 1] = function()
 		for _, point in pairs(ns.db.profileResetPoints or {}) do Who(point) end
 		ns.db.combatTextWhoDrawsV1 = true
 	end
+	-- The PRD's Keep up rows are off out of combat now (2026-11-19): shifting
+	-- into Cat Form brought the PRD up outside fights. A profile picked before
+	-- saved the old Out of combat share (95% health, 50% power): that one goes
+	-- to 0; one the player set to anything else stays. Saved profiles too. Once.
+	if not ns.db.prdKeepUpOffV1 then
+		local OLD = { prHealthPrd = 0.95, prPowerPrd = 0.5, prPowerMana = 0.5 }
+		local function Off(t)
+			if type(t) ~= "table" then return end
+			for key, was in pairs(OLD) do
+				if t[key .. "Always"] == was and t[key .. "LinkAlways"] ~= true then
+					t[key .. "Always"] = 0
+				end
+			end
+		end
+		Off(ns.db)
+		for _, saved in pairs(ns.db.profiles or {}) do
+			if type(saved) == "table" then
+				Off(saved)
+				Off(saved.settings)
+			end
+		end
+		for _, point in pairs(ns.db.profileResetPoints or {}) do Off(point) end
+		ns.db.prdKeepUpOffV1 = true
+	end
 end
 
 -- Runs them all, each on its own: an error is logged and reported (the

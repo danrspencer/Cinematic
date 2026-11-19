@@ -132,9 +132,9 @@ local function KeepUpPlayer(set, on)
 end
 local function KeepUpPrd(set, on, client)
 	if on then
-		ns.SetKeepUp(set, "prHealthPrd", unpack(ns.KEEP_UP_HEALTH))
-		ns.SetKeepUp(set, "prPowerPrd", unpack(ns.KEEP_UP_POWER))
-		if client == "retail" then ns.SetKeepUp(set, "prPowerMana", unpack(ns.KEEP_UP_POWER)) end
+		ns.SetKeepUp(set, "prHealthPrd", unpack(ns.KEEP_UP_PRD))
+		ns.SetKeepUp(set, "prPowerPrd", unpack(ns.KEEP_UP_PRD))
+		if client == "retail" then ns.SetKeepUp(set, "prPowerMana", unpack(ns.KEEP_UP_PRD)) end
 	else
 		ns.SetKeepUp(set, "prHealthPrd", 0)
 		ns.SetKeepUp(set, "prPowerPrd", 0)

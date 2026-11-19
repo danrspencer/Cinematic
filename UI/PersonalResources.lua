@@ -45,12 +45,15 @@ end
 -- full after combat, and out of combat under 95% (health) or 50% (power).
 ns.KEEP_UP_HEALTH = { 1, 0.99, 0.95 }
 ns.KEEP_UP_POWER = { 1, 0.99, 0.5 }
+-- The PRD's rows: off out of combat (user's pick, 2026-11-18): shifting into
+-- Cat Form empties your energy, which brought the PRD up outside fights.
+ns.KEEP_UP_PRD = { 1, 0.99, 0 }
 ns.KeepUpDefaults("prHealthPlayer", unpack(ns.KEEP_UP_HEALTH)) -- the player frame, health
 ns.KeepUpDefaults("prPowerPlayer", unpack(ns.KEEP_UP_POWER))   -- ...power
 ns.KeepUpDefaults("prPetHealth", unpack(ns.KEEP_UP_POWER))     -- the pet frame, its health (50% out of combat)
-ns.KeepUpDefaults("prHealthPrd", unpack(ns.KEEP_UP_HEALTH))    -- the personal health bar (as the player frame's)
-ns.KeepUpDefaults("prPowerPrd", unpack(ns.KEEP_UP_POWER))      -- the personal power bar
-ns.KeepUpDefaults("prPowerMana", unpack(ns.KEEP_UP_POWER))     -- the Cine Mana Bar, your mana
+ns.KeepUpDefaults("prHealthPrd", unpack(ns.KEEP_UP_PRD))       -- the personal health bar
+ns.KeepUpDefaults("prPowerPrd", unpack(ns.KEEP_UP_PRD))        -- the personal power bar
+ns.KeepUpDefaults("prPowerMana", unpack(ns.KEEP_UP_PRD))       -- the Cine Mana Bar, your mana
 -- Fade to, the health rows' (player frame, PRD): under the row's share now
 -- the frame fades in as your health drops, fully up at this share. 0: none,
 -- fully up as soon as it's under. (Vitals Vision's Health bars till
