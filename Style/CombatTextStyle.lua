@@ -626,7 +626,8 @@ ns.combatTextWhose = { mine = 0, others = 0 }
 -- in and out of fights, 2026-11-19), and a stray line still comes now and
 -- then: one did, and from then on every hit waited for lines that didn't
 -- come, no numbers again. So on retail a restricted log is no log. Retail
--- only till Forever's answer is known: lines do come there.)
+-- only: Forever says restricted too (2026-11-19) yet its lines do come, so
+-- there the answer tells nothing.)
 local function Restricted()
 	if not ns.isRetail then return false end
 	local IsRestricted = ns.Check.Api("C_CombatLog.IsCombatLogRestricted")
