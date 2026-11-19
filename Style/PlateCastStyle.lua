@@ -1667,7 +1667,9 @@ local function MakeSample(parent, info, kind)
 	sampleCount = sampleCount + 1
 	local ok, bar = pcall(CreateFrame, "StatusBar", "CinematicCastSample" .. sampleCount, parent, spec[1])
 	if not (ok and bar and bar.Text and bar.Icon and bar.Spark) then
-		return MakeDrawnSample(parent, info)
+		local drawn = MakeDrawnSample(parent, info)
+		drawn.sampleKind = kind
+		return drawn
 	end
 	if spec.look and bar.SetLook then pcall(bar.SetLook, bar, spec.look) end
 	Quiet(bar)
@@ -1721,6 +1723,8 @@ local function DressSample(bar, info, look, sized)
 		end
 	end
 	Apply(bar, look, true, sized)
+	-- (Yours is the one the theme's Interface Recolor tints: its irCast row.)
+	if bar.sampleKind == "player" and ns.RecolorLike then ns.RecolorLike(bar, "irCast") end
 end
 
 -- Dev copy's Preview Match test: a sample as a page's preview makes it (kind:

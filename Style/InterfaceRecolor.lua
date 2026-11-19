@@ -576,6 +576,21 @@ local function Refresh()
 	for _, group in ipairs(GROUPS) do RefreshGroup(group) end
 end
 
+-- A frame of ours made from a game template a row covers, tinted as that
+-- row's own frames are now (or put back): the Style previews' cast bar is
+-- made from the game's, and your real one has the irCast row's color
+-- (PlateCastStyle.lua's DressSample, 2026-11-19: the preview stayed gold
+-- while your bar was in the theme's color).
+function ns.RecolorLike(frame, key)
+	if not frame then return end
+	for _, group in ipairs(GROUPS) do
+		if group.key == key then
+			DressFrame(frame, group, ColorOf(group), true)
+			return
+		end
+	end
+end
+
 -- A row's color now (the theme's, brightened for the game's art), or nil: the
 -- page or the row is off, or there's no theme. For other files' parts (RaidStyle.lua).
 function ns.RecolorOf(key)

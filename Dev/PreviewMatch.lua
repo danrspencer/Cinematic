@@ -248,12 +248,19 @@ local function ReadBar(bar, label, template)
 	end
 	local box = Pixels(bar)
 	local parent = Call(bar, "GetParent")
-	for key, value in pairs(bar) do
+	local seen = {} -- (one part under two keys, our sample's glow: once, by the game's name)
+	local keys = {}
+	for key in pairs(bar) do if type(key) == "string" then keys[#keys + 1] = key end end
+	table.sort(keys) -- (capitals first: the game's part names before ours)
+	for _, key in ipairs(keys) do
+		local value = bar[key]
 		-- (Not the frame it's in: our samples keep their plate as frameBars.)
 		if type(key) == "string" and type(value) == "table" and value ~= fill and value ~= parent then
 			local okIs, isRegion = pcall(function() return value.GetObjectType ~= nil and value.GetRect ~= nil end)
 			local kind = okIs and isRegion and Call(value, "GetObjectType")
-			if kind and kind ~= "AnimationGroup" and kind ~= "MaskTexture" and Inside(value, bar) and Showing(value) then
+			if kind and kind ~= "AnimationGroup" and kind ~= "MaskTexture" and not seen[value] and Inside(value, bar)
+				and Showing(value) then
+				seen[value] = true
 				read.parts[key] = ReadRegion(value, bar)
 				-- (Only what's near the bar counts for the cut: a glow 3000 px wide doesn't.)
 				local px = Pixels(value)
@@ -361,6 +368,17 @@ local function Differ(a, b, off)
 	if type(a) ~= "number" or type(b) ~= "number" then return false end
 	return math.abs(a - b) > off
 end
+-- Two "r,g,b[,a]" colors more than a tenth apart on any part.
+local function ColorOff(a, b)
+	if not (a and b) then return false end
+	local x, y = {}, {}
+	for v in a:gmatch("[%d%.]+") do x[#x + 1] = tonumber(v) end
+	for v in b:gmatch("[%d%.]+") do y[#y + 1] = tonumber(v) end
+	for i = 1, 3 do
+		if x[i] and y[i] and math.abs(x[i] - y[i]) > 0.1 then return true end
+	end
+	return false
+end
 local function Compare(real, ours)
 	local findings = { checks = 0 }
 	local function Say(text) findings[#findings + 1] = text end
@@ -383,15 +401,21 @@ local function Compare(real, ours)
 	for _, name in ipairs(names) do
 		local g, o = real.parts[name], ours.parts[name]
 		findings.checks = findings.checks + 1 -- (shows in both)
-		if g and o then findings.checks = findings.checks + (g.kind == "FontString" and 6 or 3) end
+		if g and o then findings.checks = findings.checks + (g.kind == "FontString" and 6 or 4) end
 		if g and not o then
 			Say(("MISSING %s (%s %s) shows in game, not ours"):format(name, tostring(g.kind), tostring(g.art or g.font or "")))
 		elseif o and not g then
 			Say(("EXTRA %s (%s %s) shows ours, not in game"):format(name, tostring(o.kind), tostring(o.art or o.font or "")))
 		else
 			-- (The icon's art is the spell's: never the same spell.)
-			if name ~= "Icon" and g.art ~= o.art and (g.art or o.art) then
+			-- (Nor art the game won't tell: nil on its side is unknown, not none.)
+			if name ~= "Icon" and g.art and g.art ~= o.art then
 				Say(("ART %s: %s in game, %s ours"):format(name, tostring(g.art), tostring(o.art)))
+			end
+			-- (Its color: a theme's tint on the game's art shows here, 2026-11-19:
+			-- your bar was purple, the preview gold, and nothing said so.)
+			if g.kind ~= "FontString" and name ~= "Icon" and ColorOff(g.color, o.color) then
+				Say(("COLOR %s: %s in game, %s ours"):format(name, tostring(g.color), tostring(o.color)))
 			end
 			-- (A font string's width follows its words, which differ: height only.)
 			local wide = g.kind ~= "FontString" and Differ(g.w, o.w, SIZE_OFF)
@@ -400,7 +424,10 @@ local function Compare(real, ours)
 					tostring(o.w), tostring(o.h)))
 			end
 			-- (The spark runs along the bar as the cast goes: up and down only.)
-			if (name ~= "Spark" and Differ(g.cx, o.cx, PLACE_X_OFF)) or Differ(g.cy, o.cy, PLACE_Y_OFF) then
+			-- (The spark, and its glow with it, run along the bar as the cast
+			-- goes: their place along it isn't the look.)
+			local moves = name == "Spark" or name == "StandardGlow"
+			if (not moves and Differ(g.cx, o.cx, PLACE_X_OFF)) or Differ(g.cy, o.cy, PLACE_Y_OFF) then
 				Say(("PLACE %s: middle at %s,%s of the bar in game, %s,%s ours"):format(name, tostring(g.cx),
 					tostring(g.cy), tostring(o.cx), tostring(o.cy)))
 			end
@@ -662,6 +689,17 @@ local function OnEvent(_, event, unit)
 				Log("target: not you, target bar not read")
 			end
 			ReadSamples(phase, stamp)
+			-- (Your bar's art in the theme's color, Interface Recolor's irCast: the
+			-- preview's in the same color, 2026-11-19.)
+			local real, ours = run.reads[phase .. ":player"], run.reads[phase .. ":ours:player"]
+			for _, part in ipairs({ "Border", "TextBorder" }) do
+				local g = real and real.parts and real.parts[part]
+				local o = ours and ours.parts and ours.parts[part]
+				if g and o then
+					Verdict(not ColorOff(g.color, o.color), ("%s: your bar's %s %s, the preview's %s"):format(phase, part,
+						tostring(g.color), tostring(o.color)))
+				end
+			end
 			if phase == "other" then
 				CheckOther("unit", run.facts["other:player"], "your bar")
 				CheckOther("unit", run.facts["other:target"], "target bar")

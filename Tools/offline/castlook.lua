@@ -104,6 +104,25 @@ Check("plate back: name justify", plateAfter.justify == plateBefore.justify, pla
 Check("plate back: name anchors", plateAfter.text == plateBefore.text, plateAfter.text .. " | was " .. plateBefore.text)
 Check("plate back: icon size", math.abs(plateAfter.iconW - plateBefore.iconW) < 0.01, plateAfter.iconW)
 
+-- The theme's Interface Recolor on your cast bar's art (irCast): the
+-- preview's "You" bar asks for that row's tint, as your real bar has it
+-- (2026-11-19: yours purple, the preview gold); the target's doesn't (the
+-- game's target bar isn't in the row). The tint itself needs the game's
+-- template parts: the in-game match test compares the colors.
+do
+	local asked = {}
+	local recolor = ns.RecolorLike
+	ns.RecolorLike = function(frame, key) asked[frame] = key end
+	local you = ns.MakeCastLookSample(UIParent, "player", 1, "PLAYER")
+	you:Refresh()
+	Check("recolor: your bar's preview tinted as the irCast row", asked[you] == "irCast", asked[you])
+	local them = ns.MakeCastLookSample(UIParent, "unit", 1, "TARGET")
+	them:Refresh()
+	Check("recolor: the target's preview left as the game's", asked[them] == nil, asked[them])
+	ns.RecolorLike = recolor
+	Check("recolor: Interface Recolor has RecolorLike", type(recolor) == "function")
+end
+
 -- In a fight: a plate's name alpha and sizes are secret (Forever,
 -- 2026-11-19: "attempt to compare a secret number value", 22 times). A
 -- stand-in secret: a table, which errors when compared as a number, as the
