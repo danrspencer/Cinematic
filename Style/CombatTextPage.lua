@@ -565,7 +565,7 @@ function ns.CreateCombatTextStylePanel(kit)
 	resetAll:SetSize(math.max(90, (resetWords and resetWords:GetStringWidth() or 60) + 24), 22)
 	resetAll:SetPoint("LEFT", lookTop, "LEFT", 400, 0)
 	kit.Tooltip(resetAll, L["Everything on this tab back to how it starts."])
-	local OWN_FEW = { CT.Key("all", "Together"), CT.Key("all", "Tags"), "combatTextKeepLast" }
+	local OWN_FEW = { CT.Key("all", "Together"), CT.Key("all", "Tags"), CT.Key("all", "Numbers"), "combatTextKeepLast" }
 	resetAll:SetScript("OnClick", function()
 		for _, node in ipairs(CT.NODES) do
 			CT.Reset(node.id)
@@ -714,7 +714,8 @@ function ns.CreateCombatTextStylePanel(kit)
 			},
 			groups = {
 				{ "Color", { { "textColor", "Color" } } },
-				{ "Text", { { "font", "Font" }, { "textSize", "Size" }, { "shadow", "Edge" }, { "tags", "Tags" } } },
+				{ "Text", { { "font", "Font" }, { "textSize", "Size" }, { "shadow", "Edge" }, { "numbers", "Number style" },
+					{ "tags", "Tags" } } },
 				{ "Place", { { "place", "Place" }, { "together", "Together" } } },
 				{ "Motion", { { "motion", "Motion" }, { "lastHit", "Last hit" } } },
 			},
@@ -742,6 +743,26 @@ function ns.CreateCombatTextStylePanel(kit)
 					{ "edge", L["Dark edge"] },
 					{ "none", L["None"] },
 				})
+			end,
+			-- (All texts': how amounts are written, every number's. Retail only
+			-- for now, the user's call 2026-11-19: hidden on Forever.)
+			numbers = id == "all" and ns.isRetail and function(look)
+				look.Dropdown(L["Number style"], CT.Key("all", "Numbers"), function()
+					local tips = {
+						full = L["Every digit, as the game's."],
+						short = L["Thousands as K, one decimal."],
+						whole = L["Thousands as K, no decimal."],
+						bare = L["Thousands with no letter."],
+						d10 = L["Every number divided by 10."],
+						d100 = L["Every number divided by 100; smaller hits show 0."],
+						d1000 = L["Every number divided by 1,000; smaller hits show 0."],
+					}
+					local list = {}
+					for _, each in ipairs(CT.NUMBER_STYLES) do
+						list[#list + 1] = { value = each[1], text = each[2], tip = tips[each[1]] }
+					end
+					return list
+				end, L["How numbers are written: 22,245 as 22.2K, 22K, 22, or divided down."])
 			end,
 			-- (Damage's: a tag on hits that partly landed, every damage text's.)
 			tags = id == "damage" and function(look)

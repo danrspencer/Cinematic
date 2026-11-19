@@ -191,6 +191,24 @@ for _, node in ipairs(NODES) do
 end
 DEFAULTS[Key("all", "Together")] = "side"  -- hits landing together: "side" (side by side), "stack", "top" (on top of each other)
 DEFAULTS[Key("all", "Tags")] = false       -- a hit that partly landed tagged: "(Glancing)", "(Blocked)"
+DEFAULTS[Key("all", "Numbers")] = "full"   -- how amounts are written (retail only): CT.NUMBER_STYLES
+
+-- How amounts are written (All texts' Number style, the user's ask
+-- 2026-11-19: 22,245 as 22.2K, or 22, or scaled down). Amounts are secret in
+-- fights: only the game's AbbreviateNumbers, given rules of ours, can write
+-- them shorter (/cine debug numbers: honored on secret amounts on retail and
+-- Forever; retail only for now, the user's call). Each rule as the game's own
+-- data, biggest first: { breakpoint, letter, divide by, decimals' divisor }.
+-- Rounds down; a hit under the divisor of a scale-down shows 0.
+CT.NUMBER_STYLES = {
+	{ "full", "22,245" },
+	{ "short", "22.2K", { { 1000000, "M", 100000, 10 }, { 1000, "K", 100, 10 } } },
+	{ "whole", "22K", { { 1000000, "M", 1000000, 1 }, { 1000, "K", 1000, 1 } } },
+	{ "bare", "22", { { 1000, "", 1000, 1 } } },
+	{ "d10", "/10", { { 1, "", 10, 1 } } },
+	{ "d100", "/100", { { 1, "", 100, 1 } } },
+	{ "d1000", "/1000", { { 1, "", 1000, 1 } } },
+}
 
 -- Each text's built-in look: its own parts, setting by setting.
 local BUILTIN = {}

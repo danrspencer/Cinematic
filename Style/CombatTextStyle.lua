@@ -217,7 +217,40 @@ local function SetSize(number, size)
 end
 
 -- The words on the number and its copies.
+-- An amount written in All texts' Number style (CT.NUMBER_STYLES; retail
+-- only): the game's AbbreviateNumbers with our rules, which takes a secret
+-- amount. Words (a miss's) and anything that fails: as it is.
+local numberRules = {} -- [style] = the game's options for it, made once
+local function Written(amount)
+	if not ns.isRetail then return amount end
+	-- (A preview's sample comes as text, "23": written as its number.)
+	if Plain(amount) and type(amount) == "string" and tonumber(amount) then amount = tonumber(amount) end
+	if Plain(amount) and type(amount) ~= "number" then return amount end
+	local style = Value(CT.Key("all", "Numbers"))
+	if not style or style == "full" then return amount end
+	local options = numberRules[style]
+	if options == nil then
+		options = false
+		for _, each in ipairs(CT.NUMBER_STYLES) do
+			if each[1] == style and each[3] and _G.CreateAbbreviateConfig then
+				local data = {}
+				for i, rule in ipairs(each[3]) do
+					data[i] = { breakpoint = rule[1], abbreviation = rule[2], significandDivisor = rule[3],
+						fractionDivisor = rule[4], abbreviationIsGlobal = false }
+				end
+				local ok, config = pcall(_G.CreateAbbreviateConfig, data)
+				if ok and config then options = { config = config } end
+			end
+		end
+		numberRules[style] = options
+	end
+	if not options then return amount end
+	local ok, words = pcall(AbbreviateNumbers, amount, options)
+	return ok and words ~= nil and words or amount
+end
+
 local function SetWords(number, amount)
+	amount = Written(amount)
 	number.text:SetText(amount) -- (a secret amount goes on as it is)
 	for _, copy in ipairs(number.copies) do copy:SetText(amount) end
 end
