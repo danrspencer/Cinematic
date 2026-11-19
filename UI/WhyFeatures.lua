@@ -499,8 +499,8 @@ end
 local SUPPORT_OFF = "Its support is off (Addons > Custom Support): back on after a /reload"
 
 -- A faded frame's row, as the Interface tab works it out (why.Explain).
-local FRAME_STATUS = { shown = "on", partly = "on", hidden = "off" }
-local FRAME_WORD = { shown = "SHOWING", partly = "PARTLY SHOWN", hidden = "HIDDEN" }
+local FRAME_STATUS = { shown = "on", partly = "on", game = "on", hidden = "off" }
+local FRAME_WORD = { shown = "SHOWING", partly = "PARTLY SHOWN", game = "SET BY THE GAME", hidden = "HIDDEN" }
 local function FrameRow(known, first)
 	local key = "addon:" .. known.key
 	local row = { key = "addonframe:" .. known.key, title = L[known.short or known.label or known.key],

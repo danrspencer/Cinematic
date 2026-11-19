@@ -574,7 +574,8 @@ local function ExplainOwn(entry)
 	return entry.name, "shown", out, "page:" .. entry.page
 end
 
--- Title, status ("shown", "hidden", "partly", "unmanaged" or "unknown"),
+-- Title, status ("shown", "hidden", "partly", "game" (its opacity set by the
+-- game's health or power curve, unreadable), "unmanaged" or "unknown"),
 -- what decides it.
 local function Explain(entry)
 	if entry.tooltip then
@@ -629,10 +630,11 @@ local function Explain(entry)
 	local status = n.target >= 1 and "shown" or n.target > 0 and "partly" or "hidden"
 	-- (Faded out by us, but under a Show below share the game won't say: the
 	-- game's curve sets its opacity, which addons can't read (Frames.lua's
-	-- manaSecret). Up as far as that says, not hidden: a player's report
-	-- 2026-11-19, the player frame up while Inspect said HIDDEN.)
+	-- manaSecret): up as far as that says, from none at a full share to all of
+	-- it, so "set by the game", not HIDDEN (a player's report 2026-11-19, the
+	-- player frame up while Inspect said HIDDEN) or partly (none at full).
 	local secret = status == "hidden" and n.cinematic and entry.manaSecret
-	if secret then status = "partly" end
+	if secret then status = "game" end
 	-- (Shown or hidden by its row's key, in CineMode or out: Frames.lua's ns.FrameForced.)
 	local forced = ns.FrameForced and ns.FrameForced(entry)
 	local forcedBy = forced and ns.FrameForcedBy and ns.FrameForcedBy(entry)
@@ -811,6 +813,7 @@ local picked
 local function StatusText(status)
 	return status == "shown" and GREEN .. L["SHOWING"] .. "|r" or status == "hidden" and "|cfff2a3a3" .. L["HIDDEN"] .. "|r"
 		or status == "partly" and GOLD .. L["PARTLY SHOWN"] .. "|r"
+		or status == "game" and GOLD .. L["SET BY THE GAME"] .. "|r"
 		or status == "unmanaged" and GREY .. L["NOT FADED"] .. "|r" or GREY .. "?|r"
 end
 

@@ -26,7 +26,7 @@ local SCROLL_ROOM = 18 -- (the list's scroll bar, right of its rows)
 local ROW_HEIGHT, HEADER_HEIGHT = 38, 24
 local HINT_HEIGHT = 14 -- (one line: the rest is in its tooltip)
 local STATUS_COLOR = {
-	shown = { 0.56, 0.89, 0.60 }, partly = { 1, 0.82, 0 }, hidden = { 0.95, 0.64, 0.64 },
+	shown = { 0.56, 0.89, 0.60 }, partly = { 1, 0.82, 0 }, game = { 1, 0.82, 0 }, hidden = { 0.95, 0.64, 0.64 },
 	idle = { 0.5, 0.5, 0.5 }, unknown = { 0.5, 0.5, 0.5 },
 	-- (The other tabs': on now, ready for its moment, held back, off.)
 	on = { 0.56, 0.89, 0.60 }, ready = { 0.61, 0.78, 0.94 }, held = { 0.94, 0.69, 0.38 }, off = { 0.95, 0.64, 0.64 },
@@ -208,7 +208,8 @@ local function MainReason(reasons)
 end
 
 local function Kind(status)
-	return ((status == "shown" or status == "partly") and "shown") or (status == "hidden" and "hidden") or nil
+	return ((status == "shown" or status == "partly" or status == "game") and "shown")
+		or (status == "hidden" and "hidden") or nil
 end
 
 -- A unit frame's part as a row under its frame's: what the HUD
@@ -320,7 +321,7 @@ local function InterfaceTops()
 			-- reasons saying why, rather than a "?".)
 			if (status == "unknown" or status == nil) and not info.onScreen then
 				status = "idle"
-			elseif (status == "shown" or status == "partly") and not info.onScreen then
+			elseif (status == "shown" or status == "partly" or status == "game") and not info.onScreen then
 				status = "idle"
 				-- (What the game's missing, where it's known: the line under the row.)
 				local okIdle, cause = pcall(IdleCause, key)
@@ -420,7 +421,7 @@ end
 
 -- The Sort button's order: on or showing first, then ready, held, off or
 -- hidden, then not on screen; each kept in the order it had.
-local STATUS_RANK = { on = 1, shown = 1, partly = 1, ready = 2, held = 3, off = 4, hidden = 4, idle = 5 }
+local STATUS_RANK = { on = 1, shown = 1, partly = 1, game = 1, ready = 2, held = 3, off = 4, hidden = 4, idle = 5 }
 local function ByStatus(items)
 	for i, item in ipairs(items) do item.sortAt = i end
 	table.sort(items, function(a, b)

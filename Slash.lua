@@ -220,6 +220,7 @@ local function PrintDebugHelp()
 	print("  /cine debug previewwatch [off] - records how the Style previews move and catches one covering a page's rows, with a screenshot (dev copy)")
 	print("  /cine debug sweep [pages] [shots] [visual [N]] [seed S] [page words] - one run opening every page and tab (layout checked) and changing every setting and putting it back (pages: layout only; shots: a screenshot of each; visual N: N settings at random with screenshots) (dev copy)")
 	print("  /cine prerelease [quick|guided|skip] - one run before a release: selftest, smoke checks and the settings sweep (quick: pages only), or guided steps you do; compared with the last run (dev copy)")
+	print("  /cine debug whysecret - one run checking Why on the player frame while the game sets its opacity by your health (dev copy)")
 	print("  /cine debug deathtest - one run checking the Death Vision page: its menu, Test, sliders and switch, with screenshots (dev copy)")
 	print("  /cine debug resettest [logout] - one run checking what a reset puts back (layouts, plate settings), or with logout the plate settings going back at logout, across a reload (dev copy)")
 	print("  /cine debug euiswing - one run recording why EllesmereUI's swing timer stays hidden in CineMode (dev copy; again to stop)")
@@ -1775,6 +1776,9 @@ local function HandleSlash(msg)
 	elseif cmd == "debug" and arg == "zonecard" then
 		-- (Dev copy: one run checking a zone change shows one zone title, not two, ZoneCardTest.lua.)
 		if ns.ZoneCardTest then ns.ZoneCardTest() else ns.Print("/cine debug zonecard is in the dev copy only.") end
+	elseif cmd == "debug" and arg == "whysecret" then
+		-- (Dev copy: one run checking Why on a frame the game shows by your health, WhyTest.lua.)
+		if ns.WhySecretTest then ns.WhySecretTest() else ns.Print("/cine debug whysecret is in the dev copy only.") end
 	elseif cmd == "debug" and arg:find("^whytest") then
 		-- (Dev copy: one run checking the Why window's tabs against the game, WhyTest.lua.)
 		if ns.WhyTest then ns.WhyTest(arg:match("^whytest%s*(.*)$"))

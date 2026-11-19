@@ -299,3 +299,154 @@ function ns.WhyTest(args)
 	end)
 	ns.Print(("Why test: %d steps, follow the box at the top of the screen (type it again to stop)"):format(#order))
 end
+
+-- /cine debug whysecret: one run checking Why on a frame the game shows by
+-- your health (a player's report 2026-11-19: the player frame up while Why
+-- said HIDDEN). In CineMode (the curve only runs there; back as it was
+-- after), with the player frame's Health row as the report had it (the
+-- defaults; yours back after). Step 0, now: no curve yet, no opacity line.
+-- Step 1: get hit, end the fight and stand still (health secret out of a
+-- fight on Forever, under full); once the game's curve sets its opacity
+-- (entry.manaSecret), Why must say set by the game with its "sets its opacity"
+-- line, not HIDDEN (screenshot). Up to 120 sec. Typed again: stops.
+-- Into CinematicDB.whySecretTestLog. Dev copy only.
+local secretRun
+local function SLog(text)
+	local log = CinematicDB and CinematicDB.whySecretTestLog
+	if log then log[#log + 1] = ("%.1f %s"):format(secretRun and GetTime() - secretRun.at or 0, text) end
+end
+local function SVerdict(name, ok, detail)
+	SLog(("%s %s: %s"):format(ok and "PASS" or "FAIL", name, detail))
+	ns.Print(("%s %s"):format(ok and "|cff40ff40PASS|r" or "|cffff4040FAIL|r", name))
+end
+local function PlayerEntry()
+	for _, entry in ipairs(ns.managed or {}) do
+		if entry.name == "PlayerFrame" then return entry end
+	end
+end
+local function Reasons(out)
+	local lines, opacity = {}, false
+	for _, reason in ipairs(out) do
+		lines[#lines + 1] = ("[%s] %s"):format(reason.state, Bare(reason.text))
+		if tostring(reason.text):find("sets its opacity", 1, true) then opacity = true end
+	end
+	return table.concat(lines, " | "), opacity
+end
+local function Health()
+	local ok, value = pcall(function()
+		local h, m = UnitHealth("player"), UnitHealthMax("player")
+		if issecretvalue and (issecretvalue(h) or issecretvalue(m)) then return "secret" end
+		return ("%d/%d"):format(h, m)
+	end)
+	return ok and value or "error"
+end
+local function SecretText(spec)
+	if not spec then return "none" end
+	return ("%s share %.3f"):format(spec.health and "health" or ("power " .. tostring(spec.powerType)), spec.share or -1)
+end
+-- The player frame's Health row as the report had it (the defaults: Always in
+-- fights, Not full after one, under 95% out of one), for the run; yours back
+-- after (and at the next login after a /reload mid-run).
+local SECRET_KEYS = { personalResources = true, prHealthPlayer = 1, prHealthPlayerCalm = 0.99,
+	prHealthPlayerAlways = 0.95, prHealthPlayerLinkCalm = false, prHealthPlayerLinkAlways = false }
+local function SecretPutBack()
+	local db, kept = ns.GetDB(), CinematicDB and CinematicDB.whySecretKept
+	if not (db and kept) then return end
+	for key, value in pairs(kept) do
+		if value == "__nil" then db[key] = nil else db[key] = value end
+	end
+	CinematicDB.whySecretKept = nil
+end
+local secretLogin = CreateFrame("Frame")
+secretLogin:RegisterEvent("PLAYER_LOGIN")
+secretLogin:SetScript("OnEvent", function()
+	C_Timer.After(1, function() if not secretRun then ns.Guard(SecretPutBack) end end)
+end)
+local function SecretFinish(stopped)
+	local r = secretRun
+	if not r then return end
+	if r.ticker then r.ticker:Cancel() end
+	SecretPutBack()
+	if r.cineWasOff and ns.IsCineModeOn and ns.IsCineModeOn() and Cinematic_ToggleCineMode then
+		Cinematic_ToggleCineMode()
+	end
+	SLog(stopped and "stopped" or "done")
+	secretRun = nil
+	ns.TestPrompt(stopped and "Why test stopped." or "Why test done. /reload, then say \"check log\".", 12)
+end
+
+function ns.WhySecretTest()
+	if secretRun then return SecretFinish(true) end
+	local entry = PlayerEntry()
+	if not entry then return ns.Print("no player frame managed") end
+	CinematicDB.whySecretTestLog = {}
+	secretRun = { at = GetTime(), entry = entry, cineWasOff = not (ns.IsCineModeOn and ns.IsCineModeOn()) }
+	if secretRun.cineWasOff and Cinematic_ToggleCineMode then Cinematic_ToggleCineMode() end
+	local db, kept, yours = ns.GetDB(), {}, {}
+	for key, value in pairs(SECRET_KEYS) do
+		kept[key] = db[key] == nil and "__nil" or db[key]
+		yours[#yours + 1] = key .. "=" .. tostring(db[key])
+		db[key] = value
+	end
+	CinematicDB.whySecretKept = kept
+	table.sort(yours)
+	SLog("yours (back after): " .. table.concat(yours, ", "))
+	SLog(("start %s | Cinematic %s, game %s | CineMode was %s | in combat %s, health %s, dead %s")
+		:format(date("%Y-%m-%d %H:%M:%S"), ns.Version and ns.Version() or "?", tostring(select(4, GetBuildInfo())),
+		secretRun.cineWasOff and "off" or "on", tostring(InCombatLockdown()), Health(),
+		tostring(ns.Flag(UnitIsDeadOrGhost("player")))))
+	-- Step 0: now, out of a fight.
+	C_Timer.After(1.5, function()
+		if not secretRun then return end
+		local spec = entry.manaSecret
+		ns.WhyLater(entry, function(ok, status, out)
+			if not secretRun then return end
+			local text, opacity = Reasons(out)
+			SLog(("0 now: curve %s, why %s: %s"):format(SecretText(spec), tostring(status), text))
+			if not ok then
+				SVerdict("0 why works", false, tostring(status))
+			elseif spec then
+				SVerdict("0 curve already on: says set by the game + opacity line", status == "game" and opacity,
+					("status %s, line %s"):format(tostring(status), tostring(opacity)))
+			else
+				SVerdict("0 no curve: no opacity line", not opacity, ("status %s"):format(tostring(status)))
+			end
+			ns.TestPrompt("Step 1: attack a mob and let it hit you a few times, then finish the fight " ..
+				"and stand still. Don't eat or bandage.", 15)
+			secretRun.step1At = GetTime()
+		end)
+	end)
+	-- Step 1: watch for the curve, then ask Why once.
+	secretRun.ticker = C_Timer.NewTicker(1, function()
+		local r = secretRun
+		if not (r and r.step1At) or r.checking then return end
+		local spec = entry.manaSecret
+		local waited = GetTime() - r.step1At
+		if math.floor(waited) % 5 == 0 then
+			SLog(("1 waiting %.0f s: combat %s, health %s, curve %s, frame shown %s"):format(waited,
+				tostring(InCombatLockdown()), Health(), SecretText(spec), tostring(ns.Flag(entry.frame:IsVisible()))))
+		end
+		if math.floor(waited) % 20 == 19 then
+			ns.TestPrompt("Step 1: get hit a few times, then finish the fight and stand still.", 8)
+		end
+		if spec then
+			r.checking = true
+			Shot("whysecret 1 curve on")
+			SLog("SHOT 1 curve on (" .. date("%H:%M:%S") .. ")")
+			ns.WhyLater(entry, function(ok, status, out)
+				if not secretRun then return end
+				local text, opacity = Reasons(out)
+				SLog(("1 curve on: curve %s, health %s, why %s: %s"):format(SecretText(spec), Health(),
+					tostring(status), text))
+				SVerdict("1 game-set frame says set by the game, not HIDDEN", ok and status == "game" and opacity,
+					("status %s, opacity line %s"):format(tostring(status), tostring(opacity)))
+				SecretFinish()
+			end)
+		elseif waited > 120 then
+			SVerdict("1 curve seen", false, "no game-set opacity in 120 sec (health readable, or full after the fight, " ..
+				"or never under the share): " .. Health())
+			SecretFinish()
+		end
+	end)
+	ns.Print("Why secret test: follow the text in the middle of the screen (type it again to stop)")
+end
