@@ -533,7 +533,7 @@ ns.PROFILE_MODULES = {
 	-- turn on just the pages they want.)
 	{ key = "all-pages-off", name = "Every page off", scope = { "Action Style/top", "Advanced Frames/Supported addons",
 		"Audio/top", "Bubble Style/top", "Buffs/debuffs/top", "Cameras/top", "Card Vision/top", "Cast Bar Style/top",
-		"Chat/top", "Cooldown Manager/top", "Duel Vision/top", "Effects/top", "Fishing/top", "Gamepad/top",
+		"Chat/top", "Cooldown Manager/top", "Death Vision/top", "Duel Vision/top", "Effects/top", "Fishing/top", "Gamepad/top",
 		"General/top", "Graphics+/top", "Heal Vision/top", "Hunter/top", "Letterbox/top", "Minimap/top",
 		"Interface Recolor/top", "Mouseover groups/top", "Name Style/top", "Nameplate Style/top", "Nameplates/top", "Personal Resources/top",
 		"Personal Style/top", "Quest Vision/top", "Quest tracker/top", "Raid Style/top", "Roll Vision/top",

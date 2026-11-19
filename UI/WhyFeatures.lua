@@ -261,6 +261,7 @@ local WHEN = {
 	["Vitals Vision"] = "Shows as your health gets low", ["Heal Vision"] = "Works on your group's frames while you're in a group",
 	["Damage Vision"] = "Shows in fights", ["Quest Vision"] = "Shows as you talk to quest givers and near quest mobs",
 	["Roll Vision"] = "Shows as loot is rolled for", ["Duel Vision"] = "Shows in duels",
+	["Death Vision"] = "Shows while you're dead, with the death camera",
 	["Teleport Vision"] = "Shows as you teleport or use a Hearthstone",
 	["Emote Vision"] = "Shows its cards as emotes and their moments happen",
 	["Card Vision"] = "Each card is on the Cards tab", ["Tint"] = "Tints the world by the time of day and where you are",

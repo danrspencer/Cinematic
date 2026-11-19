@@ -242,6 +242,7 @@ Dev\NpcNamesTest.lua
 Dev\ReadyAnyTimeTest.lua
 Dev\FollowHudTest.lua
 Dev\ResetTest.lua
+Dev\DeathVisionTest.lua
 Dev\Sweep.lua
 Dev\Prerelease.lua
 Dev\PreviewWatch.lua

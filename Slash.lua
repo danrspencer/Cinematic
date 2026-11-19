@@ -220,6 +220,7 @@ local function PrintDebugHelp()
 	print("  /cine debug previewwatch [off] - records how the Style previews move and catches one covering a page's rows, with a screenshot (dev copy)")
 	print("  /cine debug sweep [pages] [shots] [visual [N]] [seed S] [page words] - one run opening every page and tab (layout checked) and changing every setting and putting it back (pages: layout only; shots: a screenshot of each; visual N: N settings at random with screenshots) (dev copy)")
 	print("  /cine prerelease [quick|guided|skip] - one run before a release: selftest, smoke checks and the settings sweep (quick: pages only), or guided steps you do; compared with the last run (dev copy)")
+	print("  /cine debug deathtest - one run checking the Death Vision page: its menu, Test, sliders and switch, with screenshots (dev copy)")
 	print("  /cine debug resettest [logout] - one run checking what a reset puts back (layouts, plate settings), or with logout the plate settings going back at logout, across a reload (dev copy)")
 	print("  /cine debug euiswing - one run recording why EllesmereUI's swing timer stays hidden in CineMode (dev copy; again to stop)")
 	print("  /cine debug euicd - one run recording why an icon goes missing from EllesmereUI's cooldown bar (dev copy; again to stop)")
@@ -539,6 +540,9 @@ local function HandleSlash(msg)
 		-- (Dev copy: one run through every settings page and setting, Dev/Sweep.lua.)
 		if ns.SettingsSweep then ns.SettingsSweep(arg:match("^sweep%s*(.*)$"))
 		else ns.Print("/cine debug sweep is in the dev copy only.") end
+	elseif cmd == "debug" and arg == "deathtest" then
+		-- (Dev copy: one run checking the Death Vision page, DeathVisionTest.lua.)
+		if ns.DeathVisionTest then ns.DeathVisionTest() else ns.Print("/cine debug deathtest is in the dev copy only.") end
 	elseif cmd == "debug" and (arg == "resettest" or arg == "resettest logout") then
 		-- (Dev copy: one run checking what a reset puts back, layouts and plate settings, ResetTest.lua.)
 		if ns.ResetTest then ns.ResetTest(arg:match("logout")) else ns.Print("/cine debug resettest is in the dev copy only.") end

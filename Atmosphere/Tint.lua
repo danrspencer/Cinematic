@@ -1095,6 +1095,7 @@ function ns.GetCorpseDebug()
 		edgeSize = DEATH_VIGNETTE_START + (db.deathVignetteSize - DEATH_VIGNETTE_START)
 			* deathCreep * deathCreep * (3 - 2 * deathCreep),
 		ghost = ns.Flag(UnitIsGhost("player")), wave = WaveTimeLeft(),
+		shown = deathFrame ~= nil and deathFrame:IsShown(), -- (the overlay up now)
 	}
 end
 
@@ -1103,8 +1104,16 @@ local function UpdateDeathScreen(elapsed)
 		return
 	end
 	local want = db.enabled and db.deathScreen and ns.DeathCinematicWanted and ns.DeathCinematicWanted()
-	local target = want and 1 or 0
 	local run = CorpseRunLevel(elapsed)
+	-- (Death Vision's Test: as if just dead, until it ends or Stop.)
+	local test = ns.deathVisionTest
+	if test and GetTime() >= test.endsAt then
+		ns.deathVisionTest, test = nil, nil
+	end
+	if test and db.deathScreen then -- (page off: none, its Test too)
+		want, run = true, nil
+	end
+	local target = want and 1 or 0
 	local creepTarget = run or target
 	if deathLevel ~= target or deathCreep ~= creepTarget then
 		local wave = target == 0 and WaveTimeLeft() or 0
@@ -1972,3 +1981,85 @@ C_Timer.NewTicker(CHANGE_CHECK, ns.Profiled("Time of day check", function()
 	end
 	lastTitle = title
 end))
+
+-- Death Vision (Visions, World, 2026-11-19): the death screen's own page, so
+-- players can reach it (before, its settings were on the dev copy's Camera
+-- Settings page only). Its switch is deathScreen. It shows while the death
+-- camera runs, as before.
+-- Test: the death screen as if you'd just died, for its creep time and a few
+-- seconds more (again: stop).
+function ns.TestDeathVision()
+	if ns.deathVisionTest then
+		ns.deathVisionTest = nil
+		return
+	end
+	db = db or ns.GetDB()
+	ns.deathVisionTest = { endsAt = GetTime() + (db.deathVignetteTime or 10) + 5 }
+end
+function ns.DeathVisionTesting() return ns.deathVisionTest ~= nil end
+
+function ns.CreateDeathVisionPanel(kit)
+	local canvas, content = kit.CreateScrollPage()
+	local title = kit.Label(content, "GameFontNormalLarge", L["Death Vision"])
+	title:SetPoint("TOPLEFT", 16, -16)
+	local intro = kit.PageIntro(content, title,
+		L["The world dims and goes cold while you're dead, and dark edges close in. It shows with the death camera."])
+	local switch = kit.PageSwitch(content, "deathScreen", L["Enable Page"],
+		L["Turns Death Vision on or off."], intro)
+	local stack = kit.Stack(switch, "check")
+	local function On() return ns.GetDB() and ns.GetDB().deathScreen end
+
+	local strength = stack:Add(kit.Slider(content, "deathScreenStrength", L["Strength"], 10, 100, 5,
+		"%d%%", 100), "slider")
+	kit.Tooltip(strength, L["How dim the world and how dark the edges get."])
+	kit.GreyUnless(strength, On)
+	local creep = stack:Add(kit.Slider(content, "deathVignetteTime", L["Edges creep in over"], 1, 30, 1,
+		L["%d sec"]), "slider")
+	kit.Tooltip(creep, L["How long the dark edges take to close in after you die."])
+	kit.GreyUnless(creep, On)
+	local reach = stack:Add(kit.Slider(content, "deathVignetteSize", L["Edges reach in"], 15, 50, 5,
+		"%d%%", 100), "slider")
+	kit.Tooltip(reach, L["How far the dark edges reach in from each side of the screen."])
+	kit.GreyUnless(reach, On)
+	local corpseRun = stack:Add(kit.Check(content, "deathCorpseRun", L["Edges lift as you near your body"],
+		L["The dark edges lift as you walk back to your body."]), "check")
+	kit.GreyUnless(corpseRun, On)
+
+	-- Test (Stop while it runs, as the other Visions' tests).
+	local row = CreateFrame("Frame", nil, content)
+	row:SetSize(300, 26)
+	stack:Add(row, "label")
+	local button = ns.PanelButton(content)
+	button:SetSize(100, 22)
+	button:SetPoint("LEFT", row, "LEFT")
+	local function Label() button:SetText(ns.DeathVisionTesting() and L["Stop"] or L["Test"]) end
+	button:SetScript("OnClick", function()
+		ns.TestDeathVision()
+		Label()
+	end)
+	ns.SetOnUpdate(button, Label)
+	button.Refresh = Label -- (before GreyUnless, which wraps it)
+	kit.Tooltip(button, L["Shows the death screen for a few seconds (close the settings to see it)."])
+	kit.GreyUnless(button, On)
+	kit.AddControl(button)
+	Label()
+
+	-- Related: the death banner (Cards) and the game's own gray screen.
+	stack:Header(content, L["Also on death"])
+	stack:Add(ns.CardsLink(content, L["The death banner:"], "death"), "label")
+	local holder = CreateFrame("Frame", nil, content)
+	holder:SetSize(420, 22)
+	local label = kit.Label(holder, "GameFontHighlightSmall", L["The game's gray screen:"])
+	label:SetPoint("LEFT", 2, 0)
+	local open = ns.PanelButton(holder)
+	open:SetSize(110, 22)
+	open:SetText(L["Graphics Boost"])
+	kit.Tooltip(open, L["Opens the Graphics Boost page."])
+	open:SetScript("OnClick", function() ns.OpenOptions("Graphics+") end)
+	open:SetPoint("LEFT", label, "RIGHT", 10, 0)
+	stack:Add(holder, "label")
+
+	canvas:SetScript("OnShow", kit.PageShown(kit.Refresh, content))
+	canvas:Hide()
+	kit.RegisterSubpage(canvas, "Death Vision")
+end

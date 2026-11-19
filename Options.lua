@@ -2929,6 +2929,7 @@ do
 			{ "Quest Vision", "Interface\\Icons\\INV_Misc_Head_Dragon_01", section = "World" },
 			{ "Roll Vision", "Interface\\Icons\\INV_Misc_Dice_01", section = "World" },
 			{ "Duel Vision", "Interface\\Icons\\Ability_DualWield", section = "World" },
+			{ "Death Vision", "Interface\\Icons\\INV_Misc_Bone_HumanSkull_01", section = "World" }, -- (Tint.lua)
 			-- (RP: the role-play ones, 2026-11-17)
 			{ "Teleport Vision", "Interface\\Icons\\Spell_Arcane_TeleportStormWind",
 				section = "RP" }, -- (TeleportVision.lua; its tooltip: ns.TILE_TOOLTIPS)
@@ -6531,24 +6532,7 @@ local function CreateDeathPanel()
 		Tooltip(keep, KEEP_TIP)
 		GreyUnless(keep, IfOn)
 	end
-	local screen = stack:Add(Check(content, "deathScreen", L["Darken the screen"],
-		L["The world dims and goes cold until you release or come back."]), "check")
-	screen:HookScript("OnClick", Refresh) -- grey out / enable the strength below
-	GreyUnless(screen, IfOn)
-	local screenStrength = stack:Add(Slider(content, "deathScreenStrength", L["Strength"], 10, 100, 5,
-		"%d%%", 100), "slider")
-	GreyUnless(screenStrength, function(db) return IfOn(db) and db.deathScreen end)
-	local creep = stack:Add(Slider(content, "deathVignetteTime", L["Edges creep in over"], 1, 30, 1,
-		L["%d sec"]), "slider")
-	Tooltip(creep, L["How long the dark edges take to close in after you die."])
-	GreyUnless(creep, function(db) return IfOn(db) and db.deathScreen end)
-	local reach = stack:Add(Slider(content, "deathVignetteSize", L["Edges reach in"], 15, 50, 5,
-		"%d%%", 100), "slider")
-	Tooltip(reach, L["How far the dark edges reach in from each side of the screen."])
-	GreyUnless(reach, function(db) return IfOn(db) and db.deathScreen end)
-	local corpseRun = stack:Add(Check(content, "deathCorpseRun", L["Edges lift as you near your body"],
-		L["The dark edges lift as you walk back to your body."]), "check")
-	GreyUnless(corpseRun, function(db) return IfOn(db) and db.deathScreen end)
+	-- (The death screen, dim with dark edges: its own page now, Visions > Death Vision.)
 
 	stack:Header(content, L["Music"])
 	local songBox = ns.SkinEditBox(CreateFrame("EditBox", nil, content, "InputBoxTemplate"))
@@ -21643,6 +21627,10 @@ ns.OnLanguage(function()
 		Lap("CreateDamageVisionPanel")
 		ns.CreateDamageVisionLookPanel(ns.lowHealthKit)
 		Lap("CreateDamageVisionLookPanel")
+	end
+	if ns.CreateDeathVisionPanel then -- (Tint.lua)
+		ns.CreateDeathVisionPanel(ns.lowHealthKit)
+		Lap("CreateDeathVisionPanel")
 	end
 	if ns.CreateTeleportVisionPanel then -- (TeleportVision.lua)
 		ns.CreateTeleportVisionPanel(ns.lowHealthKit)

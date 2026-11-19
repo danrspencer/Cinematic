@@ -11,6 +11,9 @@
 local _, ns = ...
 
 ns.CHANGELOG_FEATURES = {
+	{ date = "2026-11-19", page = "Death Vision", title = "Death Vision",
+		text = "The dim, cold screen and dark edges while you're dead now have a page of their own, with their " ..
+		"strength, how far the edges reach in and a Test button." },
 	{ date = "2026-11-18", page = "Card Vision", title = "Rest timers", client = "forever",
 		text = "Lying in a sleeping bag shows your Well-Rested stacks in the top bar, with a bar filling up to 3/3. " ..
 		"Resting by a Welcoming Campfire shows a bar filling up until Camp Benefits arrives." },

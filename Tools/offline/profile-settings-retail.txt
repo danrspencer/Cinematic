@@ -36,6 +36,7 @@ Blank Slate|abStyle=false
 Blank Slate|bubblesStyle=false
 Blank Slate|cameraModes=false
 Blank Slate|cards=false
+Blank Slate|deathScreen=false
 Blank Slate|duelPlates=false
 Blank Slate|fadeUI=false
 Blank Slate|graphicsPlus=false

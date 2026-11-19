@@ -263,7 +263,7 @@ local OFF_UNTIL_PICKED = {
 	"visualEffects", "letterboxPage", "tintPage", "graphicsPlus", "musicInCinematic",
 	"styleGeneral", "ufStyle", "rfStyle", "abStyle", "prdStyle", "tooltipStyle", "handlePlateStyle", "plateNameStyle",
 	"plateCastStyle", "bubblesStyle", "irStyle", "combatTextStyle",
-	"handleHealVision", "damageVision", "lowHealth", "questVision", "questTalk", "rollWindow", "teleportVision",
+	"handleHealVision", "damageVision", "lowHealth", "questVision", "questTalk", "rollWindow", "teleportVision", "deathScreen",
 	"duelPlates", "emoteVision", "cards", "windGuide",
 	"handleQuality", "handleFishing", "handleHunter",
 	"cooldownManagerOn", "prdOn", "prdOnFights", -- (the game switches a profile turns on: ApplyProfileSwitches)
