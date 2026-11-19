@@ -1795,6 +1795,10 @@ local function HandleSlash(msg)
 		-- (Dev copy: one run checking the action buttons' Opacity and the target's Name background, DimNameTest.lua.)
 		if ns.DimNameTest then ns.DimNameTest(arg:match("^dimname%s*(.*)$"))
 		else ns.Print("/cine debug dimname is in the dev copy only.") end
+	elseif cmd == "debug" and arg:find("^emotefit") then
+		-- (Dev copy: one run checking Emote Vision's buttons fit their names in every style, EmoteFitTest.lua.)
+		if ns.EmoteFitTest then ns.EmoteFitTest(arg:match("^emotefit%s*(.*)$"))
+		else ns.Print("/cine debug emotefit is in the dev copy only.") end
 	elseif cmd == "debug" and arg:find("^keysbars") then
 		-- (Dev copy: one run checking the Keyboard Map, Action Bars style and themecheck, KeysBarsTest.lua.)
 		if ns.KeysBarsTest then ns.KeysBarsTest(arg:match("^keysbars%s*(.*)$"))

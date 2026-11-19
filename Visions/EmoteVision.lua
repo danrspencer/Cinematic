@@ -1412,7 +1412,10 @@ local function Create()
 
 	card.buttons, card.words = {}, {}
 	for i = 1, MAX_EMOTES do
-		local button = ns.PanelButton(front)
+		-- (The game's own button, not ns.PanelButton: that one wears the settings
+		-- menu's look, flat in HD, and changed mid-card as the menu look was
+		-- read again, 2026-11-19. The card's styles have their own looks.)
+		local button = CreateFrame("Button", nil, front, "UIPanelButtonTemplate")
 		button:SetSize(BUTTON_W, BUTTON_H)
 		button:SetScript("OnClick", function(self) Answer(self.token) end)
 		card.buttons[i] = button
@@ -1549,7 +1552,11 @@ local function Face(moment)
 		card.portrait:SetTexCoord(0, 1, 0, 1)
 	elseif moment.class and CLASS_ICON_TCOORDS and CLASS_ICON_TCOORDS[moment.class] then
 		card.portrait:SetTexture("Interface\\GLUES\\CHARACTERCREATE\\UI-CHARACTERCREATE-CLASSES")
-		card.portrait:SetTexCoord(unpack(CLASS_ICON_TCOORDS[moment.class]))
+		-- (Zoomed in a little: the icon's own square frame showed inside the
+		-- round mask, 2026-11-19.)
+		local left, right, top, bottom = unpack(CLASS_ICON_TCOORDS[moment.class])
+		local inX, inY = (right - left) * 0.1, (bottom - top) * 0.1
+		card.portrait:SetTexCoord(left + inX, right - inX, top + inY, bottom - inY)
 	else
 		card.portrait:SetTexture(moment.icon or "Interface\\Icons\\INV_Misc_QuestionMark")
 		card.portrait:SetTexCoord(0.08, 0.92, 0.08, 0.92)
@@ -1566,9 +1573,10 @@ local function StyleButton(style, look, panelButton, word, text)
 		button = panelButton
 		StyleText(button:GetFontString(), look)
 		button:SetText(text)
-		-- (fit: as wide as its name, the wheel's, not all the same width)
-		button.width = style.fit and math.max(56, math.ceil(button:GetFontString():GetStringWidth()) + 22)
-			or BUTTON_W
+		-- (fit: as wide as its name, the wheel's, not all the same width; the
+		-- others all BUTTON_W, wider for a name that wouldn't fit in it)
+		local need = math.ceil(button:GetFontString():GetStringWidth()) + 22
+		button.width = style.fit and math.max(56, need) or math.max(BUTTON_W, need)
 		button:SetWidth(button.width)
 	else
 		button = word
@@ -1791,11 +1799,22 @@ local function Show(moment)
 		card.name:SetJustifyH("CENTER")
 		card.name:SetWidth(width + 60)
 		card.name:SetPoint("TOP", card, "TOPLEFT", middle, -width - 2)
+		-- (Each out from the middle till its nearest corner clears the face's
+		-- ring by a little: big words' buttons sat on it, 2026-11-19.)
+		local clear = (face and faceSize / 2 + 2 or 0) + 4
 		for i, button in ipairs(buttons) do
 			local angle = math.pi / 2 - (i - 1) * 2 * math.pi / #buttons
+			local cos, sin = math.cos(angle), math.sin(angle)
+			local halfW, halfH = button.width / 2, button:GetHeight() / 2
+			local reach = WHEEL_REACH
+			for _ = 1, 60 do
+				local nx = math.max(0, math.abs(cos * reach) - halfW)
+				local ny = math.max(0, math.abs(sin * reach) - halfH)
+				if nx * nx + ny * ny >= clear * clear then break end
+				reach = reach + 1
+			end
 			button:ClearAllPoints()
-			button:SetPoint("CENTER", card, "TOPLEFT", middle + math.cos(angle) * WHEEL_REACH,
-				-middle + math.sin(angle) * WHEEL_REACH)
+			button:SetPoint("CENTER", card, "TOPLEFT", middle + cos * reach, -middle + sin * reach)
 			button:Show()
 		end
 		card.line:SetJustifyH("CENTER")
@@ -2800,6 +2819,13 @@ function ns.EmoteCardShown()
 end
 function ns.HideEmoteCard()
 	if card then card:Hide() end
+end
+-- (Dev's EmoteFitTest.lua: a card for moment shown as Show lays it out, and
+-- the card, to measure its buttons. Not a local: this chunk is at the cap.)
+function ns.EmoteFitShow(moment)
+	moving = nil
+	if card then card:Hide() end
+	return Show(moment), card
 end
 
 function ns.RefreshEmoteVision()
