@@ -1815,6 +1815,18 @@ local function HandleSlash(msg)
 		-- (Dev copy: which shortened number styles the game gives combat text, NumberStyleTest.lua.)
 		if ns.NumberStyleTest then ns.NumberStyleTest()
 		else ns.Print("/cine debug numbers is in the dev copy only.") end
+	elseif cmd == "debug" and arg == "whosehit" then
+		-- (Dev copy: does anything tell your hits from strangers' with no log lines, WhoseHitTest.lua.)
+		if ns.WhoseHitTest then ns.WhoseHitTest()
+		else ns.Print("/cine debug whosehit is in the dev copy only.") end
+	elseif cmd == "debug" and arg == "checks" then
+		-- (Dev copy: which checks this client has to replace pcalls, ChecksProbe.lua, Tools/pcall-plan.md.)
+		if ns.ChecksProbe then ns.ChecksProbe()
+		else ns.Print("/cine debug checks is in the dev copy only.") end
+	elseif cmd == "debug" and arg == "errors" then
+		-- (Dev copy: the window every error and warning pops up in, ErrorWindow.lua.)
+		if ns.DevErrorWindowShow then ns.DevErrorWindowShow()
+		else ns.Print("/cine debug errors is in the dev copy only.") end
 	elseif cmd == "debug" and arg:find("^cttest") then
 		-- (Dev copy: which way of moving the game's floating combat text works, CombatTextTest.lua.)
 		if ns.CombatTextTest then ns.CombatTextTest(arg:match("^cttest%s*(.*)$"))

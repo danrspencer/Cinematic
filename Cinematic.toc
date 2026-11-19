@@ -19,6 +19,7 @@
 ## SavedVariables: CinematicDB
 ## SavedVariablesPerCharacter: CinematicCharDB
 
+Checks.lua
 FrameGuess.lua
 Locales\Locales.lua
 Locales\deDE.lua

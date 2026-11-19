@@ -80,6 +80,7 @@ function ns.Log(category, text)
 	if captured and category ~= "chat" and category ~= "cmd" then
 		captured[#captured + 1] = Plain(text)
 	end
+	if ns.DevTap and (category == "warning" or category == "safety") then pcall(ns.DevTap, category, Plain(text)) end
 	local line = ("%s %s: %s"):format(Stamp(), category, Plain(text))
 	pcall(LiveLine, category, line) -- (a chat window's trouble never stops the log)
 	local log = ns.db and ns.db.log
@@ -242,6 +243,7 @@ end
 -- Records an error from this addon. `caught` errors were stopped by the
 -- addon's own loop (so the game's error handler hasn't seen them yet).
 function ns.ReportError(message, stack, caught)
+	if caught and ns.DevTap then pcall(ns.DevTap, "caught", message, stack) end
 	if caught and Harmless(message) then
 		return
 	end
@@ -324,7 +326,11 @@ local function Protect(fn, hooked, label)
 		local ok, err = xpcall(Run, LoopHandler)
 		if started then ns.LoopAuditAdd(label, debugprofilestop() - started) end
 		self_, elapsed_ = nil, nil
-		if ok or Harmless(err) then return end
+		if ok then return end
+		if Harmless(err) then
+			if ns.DevTap then pcall(ns.DevTap, "caught (dropped as harmless)", err, loopStack) end
+			return
+		end
 		pcall(ns.ReportError, err, loopStack, true)
 		local now = GetTime()
 		if now - state.windowStart > REPEAT_WINDOW then
@@ -493,6 +499,8 @@ end
 local usingBugGrabber = false
 local original = geterrorhandler()
 seterrorhandler(function(message, ...)
+	-- (Dev copy's error window hears every one, even those dropped below.)
+	if ns.DevTap and not forwarding then pcall(ns.DevTap, "error", message, debugstack(2)) end
 	if Harmless(message) then -- (see Harmless)
 		return
 	end
@@ -935,6 +943,7 @@ end
 do
 	local SECONDS, MAX_LINES = 180, 4000
 	local probe, stopAt, log, counts
+	local maxLines = MAX_LINES -- (a test may ask for more: busy training dummies filled 4000 in 26 s)
 
 	local function State(value)
 		if issecretvalue and issecretvalue(value) then return "<secret>" end
@@ -942,7 +951,7 @@ do
 	end
 
 	local function Rec(text)
-		if not log or #log >= MAX_LINES then return end
+		if not log or #log >= maxLines then return end
 		log[#log + 1] = ("%.3f %s"):format(GetTime(), text)
 	end
 
@@ -999,13 +1008,14 @@ do
 		ns.combatTextRecord = nil
 		Rec(StateLine())
 		Rec(("stopped (%s): %d UNIT_COMBAT, %d combat log lines, %d lines kept%s"):format(why, counts.combat,
-			counts.log, #log, #log >= MAX_LINES and " (FULL: the rest was dropped)" or ""))
+			counts.log, #log, #log >= maxLines and " (FULL: the rest was dropped)" or ""))
 		ns.Print(("combattext: stopped, %d lines recorded. Now /reload"):format(#log))
 		probe = nil
 	end
 
-	function ns.CombatTextProbe()
+	function ns.CombatTextProbe(lines)
 		if probe then Stop("run again") return end
+		maxLines = lines or MAX_LINES
 		probe, counts = CreateFrame("Frame"), { combat = 0, log = 0 }
 		ns.db.combatTextLog = {}
 		log = ns.db.combatTextLog
