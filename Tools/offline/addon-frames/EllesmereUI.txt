@@ -3,9 +3,8 @@
 # of its that's in neither = a MISS: decide it (a row, a fade, or here with
 # why). One per line: name or glob (*), a space, why. Its parts' own short
 # names (EUI, EAB, ERB_, ERF, ECME_...) count too: EXTRA_PREFIXES there.
-# Checked against v9.9, 2026-11-19. Not here on purpose, so they stay MISS
-# till decided: the mirror bars (ERB_Mirror_*: how the Breath bar row fades
-# isn't settled).
+# Checked against v9.9, 2026-11-19. (Its mirror bars, ERB_Mirror_*, fade
+# with the Breath bar row since 2026-11-19.)
 
 # Inside a frame that is faded (or a gap's: covered once that gets its row).
 EABPagingFrame page arrows, reparented to EABBar_MainBar (faded, mainbar row)

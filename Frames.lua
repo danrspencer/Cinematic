@@ -13579,6 +13579,7 @@ end
 -- Its frames that stand in for the game's: they fade in that group and follow
 -- the Standard Frames page's row (by key, see COMBAT_SHOW). own: they set
 -- their own alpha; hook: follow it at once (the addon's own frames only).
+-- group: nil for a row whose game frames are in none (the Breath bar's).
 function ns.FadeWithRow(rowKey, group, names, own, hook)
 	local row
 	for _, item in ipairs(ns.COMBAT_SHOW) do
@@ -13587,7 +13588,7 @@ function ns.FadeWithRow(rowKey, group, names, own, hook)
 		end
 	end
 	for _, name in ipairs(names) do
-		AddName(FRAME_GROUPS[group], name)
+		if group and FRAME_GROUPS[group] then AddName(FRAME_GROUPS[group], name) end
 		if row and row.frames then
 			AddName(row.frames, name)
 		end

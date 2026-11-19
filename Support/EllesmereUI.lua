@@ -612,6 +612,11 @@ ns.WhenAddonLoads("EllesmereUIResourceBars", function()
 	})
 	-- Its own cast bar in place of the game's: with the Cast bar row.
 	ns.FadeWithRow("castbar", "castbar", { "ERB_CastBarFrame" }, true, true)
+	-- Its mirror timers in place of the game's (breath, fatigue, Feign Death,
+	-- and its battleground start and group countdown bars, made on UIParent as
+	-- each is switched on): with the Breath bar row.
+	ns.FadeWithRow("mirror", nil, { "ERB_Mirror_breath", "ERB_Mirror_fatigue", "ERB_Mirror_feign",
+		"ERB_Mirror_pvp", "ERB_Mirror_countdown" })
 end)
 
 -- It moves the map out of the cluster and keeps the cluster at alpha 0, and
