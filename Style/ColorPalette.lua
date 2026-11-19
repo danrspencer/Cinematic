@@ -270,8 +270,9 @@ function palette.Pop(r, g, b, onChange, wheel)
 		close:SetScript("OnClick", function() pop:Hide() end)
 		-- (A click anywhere else: closed. Down, so the click that opened it,
 		-- whose OnClick comes on the way up, never closes it.)
-		pop:SetScript("OnEvent", function(self)
-			if not self:IsMouseOver() then self:Hide() end
+		-- (A fight starting: closed, while the keyboard can still be let go.)
+		pop:SetScript("OnEvent", function(self, event)
+			if event == "PLAYER_REGEN_DISABLED" or not self:IsMouseOver() then self:Hide() end
 		end)
 		-- (Esc: closed, and kept from the options behind. Keyboard input is
 		-- locked in fights: there, only a click closes it.)
@@ -283,10 +284,16 @@ function palette.Pop(r, g, b, onChange, wheel)
 		end)
 		pop:SetScript("OnShow", function(self)
 			self:RegisterEvent("GLOBAL_MOUSE_DOWN")
-			if not InCombatLockdown() then pcall(self.EnableKeyboard, self, true) end
+			self:RegisterEvent("PLAYER_REGEN_DISABLED")
+			-- (Keys go on to the game from the start: only Esc is kept.)
+			if not InCombatLockdown() then
+				pcall(self.EnableKeyboard, self, true)
+				pcall(self.SetPropagateKeyboardInput, self, true)
+			end
 		end)
 		pop:SetScript("OnHide", function(self)
 			self:UnregisterEvent("GLOBAL_MOUSE_DOWN")
+			self:UnregisterEvent("PLAYER_REGEN_DISABLED")
 			if not InCombatLockdown() then pcall(self.EnableKeyboard, self, false) end
 		end)
 	end

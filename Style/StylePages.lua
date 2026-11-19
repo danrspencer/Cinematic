@@ -2630,25 +2630,24 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf, panel)
 		name:SetWidth(150)
 		-- (A long row goes on over more lines, each under the first's choices:
 		-- the Unit Frame Style page's 13 shapes ran off the page's edge.)
-		local ROOM = 420
-		local last, used = nil, 0
+		-- (Each choice starts on a column, COL wide, a long one taking two or
+		-- more: the rows under each other line up.)
+		local ROOM, COL = 420, 100
+		local last, used, at = nil, 0, name
 		for _, info in ipairs(list) do
 			local choice = kit.Choice(content, K(key), info[1], info[2], info[3])
 			choice:HookScript("OnClick", changed)
 			local words = choice.Text or choice.text
 			local textW = words and words:GetStringWidth()
 			local wide = choice:GetWidth() + (type(textW) == "number" and textW or 60) + 16
+			wide = math.ceil(wide / COL) * COL
 			if last and used + wide > ROOM then
 				local line = CreateFrame("Frame", nil, content)
 				line:SetSize(150, 18)
 				stack:Add(line, "label")
-				choice:SetPoint("LEFT", line, "RIGHT", 4, 0)
-				used = 0
-			elseif last then
-				choice:SetPoint("LEFT", last.Text or last.text, "RIGHT", 16, 0)
-			else
-				choice:SetPoint("LEFT", name, "RIGHT", 4, 0)
+				at, used = line, 0
 			end
+			choice:SetPoint("LEFT", at, "RIGHT", 4 + used, 0)
 			used = used + wide
 			kit.GreyUnless(choice, test or On)
 			last = choice
