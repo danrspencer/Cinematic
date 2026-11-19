@@ -1,0 +1,489 @@
+# version 9.9
+EnableMouse(false or a variable) in EllesmereUI/EUI_SpecOverrides_Session.lua
+EnableMouse(false or a variable) in EllesmereUI/EUI_UnlockMode_PointPicker.lua
+EnableMouse(false or a variable) in EllesmereUI/EUI_UnlockMode_PointVisuals.lua
+EnableMouse(false or a variable) in EllesmereUI/EUI_UnlockMode_Session.lua
+EnableMouse(false or a variable) in EllesmereUI/EllesmereUI.lua
+EnableMouse(false or a variable) in EllesmereUI/EllesmereUI_AuraKit.lua
+EnableMouse(false or a variable) in EllesmereUI/EllesmereUI_GlobalSearch.lua
+EnableMouse(false or a variable) in EllesmereUI/EllesmereUI_Kick.lua
+EnableMouse(false or a variable) in EllesmereUI/EllesmereUI_Panel.lua
+EnableMouse(false or a variable) in EllesmereUI/EllesmereUI_PartyMode.lua
+EnableMouse(false or a variable) in EllesmereUI/EllesmereUI_PixelPerfect.lua
+EnableMouse(false or a variable) in EllesmereUI/EllesmereUI_RoundedCorners.lua
+EnableMouse(false or a variable) in EllesmereUI/EllesmereUI_SharedHelpers.lua
+EnableMouse(false or a variable) in EllesmereUI/EllesmereUI_SignupHelpers.lua
+EnableMouse(false or a variable) in EllesmereUI/EllesmereUI_UICore.lua
+EnableMouse(false or a variable) in EllesmereUIActionBars/EUI_ActionBars_Apply.lua
+EnableMouse(false or a variable) in EllesmereUIActionBars/EUI_ActionBars_DataBars.lua
+EnableMouse(false or a variable) in EllesmereUIActionBars/EUI_ActionBars_Disposal.lua
+EnableMouse(false or a variable) in EllesmereUIActionBars/EUI_ActionBars_ExtraBars.lua
+EnableMouse(false or a variable) in EllesmereUIActionBars/EUI_ActionBars_ForeverSwingSweep.lua
+EnableMouse(false or a variable) in EllesmereUIActionBars/EUI_ActionBars_Init.lua
+EnableMouse(false or a variable) in EllesmereUIActionBars/EUI_ActionBars_QuickKeybind.lua
+EnableMouse(false or a variable) in EllesmereUIActionBars/EUI_ActionBars_XPBar.lua
+EnableMouse(false or a variable) in EllesmereUIActionBars/EllesmereUIActionBars.lua
+EnableMouse(false or a variable) in EllesmereUIAuraBuffReminders/EUI_AuraBuffReminders_Beacon.lua
+EnableMouse(false or a variable) in EllesmereUIAuraBuffReminders/EUI_AuraBuffReminders_Icons.lua
+EnableMouse(false or a variable) in EllesmereUIAuraBuffReminders/EUI_AuraBuffReminders_Lifecycle.lua
+EnableMouse(false or a variable) in EllesmereUIAuraBuffReminders/EllesmereUIABR_BeaconMPlus.lua
+EnableMouse(false or a variable) in EllesmereUIAuraBuffReminders/EllesmereUIABR_TalentReminders.lua
+EnableMouse(false or a variable) in EllesmereUIChat/EUI_Chat_Init.lua
+EnableMouse(false or a variable) in EllesmereUIChat/EUI_Chat_Position.lua
+EnableMouse(false or a variable) in EllesmereUIChat/EUI_Chat_Sidebar.lua
+EnableMouse(false or a variable) in EllesmereUIChat/EUI_Chat_SidebarIcons.lua
+EnableMouse(false or a variable) in EllesmereUIChat/EUI_Chat_Skin.lua
+EnableMouse(false or a variable) in EllesmereUIChat/EUI_Chat_Visibility.lua
+EnableMouse(false or a variable) in EllesmereUIChat/EllesmereUIChat.lua
+EnableMouse(false or a variable) in EllesmereUIChat/EllesmereUIChat_Engine.lua
+EnableMouse(false or a variable) in EllesmereUIChat/EllesmereUIChat_SidebarStock.lua
+EnableMouse(false or a variable) in EllesmereUIChat/EllesmereUIChat_Tabs.lua
+EnableMouse(false or a variable) in EllesmereUICooldownManager/EUI_CDM_AuraIcons.lua
+EnableMouse(false or a variable) in EllesmereUICooldownManager/EUI_CDM_Bars.lua
+EnableMouse(false or a variable) in EllesmereUICooldownManager/EUI_CDM_Blizzard.lua
+EnableMouse(false or a variable) in EllesmereUICooldownManager/EUI_CDM_BuffBarCooldown.lua
+EnableMouse(false or a variable) in EllesmereUICooldownManager/EUI_CDM_BuffBarFrames.lua
+EnableMouse(false or a variable) in EllesmereUICooldownManager/EUI_CDM_ForeverSwingSweep.lua
+EnableMouse(false or a variable) in EllesmereUICooldownManager/EUI_CDM_Glows.lua
+EnableMouse(false or a variable) in EllesmereUICooldownManager/EUI_CDM_HookCustomBuffs.lua
+EnableMouse(false or a variable) in EllesmereUICooldownManager/EUI_CDM_HookDecorate.lua
+EnableMouse(false or a variable) in EllesmereUICooldownManager/EUI_CDM_HookIconStyle.lua
+EnableMouse(false or a variable) in EllesmereUICooldownManager/EUI_CDM_HookPresetFrames.lua
+EnableMouse(false or a variable) in EllesmereUICooldownManager/EUI_CDM_HookReanchor.lua
+EnableMouse(false or a variable) in EllesmereUICooldownManager/EUI_CDM_HookTrinkets.lua
+EnableMouse(false or a variable) in EllesmereUICooldownManager/EUI_CDM_HookViewers.lua
+EnableMouse(false or a variable) in EllesmereUICooldownManager/EUI_CDM_Icons.lua
+EnableMouse(false or a variable) in EllesmereUICooldownManager/EUI_CDM_Rebuild.lua
+EnableMouse(false or a variable) in EllesmereUICooldownManager/EllesmereUICdmBarGlows.lua
+EnableMouse(false or a variable) in EllesmereUICooldownManager/EllesmereUICdmHooks.lua
+EnableMouse(false or a variable) in EllesmereUICooldownManager/EllesmereUICdmRotationIcon.lua
+EnableMouse(false or a variable) in EllesmereUICooldownManager/EllesmereUICdmTbbDecimals.lua
+EnableMouse(false or a variable) in EllesmereUIDamageMeters/EUI_DamageMeters_Appearance.lua
+EnableMouse(false or a variable) in EllesmereUIDamageMeters/EUI_DamageMeters_State.lua
+EnableMouse(false or a variable) in EllesmereUIDamageMeters/EUI_DamageMeters_Timer.lua
+EnableMouse(false or a variable) in EllesmereUIDamageMeters/EUI_DamageMeters_Tooltip.lua
+EnableMouse(false or a variable) in EllesmereUIDamageMeters/EUI_DamageMeters_Window.lua
+EnableMouse(false or a variable) in EllesmereUIDamageMeters/EllesmereUIDamageMeters_SpellHistory.lua
+EnableMouse(false or a variable) in EllesmereUIDataBars/EllesmereUIDataBars.lua
+EnableMouse(false or a variable) in EllesmereUIForeverEssentials/EllesmereUIForeverEssentials_ActiveForm.lua
+EnableMouse(false or a variable) in EllesmereUIForeverEssentials/EllesmereUIForeverEssentials_LootFeed.lua
+EnableMouse(false or a variable) in EllesmereUIForeverEssentials/EllesmereUIForeverEssentials_MapFade.lua
+EnableMouse(false or a variable) in EllesmereUIForeverEssentials/EllesmereUIForeverEssentials_ThreatMeter.lua
+EnableMouse(false or a variable) in EllesmereUIMinimap/EUI_Minimap_Apply.lua
+EnableMouse(false or a variable) in EllesmereUIMinimap/EUI_Minimap_Layout.lua
+EnableMouse(false or a variable) in EllesmereUIMinimap/EUI_Minimap_Lifecycle.lua
+EnableMouse(false or a variable) in EllesmereUIMinimap/EUI_Minimap_Styles.lua
+EnableMouse(false or a variable) in EllesmereUINameplates/EUI_Nameplates_AuraContainers.lua
+EnableMouse(false or a variable) in EllesmereUINameplates/EUI_Nameplates_Cast.lua
+EnableMouse(false or a variable) in EllesmereUINameplates/EUI_Nameplates_Layout.lua
+EnableMouse(false or a variable) in EllesmereUINameplates/EUI_Nameplates_Styles.lua
+EnableMouse(false or a variable) in EllesmereUINameplates/EllesmereUINameplates_CastOverlay.lua
+EnableMouse(false or a variable) in EllesmereUINameplates/EllesmereUINameplates_DebuffColors.lua
+EnableMouse(false or a variable) in EllesmereUIQoL/EllesmereUIQoL.lua
+EnableMouse(false or a variable) in EllesmereUIQoL/EllesmereUIQoL_Alerts.lua
+EnableMouse(false or a variable) in EllesmereUIQoL/EllesmereUIQoL_Cursor.lua
+EnableMouse(false or a variable) in EllesmereUIQoL/EllesmereUIQoL_Keys.lua
+EnableMouse(false or a variable) in EllesmereUIQoL/EllesmereUIQoL_RaidTools.lua
+EnableMouse(false or a variable) in EllesmereUIQoL/EllesmereUIQoL_Shifter.lua
+EnableMouse(false or a variable) in EllesmereUIQuestTracker/EllesmereUIQuestTracker_QoL.lua
+EnableMouse(false or a variable) in EllesmereUIQuestTracker/EllesmereUIQuestTracker_Skin.lua
+EnableMouse(false or a variable) in EllesmereUIRaidFrames/EUI_RaidFrames_AuraContainers.lua
+EnableMouse(false or a variable) in EllesmereUIRaidFrames/EUI_RaidFrames_BuffManager.lua
+EnableMouse(false or a variable) in EllesmereUIRaidFrames/EUI_RaidFrames_ClickCast.lua
+EnableMouse(false or a variable) in EllesmereUIRaidFrames/EUI_RaidFrames_DebuffManager.lua
+EnableMouse(false or a variable) in EllesmereUIRaidFrames/EUI_RaidFrames_ForeverMissingBuffs.lua
+EnableMouse(false or a variable) in EllesmereUIRaidFrames/EUI_RaidFrames_Portrait.lua
+EnableMouse(false or a variable) in EllesmereUIRaidFrames/EUI_RaidFrames_Stock.lua
+EnableMouse(false or a variable) in EllesmereUIRaidFrames/EUI_RaidFrames_Update.lua
+EnableMouse(false or a variable) in EllesmereUIResourceBars/EUI_ResourceBars_Anchors.lua
+EnableMouse(false or a variable) in EllesmereUIResourceBars/EUI_ResourceBars_CallTotemBar.lua
+EnableMouse(false or a variable) in EllesmereUIResourceBars/EUI_ResourceBars_Frames.lua
+EnableMouse(false or a variable) in EllesmereUIResourceBars/EUI_ResourceBars_Groups.lua
+EnableMouse(false or a variable) in EllesmereUIResourceBars/EUI_ResourceBars_MirrorTimer.lua
+EnableMouse(false or a variable) in EllesmereUIResourceBars/EUI_ResourceBars_Style.lua
+EnableMouse(false or a variable) in EllesmereUIResourceBars/EUI_ResourceBars_Update.lua
+EnableMouse(false or a variable) in EllesmereUIUnitFrames/EUI_PlayerAuraBars_Preview.lua
+EnableMouse(false or a variable) in EllesmereUIUnitFrames/EUI_UnitFrames_AuraContainers.lua
+EnableMouse(false or a variable) in EllesmereUIUnitFrames/EUI_UnitFrames_Castbar.lua
+EnableMouse(false or a variable) in EllesmereUIUnitFrames/EUI_UnitFrames_Init.lua
+EnableMouse(false or a variable) in EllesmereUIUnitFrames/EUI_UnitFrames_Layout.lua
+EnableMouse(false or a variable) in EllesmereUIUnitFrames/EUI_UnitFrames_StockStyles.lua
+EnableMouse(false or a variable) in EllesmereUIUnitFrames/EllesmereUIUnitFrames.lua
+EnableMouse(false or a variable) in EllesmereUIUnitFrames/EllesmereUIUnitFrames_PlayerAuraBars.lua
+SetAlpha hook in EllesmereUI/EUI_UnlockMode_Session.lua
+SetAlpha hook in EllesmereUI/EllesmereUI.lua
+SetAlpha hook in EllesmereUI/EllesmereUI_SharedHelpers.lua
+SetAlpha hook in EllesmereUIActionBars/EUI_ActionBars_ButtonArt.lua
+SetAlpha hook in EllesmereUINameplates/EUI_Nameplates_Plate.lua
+SetAlpha hook in EllesmereUINameplates/EllesmereUINameplatesFriendly.lua
+SetAlpha hook in EllesmereUIQoL/EllesmereUIQoL.lua
+SetAlpha hook in EllesmereUIQuestTracker/EllesmereUIQuestTracker_Custom.lua
+SetAlpha hook in EllesmereUIQuestTracker/EllesmereUIQuestTracker_Skin.lua
+SetAlphaFromBoolean (secret alpha) in EllesmereUI/EllesmereUI_AbsorbGlow.lua
+SetAlphaFromBoolean (secret alpha) in EllesmereUIActionBars/EUI_ActionBars_Events.lua
+SetAlphaFromBoolean (secret alpha) in EllesmereUINameplates/EUI_Nameplates_Cast.lua
+SetAlphaFromBoolean (secret alpha) in EllesmereUINameplates/EUI_Nameplates_CastState.lua
+SetAlphaFromBoolean (secret alpha) in EllesmereUIQoL/EllesmereUIQoL_RaidTools.lua
+SetAlphaFromBoolean (secret alpha) in EllesmereUIRaidFrames/EUI_RaidFrames_Absorb.lua
+SetAlphaFromBoolean (secret alpha) in EllesmereUIRaidFrames/EUI_RaidFrames_BossFrames.lua
+SetAlphaFromBoolean (secret alpha) in EllesmereUIRaidFrames/EUI_RaidFrames_PetFrames.lua
+SetAlphaFromBoolean (secret alpha) in EllesmereUIRaidFrames/EUI_RaidFrames_Portrait.lua
+SetAlphaFromBoolean (secret alpha) in EllesmereUIRaidFrames/EUI_RaidFrames_Visibility.lua
+SetAlphaFromBoolean (secret alpha) in EllesmereUIUnitFrames/EUI_UnitFrames_Castbar.lua
+SetAlphaFromBoolean (secret alpha) in EllesmereUIUnitFrames/EUI_UnitFrames_Lifecycle.lua
+SetIgnoreParentAlpha(true) in EllesmereUI/EllesmereUI.lua
+SetIgnoreParentAlpha(true) in EllesmereUIChat/EllesmereUIChat_Tabs.lua
+SetIgnoreParentAlpha(true) in EllesmereUIRaidFrames/EUI_RaidFrames_PetFrames.lua
+UIFrameFadeIn/Out in EllesmereUIActionBars/EUI_ActionBars_QuickKeybind.lua
+frame EABActionButtonController
+frame EABBar_
+frame EABBar_*
+frame EABHiddenParent
+frame EABOverrideController
+frame EABPageNext
+frame EABPagePrev
+frame EABPagingDown
+frame EABPagingFrame
+frame EABPagingUp
+frame EABR_Anchor
+frame EABR_BeaconAnchor
+frame EABR_CombatAnchor
+frame EABR_CursorAnchor
+frame EABR_CursorIcon
+frame EABR_CursorIcon*
+frame EABR_Icon
+frame EABR_Icon*
+frame EABR_ProviderCast
+frame EABR_TalentAnchor
+frame EABR_TalentIcon
+frame EABR_TalentIcon*
+frame EABSecureSetupHandler
+frame EAB_BindOwner
+frame ECL_CastRoot
+frame ECL_GCDRoot
+frame ECL_TrailContainer
+frame ECME_CDMBar_
+frame ECME_CDMBar_*
+frame ECME_Glow_
+frame ECME_Glow_*
+frame ECME_TBB
+frame ECME_TBB*
+frame ECME_TBBWrap
+frame ECME_TBBWrap*
+frame ERB_CallTotemBarFrame
+frame ERB_CastBar
+frame ERB_CastBarFrame
+frame ERB_GCDBar
+frame ERB_GCDBarFrame
+frame ERB_MirrorBars
+frame ERB_Mirror_
+frame ERB_Mirror_*
+frame ERB_SecondaryFrame
+frame ERB_SwingTimerFrame
+frame ERB_TotemBarFrame
+frame ERFExtraFrame
+frame ERFExtraFrame*
+frame ERFExtraFramesBindBtn
+frame ERFExtraFramesContainer
+frame ERFFlatHeader
+frame ERFFriendlyBoss
+frame ERFFriendlyBoss*
+frame ERFFriendlyBossContainer
+frame ERFFriendlyBossController
+frame ERFGroupHeader
+frame ERFGroupHeader*
+frame ERFPartyHeader
+frame ERFPartySelfButton
+frame ERFPetHeader
+frame ERF_HealerMana
+frame ERF_PlayerGroup
+frame EUIClickCastBindProxy
+frame EUIClickCastGlobalBtn
+frame EUIClickCastHeader
+frame EUIClientGatePopup
+frame EUICondKeyBtn
+frame EUICondKeyBtn*
+frame EUIConfirmDimmer
+frame EUIConfirmMacroOverlay
+frame EUIConfirmPopup
+frame EUIInfoDimmer
+frame EUIInfoPopup
+frame EUIInputDimmer
+frame EUIInputPopup
+frame EUIKeysPopup
+frame EUIRFTipEater
+frame EUIRFTipEater*
+frame EUISpecAssignDimmer
+frame EUISpecAssignPopup
+frame EUITeleportButton
+frame EUITeleportPopup
+frame EUIUpgCalcFrame
+frame EUIVisToggleKeyBtn
+frame EUIVisToggleKeyBtn*
+frame EUI_CharacterCrosshair
+frame EUI_ClassicSpellbook
+frame EUI_ClassicSpellbookEscape
+frame EUI_ClassicSpellbookToggle
+frame EUI_ClassicTalents
+frame EUI_ClassicTalentsToggle
+frame EUI_CustomQuestTracker
+frame EUI_EnvPingButton
+frame EUI_EnvPingHoldButton
+frame EUI_FPSBindBtn
+frame EUI_FPSCounter
+frame EUI_GatewayShardFrame
+frame EUI_MerchantHandler
+frame EUI_MouseLookBtn
+frame EUI_MovementAlertFrame
+frame EUI_NoRightClickState
+frame EUI_QuestDetails
+frame EUI_QuestItemHotkeyBtn
+frame EUI_RepairTopUp
+frame EUI_RepairWatcher
+frame EUI_SecondaryStats
+frame EUI_SpellbookRoute
+frame EUI_TalentsRoute
+frame EUI_TimeSpiralFrame
+frame EUI_TrainAllButton
+frame EWB_ILVL_
+frame EWB_ILVL_*
+frame EWB_LOC_
+frame EWB_LOC_*
+frame EllesmereEAB_
+frame EllesmereEAB_*
+frame EllesmereEAB_*_Bar
+frame EllesmereEAB_XPBar_Rested
+frame EllesmereUIActiveForm
+frame EllesmereUIAfkScreen
+frame EllesmereUIBattleResIcon
+frame EllesmereUIBloodlustIcon
+frame EllesmereUIClickArea
+frame EllesmereUICursorFrame
+frame EllesmereUIDMBarHistory
+frame EllesmereUIDMFrame
+frame EllesmereUIDMFrame*
+frame EllesmereUIDMIconHistoryFrame
+frame EllesmereUIDMIconStrip
+frame EllesmereUIDMResetBindBtn
+frame EllesmereUIDMStandaloneTimer
+frame EllesmereUIDMToggleBindBtn
+frame EllesmereUIDataBarsBar
+frame EllesmereUIDataBarsBar*
+frame EllesmereUIDataBarsHearth_
+frame EllesmereUIDataBarsHearth_*
+frame EllesmereUIDataBarsTip
+frame EllesmereUIDataBarsTipActions
+frame EllesmereUIFishingCastButton
+frame EllesmereUIFrame
+frame EllesmereUIJunkList
+frame EllesmereUIMicroMenu
+frame EllesmereUIMinimapButton
+frame EllesmereUIPartyModeBindBtn
+frame EllesmereUIPartyModeFrame
+frame EllesmereUIPlayerAuraBars_Buffs
+frame EllesmereUIPlayerAuraBars_CustomBuff
+frame EllesmereUIPlayerAuraBars_CustomBuff*
+frame EllesmereUIPlayerAuraBars_CustomDebuff
+frame EllesmereUIPlayerAuraBars_CustomDebuff*
+frame EllesmereUIPlayerAuraBars_Debuffs
+frame EllesmereUIProfileBind
+frame EllesmereUIProfileBind*
+frame EllesmereUIQTBackground
+frame EllesmereUIRaidBuffCheck
+frame EllesmereUIRaidFrameContainer
+frame EllesmereUIRaidTools
+frame EllesmereUIRaidTools*
+frame EllesmereUIRaidToolsIcon
+frame EllesmereUIRaidToolsQuickFireClear
+frame EllesmereUIRaidToolsQuickFireHeader
+frame EllesmereUIRaidToolsQuickFirePlace
+frame EllesmereUIRaidToolsQuickFireUndo
+frame EllesmereUIRaidToolsTip
+frame EllesmereUIRaidToolsToggle
+frame EllesmereUIResourceBarsFrame
+frame EllesmereUIScrollFrame
+frame EllesmereUIUnitFrames_Hider
+frame EllesmereUI_EscapeProxy
+frame EllesmereUI_GameMenuButton
+frame EllesmereUI_HouseVisitFrame
+frame EllesmereUI_MenuFallbackDock
+frame EllesmereUI_PadOverlayLayer
+frame EllesmereUI_UnlockMenuButton
+frame EllesmereUnlockMode
+hooks ActionButtonDown
+hooks ActionButtonSpellAlertManager:HideAlert
+hooks ActionButtonSpellAlertManager:ShowAlert
+hooks ActionButtonUp
+hooks ActionButton_UpdateRangeIndicator
+hooks AssistedCombatManager:UpdateAllAssistedHighlightFramesForSpell
+hooks BonusRollFrame_CloseBonusRoll
+hooks BonusRollFrame_StartBonusRoll
+hooks BuffFrame:Show
+hooks C_ClassTalents:UpdateLastSelectedSavedConfigID
+hooks C_PetJournal:DismissSummonedPet
+hooks C_PetJournal:SummonPetByGUID
+hooks CameraOrSelectOrMoveStart
+hooks CameraOrSelectOrMoveStop
+hooks ClassTrainerFrame_Update
+hooks CompactRaidFrameManager_UpdateShown
+hooks CompactUnitFrame_SetUpFrame
+hooks CooldownViewerBuffBarItemMixin:OnCooldownIDSet
+hooks CooldownViewerBuffIconItemMixin:OnCooldownIDSet
+hooks CooldownViewerEssentialItemMixin:OnCooldownIDSet
+hooks CooldownViewerUtilityItemMixin:OnCooldownIDSet
+hooks DebuffFrame:Show
+hooks EAB:ApplyBarOpacity
+hooks EAB:RefreshMouseover
+hooks EditModeManagerFrame:Hide
+hooks EllesmereUI:ApplyColorsToOUF
+hooks EllesmereUI:RefreshPage
+hooks EllesmereUI:SelectModule
+hooks EllesmereUI:SelectPage
+hooks EllesmereUI:SetBorderStyleColor
+hooks EllesmereUI_StartPartyMode
+hooks EllesmereUI_StopPartyMode
+hooks EquipmentFlyout_UpdateItems
+hooks ExtraAbilityContainer:AddFrame
+hooks ExtraAbilityContainer:ApplySystemAnchor
+hooks ExtraAbilityContainer:Show
+hooks FriendsFrame_UpdateFriendButton
+hooks FriendsListSocialCardMixin:Initialize
+hooks FriendsListSocialCardMixin:SetSelected
+hooks GameMenuFrame:Layout
+hooks GameTooltip:SetAction
+hooks GameTooltip:SetPetAction
+hooks HelpPlate:ShowTutorialTooltip
+hooks HelpPlateTooltip:Init
+hooks HelpTip:Show
+hooks LFGListCategorySelection_AddButton
+hooks LFGListSearchEntry_OnClick
+hooks MainMenuMicroButton_ShowAlert
+hooks Minimap:SetParent
+hooks Minimap:SetPoint
+hooks MinimapCluster:SetEditModeScale
+hooks MinimapCluster:SetIconScale
+hooks MultiActionButtonDown
+hooks MultiActionButtonUp
+hooks MultiCastActionBarFrame_Update
+hooks MultiCastFlyoutFrameOpenButton_Show
+hooks MultiCastFlyoutFrame_ToggleFlyout
+hooks NamePlateDriverFrame:OnNamePlateAdded
+hooks NamePlateDriverFrame:OnNamePlateRemoved
+hooks NamePlateDriverFrame:SetupClassNameplateBars
+hooks NamePlateDriverFrame:UpdateNamePlateOptions
+hooks ObjectiveTrackerFrame:ApplySystemAnchor
+hooks PetJournal_InitPetButton
+hooks QuestInfo_Display
+hooks SetItemRef
+hooks ShowUIPanel
+hooks TakeTaxiNode
+hooks TaxiNodeOnButtonEnter
+hooks TaxiRequestEarlyLanding
+hooks ToggleMinimap
+hooks TooltipComparisonManager:SetItemTooltip
+hooks TopBannerManager_BannerFinished
+hooks TopBannerManager_Show
+hooks TotemButtonMixin:OnLoad
+hooks TotemFrame:Update
+hooks TurnOrActionStart
+hooks TurnOrActionStop
+hooks UIParent:SetAlpha
+hooks UnitPopup_OpenMenu
+hooks _EABR_RequestRefresh
+partial mouse handling in EllesmereUI/EUI_SpecOverrides_Borders.lua
+partial mouse handling in EllesmereUI/EllesmereUI_AuraKit.lua
+partial mouse handling in EllesmereUI/EllesmereUI_FriendsList.lua
+partial mouse handling in EllesmereUI/EllesmereUI_SharedHelpers.lua
+partial mouse handling in EllesmereUI/EllesmereUI_WarriorCharges.lua
+partial mouse handling in EllesmereUIActionBars/EUI_ActionBars_Bars.lua
+partial mouse handling in EllesmereUIActionBars/EUI_ActionBars_QuickKeybind.lua
+partial mouse handling in EllesmereUIActionBars/EllesmereUIActionBars.lua
+partial mouse handling in EllesmereUIAuraBuffReminders/EUI_AuraBuffReminders_Icons.lua
+partial mouse handling in EllesmereUIChat/EUI_Chat_Init.lua
+partial mouse handling in EllesmereUIChat/EUI_Chat_Visibility.lua
+partial mouse handling in EllesmereUIChat/EllesmereUIChat_Engine.lua
+partial mouse handling in EllesmereUIChat/EllesmereUIChat_Tabs.lua
+partial mouse handling in EllesmereUICooldownManager/EUI_CDM_AuraIcons.lua
+partial mouse handling in EllesmereUICooldownManager/EUI_CDM_HookPresetFrames.lua
+partial mouse handling in EllesmereUICooldownManager/EUI_CDM_HookReanchor.lua
+partial mouse handling in EllesmereUICooldownManager/EUI_CDM_HookTrinkets.lua
+partial mouse handling in EllesmereUICooldownManager/EllesmereUICdmFakeActive.lua
+partial mouse handling in EllesmereUICooldownManager/EllesmereUICdmTbbDecimals.lua
+partial mouse handling in EllesmereUIDamageMeters/EUI_DamageMeters_Window.lua
+partial mouse handling in EllesmereUIForeverEssentials/EllesmereUIForeverEssentials.lua
+partial mouse handling in EllesmereUIForeverEssentials/EllesmereUIForeverEssentials_ClassicSpellbook.lua
+partial mouse handling in EllesmereUIForeverEssentials/EllesmereUIForeverEssentials_Fishing.lua
+partial mouse handling in EllesmereUIForeverEssentials/EllesmereUIForeverEssentials_MapTravel.lua
+partial mouse handling in EllesmereUIMinimap/EUI_Minimap_Apply.lua
+partial mouse handling in EllesmereUIMinimap/EUI_Minimap_Layout.lua
+partial mouse handling in EllesmereUINameplates/EUI_Nameplates_AuraContainers.lua
+partial mouse handling in EllesmereUIQoL/EllesmereUIQoL.lua
+partial mouse handling in EllesmereUIQoL/EllesmereUIQoL_Alerts.lua
+partial mouse handling in EllesmereUIQuestTracker/EllesmereUIQuestTracker_Custom.lua
+partial mouse handling in EllesmereUIQuestTracker/EllesmereUIQuestTracker_Skin.lua
+partial mouse handling in EllesmereUIRaidFrames/EUI_RaidFrames_AuraContainers.lua
+partial mouse handling in EllesmereUIRaidFrames/EUI_RaidFrames_BuffManager.lua
+partial mouse handling in EllesmereUIRaidFrames/EUI_RaidFrames_DebuffManager.lua
+partial mouse handling in EllesmereUIResourceBars/EUI_ResourceBars_ArcaneSoul.lua
+partial mouse handling in EllesmereUIResourceBars/EUI_ResourceBars_BlizzClassArt.lua
+partial mouse handling in EllesmereUIResourceBars/EUI_ResourceBars_EbonMight121.lua
+partial mouse handling in EllesmereUIUnitFrames/EUI_UnitFrames_ForeverExtras.lua
+partial mouse handling in EllesmereUIUnitFrames/EUI_UnitFrames_ForeverImbues.lua
+sets CVar SHOW_MULTI_ACTIONBAR_1
+sets CVar SHOW_MULTI_ACTIONBAR_2
+sets CVar SHOW_MULTI_ACTIONBAR_3
+sets CVar SHOW_MULTI_ACTIONBAR_4
+sets CVar ShowClassColorInFriendlyNameplate
+sets CVar ShowClassColorInNameplate
+sets CVar UnitNameFriendlyPlayerName
+sets CVar advancedCombatLogging
+sets CVar brightness
+sets CVar chatMouseScroll
+sets CVar clampTargetNameplateToScreen
+sets CVar contrast
+sets CVar damageMeterEnabled
+sets CVar nameplateMaxAlpha
+sets CVar nameplateMaxAlphaDistance
+sets CVar nameplateMaxDistance
+sets CVar nameplateMaxScale
+sets CVar nameplateMinAlpha
+sets CVar nameplateMinAlphaDistance
+sets CVar nameplateMinScale
+sets CVar nameplateOverlapH
+sets CVar nameplateSelectedScale
+sets CVar nameplateShowAll
+sets CVar nameplateShowEnemies
+sets CVar nameplateShowEnemyPets
+sets CVar nameplateShowFriendlyNPCs
+sets CVar nameplateShowFriendlyNpcs
+sets CVar nameplateShowOnlyNameForFriendlyPlayerUnits
+sets CVar nameplateSize
+sets CVar nameplateTargetBehindMaxDistance
+sets CVar nameplateUseClassColorForFriendlyPlayerUnitNames
+sets CVar rotateMinimap
+sets CVar showTimestamps
+state driver in EllesmereUIActionBars/EUI_ActionBars_Bars.lua
+state driver in EllesmereUIActionBars/EUI_ActionBars_Controllers.lua
+state driver in EllesmereUIActionBars/EUI_ActionBars_Keybinds.lua
+state driver in EllesmereUIActionBars/EUI_ActionBars_Paging.lua
+state driver in EllesmereUIActionBars/EUI_ActionBars_QuickKeybind.lua
+state driver in EllesmereUIActionBars/EUI_ActionBars_Setup.lua
+state driver in EllesmereUIActionBars/EUI_ActionBars_Visibility.lua
+state driver in EllesmereUIActionBars/EUI_ActionBars_VisibilityDrivers.lua
+state driver in EllesmereUIActionBars/EllesmereUIActionBars.lua
+state driver in EllesmereUICooldownManager/EUI_CDM_Lifecycle.lua
+state driver in EllesmereUIDataBars/Blocks/ItemLevel.lua
+state driver in EllesmereUIDataBars/Blocks/Location.lua
+state driver in EllesmereUIDataBars/Blocks/MicroMenu.lua
+state driver in EllesmereUIDataBars/EllesmereUIDataBars.lua
+state driver in EllesmereUIMinimap/EUI_Minimap_Lifecycle.lua
+state driver in EllesmereUIQoL/EllesmereUIQoL.lua
+state driver in EllesmereUIQoL/EllesmereUIQoL_RaidTools.lua
+state driver in EllesmereUIRaidFrames/EUI_RaidFrames_BossFrames.lua
+state driver in EllesmereUIRaidFrames/EUI_RaidFrames_ClickCast.lua
+state driver in EllesmereUIRaidFrames/EUI_RaidFrames_PetFrames.lua
+state driver in EllesmereUIRaidFrames/EUI_RaidFrames_Visibility.lua
+state driver in EllesmereUIResourceBars/EUI_ResourceBars_Events.lua
+state driver in EllesmereUIUnitFrames/EUI_PlayerAuraBars_Visibility.lua
+state driver in EllesmereUIUnitFrames/EUI_UnitFrames_Engine.lua
+state driver in EllesmereUIUnitFrames/EUI_UnitFrames_Init.lua

@@ -84,7 +84,9 @@ for _, entry in ipairs({
 		key = "eui" .. entry[2]:gsub("%s", ""), from = "euiReminders", addon = "EllesmereUIAuraBuffReminders",
 		label = "EllesmereUI " .. entry[2], short = "EllesmereUI " .. entry[2]:lower(),
 		about = L["its missing-buff reminders"],
-		names = { entry[1] },
+		-- (The raid buff you can cast sits at the buff reminders' spot as a
+		-- clickable icon of its own, not a child of that anchor.)
+		names = entry[1] == "EABR_Anchor" and { entry[1], "EABR_ProviderCast" } or { entry[1] },
 	}
 end
 for _, known in ipairs(rows) do
@@ -97,7 +99,8 @@ for _, known in ipairs({
 		key = "euiCooldowns", addon = "EllesmereUICooldownManager", bar = true,
 		label = "EllesmereUI Cooldown Manager", short = "EllesmereUI cooldowns",
 		about = L["its cooldown bars"],
-		patterns = { "^ECME_CDMBar_" },
+		-- (And its tracked buff bars, made on UIParent: ECME_TBBWrap1...)
+		patterns = { "^ECME_CDMBar_", "^ECME_TBBWrap%d+$" },
 	},
 	{
 		key = "euiTotemBar", from = "euiResource", addon = "EllesmereUIResourceBars",
@@ -115,6 +118,9 @@ for _, known in ipairs({
 		key = "euiMeters", addon = "EllesmereUIDamageMeters",
 		label = "EllesmereUI Damage Meters", short = "EllesmereUI meters",
 		about = L["its meter windows"],
+		-- (And its spell history strip and window and its combat timer, each
+		-- on UIParent beside the meters.)
+		names = { "EllesmereUIDMIconHistoryFrame", "EllesmereUIDMBarHistory", "EllesmereUIDMStandaloneTimer" },
 		patterns = { "^EllesmereUIDMFrame%d+$" },
 	},
 	{
@@ -162,6 +168,70 @@ for _, known in ipairs({
 		label = "EllesmereUI Loot Feed", short = "EllesmereUI loot feed",
 		about = L["its loot feed"],
 		match = MatchUnlockFrames({ "EUI_LootFeed" }),
+	},
+	-- Its displays drawn on UIParent with no game frame to follow, a row
+	-- each (found 2026-11-19 by addon-check's every-frame check).
+	{
+		key = "euiCursor", addon = "EllesmereUIQoL",
+		label = "EllesmereUI Cursor Circle", short = "EllesmereUI cursor",
+		about = L["its circle around the mouse cursor"],
+		names = { "EllesmereUICursorFrame" },
+	},
+	{
+		key = "euiCursorTrail", addon = "EllesmereUIQoL",
+		label = "EllesmereUI Cursor Trail", short = "EllesmereUI cursor trail",
+		about = L["its trail behind the mouse cursor"],
+		names = { "ECL_TrailContainer" },
+	},
+	{
+		key = "euiCursorCast", addon = "EllesmereUIQoL",
+		label = "EllesmereUI Cursor Cast Ring", short = "EllesmereUI cursor cast",
+		about = L["its cast ring around the mouse cursor"],
+		names = { "ECL_CastRoot" },
+	},
+	{
+		key = "euiCursorGCD", addon = "EllesmereUIQoL",
+		label = "EllesmereUI Cursor GCD Ring", short = "EllesmereUI cursor GCD",
+		about = L["its global cooldown ring around the mouse cursor"],
+		names = { "ECL_GCDRoot" },
+	},
+	{
+		key = "euiGCDBar", addon = "EllesmereUIResourceBars",
+		label = "EllesmereUI GCD Bar", short = "EllesmereUI GCD bar",
+		about = L["its global cooldown bar"],
+		names = { "ERB_GCDBarFrame" },
+	},
+	{
+		key = "euiActiveForm", addon = "EllesmereUIForeverEssentials",
+		label = "EllesmereUI Active Form", short = "EllesmereUI form",
+		about = L["its icon for your active form, stance or aspect"],
+		names = { "EllesmereUIActiveForm" },
+	},
+	{
+		key = "euiAfkScreen", addon = "EllesmereUI",
+		label = "EllesmereUI AFK Screen", short = "EllesmereUI AFK screen",
+		about = L["its screen while you're away"],
+		names = { "EllesmereUIAfkScreen" },
+	},
+	-- (Its raid tools windows are secure, shown by its own state driver: only
+	-- their alpha is set, never shown or hidden.)
+	{
+		key = "euiRaidToolsGroup", addon = "EllesmereUIQoL",
+		label = "EllesmereUI Raid Tools: Group", short = "EllesmereUI raid group tools",
+		about = L["its raid tools' group window"],
+		names = { "EllesmereUIRaidToolsGroup" },
+	},
+	{
+		key = "euiRaidToolsMarkers", addon = "EllesmereUIQoL",
+		label = "EllesmereUI Raid Tools: Markers", short = "EllesmereUI raid markers",
+		about = L["its raid tools' markers window"],
+		names = { "EllesmereUIRaidToolsMarkers" },
+	},
+	{
+		key = "euiRaidToolsIcon", addon = "EllesmereUIQoL",
+		label = "EllesmereUI Raid Tools Icon", short = "EllesmereUI raid tools icon",
+		about = L["its raid tools' folded-up icon"],
+		names = { "EllesmereUIRaidToolsIcon" },
 	},
 }) do
 	known.suite, known.hookAlpha = "EllesmereUI", true
@@ -212,6 +282,14 @@ ns.WhenAddonLoads("EllesmereUIUnitFrames", function()
 		{ "focus", "target", "EllesmereUIUnitFrames_Focus", "EllesmereUIUnitFrames_FocusTarget" },
 		{ "buffs", "buffs", "EllesmereUIPlayerAuraBars_Buffs", "EllesmereUIPlayerAuraBars_Debuffs" },
 	})
+	-- Its custom buff and debuff bars (EllesmereUIPlayerAuraBars_CustomBuff1...,
+	-- numbered from 1 as you add them, each on UIParent): with the Buffs row.
+	local custom = {}
+	for i = 1, 20 do
+		custom[#custom + 1] = "EllesmereUIPlayerAuraBars_CustomBuff" .. i
+		custom[#custom + 1] = "EllesmereUIPlayerAuraBars_CustomDebuff" .. i
+	end
+	ns.FadeWithRow("buffs", "buffs", custom, true, true)
 	ns.AddPortraitFrame("EllesmereUIUnitFrames_Player")
 end)
 
@@ -266,7 +344,12 @@ end
 ns.WhenAddonLoads("EllesmereUIRaidFrames", function()
 	ns.FadeFoundByName("raidplayers", {
 		"EllesmereUIRaidFrameContainer", "ERF_HealerMana", "ERFExtraFramesContainer", "ERFFriendlyBossContainer",
+		-- (Its "your group number" label, on UIParent.)
+		"ERF_PlayerGroup",
 	})
+	-- Its pet frames: a pet header in a screen-sized holder of no name, outside
+	-- its raid container. With the Pets row.
+	ns.FadeFoundByName("raidpets", { "ERFPetHeader" })
 	ns.AddScanner(function()
 		local party = UnlockFrame("RF_PartyFrames")
 		if party and not ns.IsFaded(party) then
@@ -527,6 +610,8 @@ ns.WhenAddonLoads("EllesmereUIResourceBars", function()
 		{ "prdpower", "prdpower", "ERB_PrimaryBar", "ERB_SecondaryFrame" },
 		{ "swing", "swing", "ERB_SwingTimerFrame" },
 	})
+	-- Its own cast bar in place of the game's: with the Cast bar row.
+	ns.FadeWithRow("castbar", "castbar", { "ERB_CastBarFrame" }, true, true)
 end)
 
 -- It moves the map out of the cluster and keeps the cluster at alpha 0, and

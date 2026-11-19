@@ -15,7 +15,9 @@ Runs side by side, each a PASS or FAIL line, then one line for all of it:
 - the once-only settings updates on your own saved settings (each client's
   Cinematic.lua and CinematicDev.lua, a copy: nothing is written there),
   every update run from scratch: none may error;
-- the offline tests of fixed bugs (OFFLINE_TESTS: no FAIL line).
+- the offline tests of fixed bugs (OFFLINE_TESTS: no FAIL line);
+- other addons as installed against Support/ (Tools/addon-check.py: a name
+  our support uses gone fails; what changed since its baseline is listed).
 Then the last /cine prerelease runs on each client, read from the dev
 copy's saved settings (after a /reload): their summary and NEW FAIL lines.
 
@@ -112,6 +114,13 @@ def judge_test(ok, output):
     return passed > 0, "%d checks passed" % passed
 
 
+def judge_addons(ok, output):
+    lines = output.splitlines()
+    shown = [l.strip() for l in lines if l.startswith(("FAIL", "MISS", "NOTE", "      +", "      -"))]
+    detail = last_line(output, "addon check:")
+    return ok, detail + "".join("\n      " + l[:220] for l in shown[:16])
+
+
 def judge_migrate(ok, output):
     failed = [l for l in output.splitlines() if l.startswith("update failed")]
     if failed:
@@ -179,6 +188,7 @@ def main():
             jobs.append(Job("offline sweep, %s" % client, lua + ["Tools/offline/sweep.lua", client], judge_sweep))
         for name, script in OFFLINE_TESTS:
             jobs.append(Job(name, lua + [script], judge_test))
+        jobs.append(Job("other addons vs our support", [PY, "-I", "Tools/addon-check.py"], judge_addons))
         scratch = tempfile.mkdtemp(prefix="cine-prerelease-")
         for client in CLIENTS:
             for name, toc in (("Cinematic.lua", "Cinematic.toc"), ("CinematicDev.lua", "CinematicDev.toc")):

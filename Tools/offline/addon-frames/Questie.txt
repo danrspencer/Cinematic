@@ -1,0 +1,28 @@
+# Questie's named frames that its Support files (Questie.lua, QuestieMinimap.lua,
+# QuestieTracker.lua: checked together) don't name, each with why it needs no
+# line there (Tools/addon-check.py check 3). A new frame of its that's in
+# neither = a MISS: decide it. One per line: name or glob (*), a space, why.
+# Checked against v12.11.0, 2026-11-19.
+
+# On screen, covered through a frame that is faded.
+QuestieFrame* its map icons: minimap ones in QuestieFrameGroup (on the Minimap), others on the world map
+QuestieFrameGroup holder of its minimap icons, a child of the Minimap (fades with the Minimap row)
+Questie_HeaderFrame inside Questie_BaseFrame (Quest tracker row)
+Questie_AutoComplete_Frame inside Questie_BaseFrame (Quest tracker row)
+Questie_Sizer inside Questie_BaseFrame, kept at alpha 0 (its resize grip)
+
+# Invisible: never drawn.
+QuestieDBMIntegration event frame: draws nothing
+QuestieScanningTooltip item scanning tooltip, never shown
+
+# Opened by a click or hover (windows, tooltips, tutorials): left as they are.
+QuestieOptionsTab_*_* its settings window's tabs
+QuestieStandaloneSettings its settings window
+QuestieProfilerFrame its profiler window (a debug tool)
+QuestieProfilerIndicator its profiler's on-screen button, only while profiling (a debug tool)
+QuestieGamepadMapTooltip its map icon tooltip for the gamepad
+QuestieWaypointMinimapTooltip its route tooltip on the minimap
+QuestieTrackerQuestTooltip its tracker's quest tooltip
+QuestieTutorialAutoRejectInBattlegrounds its one-time tutorial popup
+QuestieTutorialChooseObjectiveType its one-time tutorial popup
+QuestieTutorialShowRunes its one-time tutorial popup

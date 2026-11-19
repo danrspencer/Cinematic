@@ -1,0 +1,231 @@
+# version 1.9.5
+EnableMouse(false or a variable) in DaylightUI/Book/Fight.lua
+EnableMouse(false or a variable) in DaylightUI/Character/List.lua
+EnableMouse(false or a variable) in DaylightUI/Character/Slots.lua
+EnableMouse(false or a variable) in DaylightUI/Fade.lua
+EnableMouse(false or a variable) in DaylightUI/InstallerCards.lua
+EnableMouse(false or a variable) in DaylightUI/Motion.lua
+EnableMouse(false or a variable) in DaylightUI/Movers.lua
+EnableMouse(false or a variable) in DaylightUI/Options/Widgets.lua
+EnableMouse(false or a variable) in DaylightUI/PrivateAuras.lua
+EnableMouse(false or a variable) in DaylightUI/Social/Raid.lua
+EnableMouse(false or a variable) in DaylightUI/Style.lua
+EnableMouse(false or a variable) in DaylightUI/Tour.lua
+EnableMouse(false or a variable) in DaylightUI/Windows/Follow.lua
+EnableMouse(false or a variable) in DaylightUI_ActionBars/Bars.lua
+EnableMouse(false or a variable) in DaylightUI_ActionBars/CdmEffects.lua
+EnableMouse(false or a variable) in DaylightUI_ActionBars/CdmRows.lua
+EnableMouse(false or a variable) in DaylightUI_ActionBars/Park.lua
+EnableMouse(false or a variable) in DaylightUI_ActionBars/Small.lua
+EnableMouse(false or a variable) in DaylightUI_ActionBars/Totems.lua
+EnableMouse(false or a variable) in DaylightUI_Buffs/Bar.lua
+EnableMouse(false or a variable) in DaylightUI_Buffs/Feel.lua
+EnableMouse(false or a variable) in DaylightUI_Buffs/PreviewBar.lua
+EnableMouse(false or a variable) in DaylightUI_Buffs/Private.lua
+EnableMouse(false or a variable) in DaylightUI_Buffs/Reminder.lua
+EnableMouse(false or a variable) in DaylightUI_Chat/Box.lua
+EnableMouse(false or a variable) in DaylightUI_Chat/Bubbles.lua
+EnableMouse(false or a variable) in DaylightUI_Chat/Chat.lua
+EnableMouse(false or a variable) in DaylightUI_Chat/ChatMenu.lua
+EnableMouse(false or a variable) in DaylightUI_Chat/Feel.lua
+EnableMouse(false or a variable) in DaylightUI_Chat/Links.lua
+EnableMouse(false or a variable) in DaylightUI_Chat/Thread.lua
+EnableMouse(false or a variable) in DaylightUI_Chat/Tiles.lua
+EnableMouse(false or a variable) in DaylightUI_InfoPanel/Minimap.lua
+EnableMouse(false or a variable) in DaylightUI_Nameplates/Auras.lua
+EnableMouse(false or a variable) in DaylightUI_Nameplates/Sample.lua
+EnableMouse(false or a variable) in DaylightUI_QoL/Afk.lua
+EnableMouse(false or a variable) in DaylightUI_QoL/Campfire.lua
+EnableMouse(false or a variable) in DaylightUI_QoL/CursorRing.lua
+EnableMouse(false or a variable) in DaylightUI_QoL/ErrorText.lua
+EnableMouse(false or a variable) in DaylightUI_QoL/Fishing.lua
+EnableMouse(false or a variable) in DaylightUI_QoL/LevelUp.lua
+EnableMouse(false or a variable) in DaylightUI_QoL/RepBanner.lua
+EnableMouse(false or a variable) in DaylightUI_QoL/ZoneTitle.lua
+EnableMouse(false or a variable) in DaylightUI_Quests/Arrow.lua
+EnableMouse(false or a variable) in DaylightUI_Quests/Blizzard.lua
+EnableMouse(false or a variable) in DaylightUI_Quests/Items.lua
+EnableMouse(false or a variable) in DaylightUI_Quests/Journal.lua
+EnableMouse(false or a variable) in DaylightUI_Quests/Look.lua
+EnableMouse(false or a variable) in DaylightUI_Quests/Nav.lua
+EnableMouse(false or a variable) in DaylightUI_Quests/Progress.lua
+EnableMouse(false or a variable) in DaylightUI_Quests/Tracker.lua
+EnableMouse(false or a variable) in DaylightUI_Skins/Kit.lua
+EnableMouse(false or a variable) in DaylightUI_Skins/MapPins.lua
+EnableMouse(false or a variable) in DaylightUI_Skins/MapReveal.lua
+EnableMouse(false or a variable) in DaylightUI_Skins/Packs/Addons/Ace3.lua
+EnableMouse(false or a variable) in DaylightUI_Skins/Packs/Addons/NeedRoll.lua
+EnableMouse(false or a variable) in DaylightUI_Skins/Packs/LossOfControl.lua
+EnableMouse(false or a variable) in DaylightUI_Skins/Packs/Social.lua
+EnableMouse(false or a variable) in DaylightUI_Skins/Packs/Spells.lua
+EnableMouse(false or a variable) in DaylightUI_Skins/Packs/System.lua
+EnableMouse(false or a variable) in DaylightUI_UnitFrames/Arrive.lua
+EnableMouse(false or a variable) in DaylightUI_UnitFrames/Auras.lua
+EnableMouse(false or a variable) in DaylightUI_UnitFrames/Blizzard.lua
+EnableMouse(false or a variable) in DaylightUI_UnitFrames/GroupParts.lua
+EnableMouse(false or a variable) in DaylightUI_UnitFrames/GroupPrivate.lua
+EnableMouse(false or a variable) in DaylightUI_UnitFrames/Indicators.lua
+EnableMouse(false or a variable) in DaylightUI_UnitFrames/PageSample.lua
+EnableMouse(false or a variable) in DaylightUI_UnitFrames/PartyPets.lua
+EnableMouse(false or a variable) in DaylightUI_UnitFrames/PartyTargets.lua
+EnableMouse(false or a variable) in DaylightUI_UnitFrames/Personal.lua
+EnableMouse(false or a variable) in DaylightUI_UnitFrames/PowerBar.lua
+EnableMouse(false or a variable) in DaylightUI_UnitFrames/Sample.lua
+SetAlpha hook in DaylightUI_InfoPanel/Panel.lua
+SetAlphaFromBoolean (secret alpha) in DaylightUI_Skins/Packs/Addons/OPie.lua
+SetAlphaFromBoolean (secret alpha) in DaylightUI_UnitFrames/CastBar.lua
+SetAlphaFromBoolean (secret alpha) in DaylightUI_UnitFrames/GroupParts.lua
+SetAlphaFromBoolean (secret alpha) in DaylightUI_UnitFrames/UnitFrames.lua
+SetIgnoreParentAlpha(true) in DaylightUI/Npc/Scene.lua
+SetIgnoreParentAlpha(true) in DaylightUI_Chat/Box.lua
+SetIgnoreParentAlpha(true) in DaylightUI_Chat/Tabs.lua
+SetIgnoreParentAlpha(true) in DaylightUI_Chat/Tiles.lua
+SetIgnoreParentAlpha(true) in DaylightUI_InfoPanel/Minimap.lua
+SetIgnoreParentAlpha(true) in DaylightUI_QoL/Afk.lua
+frame DaylightUIAfkScreen
+frame DaylightUIArenaHolder
+frame DaylightUIAskReload
+frame DaylightUIBar
+frame DaylightUIBar*Button*
+frame DaylightUIBarKeys
+frame DaylightUIBuffReminder
+frame DaylightUIBuffReminderHolder
+frame DaylightUIBuffs
+frame DaylightUIBuffsAnchor
+frame DaylightUIBuffsEdgeEditor
+frame DaylightUIBuffsHolder
+frame DaylightUIBuffsPopout
+frame DaylightUIBuffsPreview
+frame DaylightUIBuffsWeapons
+frame DaylightUICampfire
+frame DaylightUICdmEditor
+frame DaylightUICdmLayout
+frame DaylightUICdmLayout*
+frame DaylightUICdmPiece
+frame DaylightUICdmPiece*_*
+frame DaylightUIChat
+frame DaylightUIChatCopy
+frame DaylightUIChatDrawer
+frame DaylightUIChatKey
+frame DaylightUIChatKey*
+frame DaylightUIChatPanel
+frame DaylightUIChatSide
+frame DaylightUIChatSidePanel
+frame DaylightUIChatTalk
+frame DaylightUIChatTiles
+frame DaylightUIClickCastOpener
+frame DaylightUICraftTrack
+frame DaylightUICursorRing
+frame DaylightUIDamageMeter
+frame DaylightUIDataBar
+frame DaylightUIDebuffs
+frame DaylightUIDebuffsAnchor
+frame DaylightUIDebuffsHolder
+frame DaylightUIDebuffsPreview
+frame DaylightUIDebuffsPrivate
+frame DaylightUIDebuffsWeapons
+frame DaylightUIDruidBars
+frame DaylightUIErrorText
+frame DaylightUIFishScene
+frame DaylightUIFlightTimer
+frame DaylightUIFrame_
+frame DaylightUIFrame_*
+frame DaylightUIInfoPanel
+frame DaylightUIInfoPanelBody
+frame DaylightUIInfoPanelEdge
+frame DaylightUIInstaller
+frame DaylightUIInstallerReload
+frame DaylightUILeaderCard
+frame DaylightUILeaderTab
+frame DaylightUILevelUp
+frame DaylightUILinkBox
+frame DaylightUILootFeed
+frame DaylightUIMeterBreakdown
+frame DaylightUIMeterReport
+frame DaylightUIMeterWindow_
+frame DaylightUIMeterWindow_*
+frame DaylightUIMoverEditor
+frame DaylightUIOptions
+frame DaylightUIPadBind*
+frame DaylightUIPadKey*
+frame DaylightUIPadLeft
+frame DaylightUIPadSecure*
+frame DaylightUIParkedBars
+frame DaylightUIPersonal
+frame DaylightUIPortrait_
+frame DaylightUIPortrait_*
+frame DaylightUIPowerBar_
+frame DaylightUIPowerBar_*
+frame DaylightUIProfileBox
+frame DaylightUIPullTimer
+frame DaylightUIQuestArrow
+frame DaylightUIQuestDetails
+frame DaylightUIQuestItem
+frame DaylightUIQuestItem*
+frame DaylightUIQuestItems
+frame DaylightUIQuestJournal
+frame DaylightUIQuestMarker
+frame DaylightUIQuestProgress
+frame DaylightUIQuestTracker
+frame DaylightUIRepBanner
+frame DaylightUIReputationBar
+frame DaylightUISocialRaidTarget
+frame DaylightUISocialRaidTarget*
+frame DaylightUISocialRaidTargets
+frame DaylightUISweep
+frame DaylightUISwingTimer
+frame DaylightUIThreatMeter
+frame DaylightUIThreatMeterFrame
+frame DaylightUIThreatTag_target
+frame DaylightUITooltipAnchor
+frame DaylightUITourAsk
+frame DaylightUITrackerAnchor
+frame DaylightUITrainAllButton
+frame DaylightUIZoneTitle
+hooks AlertFrame_ShowNewAlert
+hooks Attune_Frame
+hooks Attune_Select
+hooks ClassTrainerFrame_InitServiceButton
+hooks EncounterJournal_UpdateButtonState
+hooks EquipmentFlyout_UpdateItems
+hooks GameTooltip_SetDefaultAnchor
+hooks GamepadActionBarStyleUtil:ApplyCollapsedActionBarStyle
+hooks GamepadActionBarStyleUtil:ApplyExpandedActionBarStyle
+hooks GamepadActionBarStyleUtil:ApplyExtraButtonStyles
+hooks InboxFrame_OnClick
+hooks InspectPaperDollItemSlotButton_Update
+hooks MerchantFrame_UpdateMerchantInfo
+hooks MoneyFrame_Update
+hooks NavBar_AddButton
+hooks PanelTemplates_DeselectTab
+hooks PanelTemplates_SelectTab
+hooks PaperDollFrame_UpdateSidebarTabs
+hooks PaperDollItemSlotButton_Update
+hooks PlaySound
+hooks PlayerFrame_ToPlayerArt
+hooks QuestFrameProgressItems_Update
+hooks QuestInfo_Display
+hooks QuestLogQuests_Update
+hooks QuestMapFrame_ShowQuestDetails
+hooks SendMail
+hooks SetSendMailShowing
+hooks ShowLegacyChallenge
+hooks SlashCmdList:NEEDROLL
+hooks StackSplitOkayButton_OnClick
+hooks StaticPopup_Show
+hooks TakeTaxiNode
+hooks TaxiRequestEarlyLanding
+hooks ToggleCharacter
+hooks UpdateMicroButtons
+hooks UpdateUIPanelPositions
+partial mouse handling in DaylightUI_ActionBars/BuffBars.lua
+partial mouse handling in DaylightUI_ActionBars/CdmAuras.lua
+partial mouse handling in DaylightUI_ActionBars/CdmBars.lua
+partial mouse handling in DaylightUI_QoL/LootFeed.lua
+partial mouse handling in DaylightUI_Skins/MapPins.lua
+partial mouse handling in DaylightUI_UnitFrames/Auras.lua
+sets CVar questPOI
+state driver in DaylightUI/Social/Raid.lua
+state driver in DaylightUI_ActionBars/Bars.lua
+state driver in DaylightUI_ActionBars/Paging.lua
+state driver in DaylightUI_UnitFrames/Group.lua

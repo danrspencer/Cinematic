@@ -7,7 +7,9 @@ sub-addons: folders named <AddonName>_*), reads its .toc, Lua and XML, and
 prints a Markdown report:
 
   1. where it is installed (clients, versions, website ids)
-  2. frames it creates (named, built names, unnamed count)
+  2. frames it creates (named, built names, unnamed count), each named one
+     marked handled or UNHANDLED against the Support file and its frame list
+     (Tools/offline/addon-frames/<Support>.txt), as Tools/addon-check.py does
   3. game frames it touches (hides, reparents, hooks, lists), NEW ones first:
      "known" = the name already appears in Cinematic's Lua
   4. fade / hover traps (SetAlpha hooks with their bodies, its own fades,
@@ -20,6 +22,7 @@ Only reads files; runs nothing from the addon. Embedded libraries (Libs/)
 and Locales/ are skipped (--libs keeps libraries). Each list shows the first
 12 hits unless --all. Exit 2: not installed anywhere.
 """
+import importlib.util
 import os
 import re
 import sys
@@ -122,7 +125,7 @@ FRAME_WORDS = (r"[A-Z][A-Za-z0-9]*(?:Frame|Bar|Bars|Button|Container|Manager|Men
                r"Tooltip|Popup|Dock|Holder|Display|Banner|Alert|Toast)[A-Za-z0-9]*")
 GAME_FRAME = (r"(?:_G\.|_G\[\s*[\"'])?(" + FRAME_WORDS +
               r"|Minimap|UIParent|WorldFrame|MicroMenu|BagsBar|DamageMeter|MultiBar\w+|ChatFrame\d+\w*)(?:[\"']\s*\])?")
-CREATE = re.compile(r"CreateFrame\s*\(\s*([\"'][^\"']+[\"'])\s*(?:,\s*([^,\)]+))?")
+CREATE = re.compile(r"(?:CreateFrame\s*\(|pcall\s*\(\s*CreateFrame\s*,)\s*([\"'][^\"']+[\"'])\s*(?:,\s*([^,\)]+))?")
 XML_FRAME = re.compile(r"<(Frame|Button|StatusBar|ScrollFrame|CheckButton|Cooldown|PlayerModel|Slider|EditBox)\b"
                        r"[^>]*\bname=\"([^\"]+)\"", re.I)
 GAME_CALL = re.compile(NOT_FIELD + GAME_FRAME + r"\s*[:.]\s*(Hide|Show|SetParent|SetAlpha|UnregisterAllEvents|"
@@ -275,12 +278,30 @@ def show_counts(title, kinds):
 
 
 print("## 2. Frames it creates\n")
-named = OrderedDict()
+# Every named frame, as Tools/addon-check.py finds them (pcall(CreateFrame,
+# ...) and built names read where it can: DaylightUI's buff bars were missed
+# by a plain CreateFrame( search), each marked with how our side covers it.
+spec = importlib.util.spec_from_file_location("addon_check", os.path.join(REPO, "Tools", "addon-check.py"))
+check = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(check)
+support_code, support_name = "", None
+for each_name, each_code, each_addons, _ in check.support_files():
+    if any(a.lower() == ADDON.lower() for a in each_addons):
+        support_code, support_name = each_code, each_name
+prefixes = {re.match(r"[A-Za-z][A-Za-z0-9]*", ADDON).group(0)} | set(check.EXTRA_PREFIXES.get(ADDON, []))
+made = check.frames_made([(rel, read(path)) for rel, path in files], prefixes)
+accounted = check.load_accounted(support_name) if support_name else None
+# (Its frames not starting with its name: the plain search's list.)
 for where, what in lists["named"]:
-    named.setdefault(what, where)
-print(f"### Named ({len(named)})\n")
-for what, where in named.items():
-    print(f"- {what} `{where}`")
+    made.setdefault(what.split(" ", 1)[1], where)
+marks = {n: (check.handled_by(n, support_code, prefixes, accounted) if support_name else None) for n in made}
+open_ones = [n for n in made if not marks[n]]
+print(f"### Named ({len(made)}, {len(open_ones)} UNHANDLED)\n")
+print("UNHANDLED = neither named by the Support file nor in Tools/offline/addon-frames/<Support>.txt: "
+      "decide each one (a row, a fade area, or listed with why it needs none). * = a part of a built name "
+      "that can't be read.\n")
+for name in sorted(made, key=lambda n: (marks[n] is not None, n)):
+    print(f"- {name} `{made[name]}` " + (f"({marks[name]})" if marks[name] else "**UNHANDLED**"))
 print()
 show("Built names (resolve each pattern: numbered, prefixed, from a variable)", lists["built"])
 show_counts("Unnamed frames, by file (need a scanner or match() if they matter)", {"unnamed CreateFrame"})

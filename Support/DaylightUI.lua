@@ -135,6 +135,8 @@ local AREAS = {
 	["UnitFrames.focus"] = { "focus", "target" },
 	["UnitFrames.focustarget"] = { "focustot", "target" },
 	["UnitFrames.party"] = { "party", "party" },
+	-- (Its party members' targets, beside their frames.)
+	["UnitFrames.partyTarget"] = { "party", "party" },
 	["UnitFrames.raid"] = { "raidplayers", "raidplayers" },
 	-- (Its bars at your feet, and the battleground's enemy flag carriers.)
 	["UnitFrames.personal"] = { "prd", "prd" },
@@ -223,6 +225,33 @@ ns.WhenAddonLoads("DaylightUI", function()
 	-- Its quest tracker sets its item buttons' holder (screen-sized) to the
 	-- tracker's alpha by hand.
 	ns.FadeWithRow("quests", "quests", { "DaylightUIQuestItems" }, true, true)
+	-- Its tracked recipes panel stands in for the game's tracker's recipes
+	-- while its quest tracker is on: it goes with that row. (No fade area of
+	-- its own.)
+	ns.FadeWithRow("quests", "quests", { "DaylightUICraftTrack" }, true, true)
+end)
+
+-- Its buff bars (DaylightUIBuffs, DaylightUIDebuffs) come through its fade
+-- areas above. Not in them: the popout a grouped buff opens on mouseover (a
+-- second aura container, with a backing frame of no name, its .back), and
+-- the private debuff slots under the debuff bar. They go with the Buffs row.
+-- (Its container's alpha is set only outside fights by its own code: tested
+-- in a fight before calling it done.)
+ns.WhenAddonLoads("DaylightUI_Buffs", function()
+	ns.FadeWithRow("buffs", "buffs", { "DaylightUIBuffsPopout", "DaylightUIDebuffsPrivate" }, true, true)
+	ns.AddScanner(function()
+		local popout = _G.DaylightUIBuffsPopout
+		local back = type(popout) == "table" and popout.back
+		if type(back) == "table" and type(back.SetAlpha) == "function" and not ns.IsFaded(back) then
+			ns.AddFoundFrame(back, "buffs", true, true)
+		end
+	end)
+end)
+
+-- Its separate reputation bar at the bottom of the screen (its XP bar's
+-- area doesn't hold it): with the Experience and reputation bars row.
+ns.WhenAddonLoads("DaylightUI_InfoPanel", function()
+	ns.FadeWithRow("xp", "bars", { "DaylightUIReputationBar" }, true, true)
 end)
 
 ns.WhenAddonLoads("DaylightUI_ActionBars", function()

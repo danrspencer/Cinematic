@@ -1,0 +1,110 @@
+# EllesmereUI's named frames that Support/EllesmereUI.lua doesn't name, each
+# with why it needs no line there (Tools/addon-check.py check 3). A new frame
+# of its that's in neither = a MISS: decide it (a row, a fade, or here with
+# why). One per line: name or glob (*), a space, why. Its parts' own short
+# names (EUI, EAB, ERB_, ERF, ECME_...) count too: EXTRA_PREFIXES there.
+# Checked against v9.9, 2026-11-19. Not here on purpose, so they stay MISS
+# till decided: the mirror bars (ERB_Mirror_*: how the Breath bar row fades
+# isn't settled).
+
+# Inside a frame that is faded (or a gap's: covered once that gets its row).
+EABPagingFrame page arrows, reparented to EABBar_MainBar (faded, mainbar row)
+EABPagingUp inside EABPagingFrame (child of EABBar_MainBar, faded)
+EABPagingDown inside EABPagingFrame (child of EABBar_MainBar, faded)
+EABR_CursorIcon* child of EABR_CursorAnchor (faded, Cursor Reminders row)
+EABR_Icon* child of EABR_Anchor (faded, Buff Reminders row)
+EABR_TalentIcon* child of EABR_TalentAnchor (faded, Talent Reminders row)
+ECME_Glow_* glow overlay inside the action button it marks (fades with its bar)
+ERFFlatHeader inside EllesmereUIRaidFrameContainer (faded, raidplayers row)
+ERFGroupHeader* inside EllesmereUIRaidFrameContainer (faded, raidplayers row)
+ERFPartyHeader inside party container (faded by unlock key 'RF_PartyFrames')
+ERFPartySelfButton inside party container (faded by unlock key 'RF_PartyFrames')
+EWB_ILVL_* click layer inside a data bar block (EllesmereUIDataBarsBar, faded)
+EWB_LOC_* click layer inside a data bar block (EllesmereUIDataBarsBar, faded)
+EllesmereEAB_*_Bar inside EllesmereEAB_XPBar/RepBar/FavorBar (faded, xp row)
+EllesmereEAB_XPBar_Rested inside EllesmereEAB_XPBar (faded, xp row)
+EllesmereUIDataBarsHearth_* inside a data bar block (EllesmereUIDataBarsBar, faded)
+EllesmereUIMinimapButton child of Minimap (minimap row)
+ECME_TBB* inside ECME_TBBWrap* (Cooldown Manager row)
+ERB_CastBar inside ERB_CastBarFrame (Cast bar row)
+ERB_GCDBar inside ERB_GCDBarFrame (a gap: no row yet)
+EllesmereUIDMIconStrip inside EllesmereUIDMIconHistoryFrame (Damage Meters row)
+
+# Invisible: never drawn.
+EABActionButtonController secure handler that manages action buttons: draws nothing
+EABHiddenParent hidden parent for stock Blizzard bars: draws nothing
+EABOverrideController secure vehicle/override state controller: draws nothing
+EABPageNext key binding button (1x1, alpha 0, off-screen): draws nothing
+EABPagePrev key binding button (1x1, alpha 0, off-screen): draws nothing
+EABSecureSetupHandler secure layout handler: draws nothing
+EAB_BindOwner owner of override key bindings: draws nothing
+ERB_MirrorBars holder its mirror bars anchor to: draws nothing
+ERFExtraFramesBindBtn hidden key binding button: draws nothing
+ERFFriendlyBossController secure controller, no parent: draws nothing
+EUIClickCastBindProxy click-cast binding proxy (1x1, alpha 0): draws nothing
+EUIClickCastGlobalBtn click-cast button (1x1, alpha 0, off-screen): draws nothing
+EUIClickCastHeader secure click-cast state header: draws nothing
+EUICondKeyBtn* hidden key binding button: draws nothing
+EUIRFTipEater* invisible click catcher on a raid unit button: draws nothing
+EUIVisToggleKeyBtn* hidden key binding button: draws nothing
+EUI_ClassicSpellbookEscape secure close button: draws nothing
+EUI_ClassicSpellbookToggle secure toggle button: draws nothing
+EUI_ClassicTalentsToggle secure toggle button: draws nothing
+EUI_EnvPingButton ping key button: draws nothing
+EUI_EnvPingHoldButton ping hold key button: draws nothing
+EUI_FPSBindBtn hidden key binding button: draws nothing
+EUI_MerchantHandler merchant event frame: draws nothing
+EUI_MouseLookBtn mouselook key button, no size: draws nothing
+EUI_NoRightClickState secure state handler: draws nothing
+EUI_QuestItemHotkeyBtn quest item key button (alpha 0, no mouse): draws nothing
+EUI_RepairTopUp repair event frame: draws nothing
+EUI_RepairWatcher repair event frame: draws nothing
+EUI_SpellbookRoute secure click route: draws nothing
+EUI_TalentsRoute secure click route: draws nothing
+EllesmereUIDMResetBindBtn hidden key binding button: draws nothing
+EllesmereUIDMToggleBindBtn hidden key binding button: draws nothing
+EllesmereUIFishingCastButton hidden fishing key button: draws nothing
+EllesmereUIPartyModeBindBtn hidden key binding button: draws nothing
+EllesmereUIProfileBind* hidden key binding button: draws nothing
+EllesmereUIRaidToolsQuickFireClear invisible secure key button: draws nothing
+EllesmereUIRaidToolsQuickFireHeader secure handler: draws nothing
+EllesmereUIRaidToolsQuickFirePlace invisible secure key button: draws nothing
+EllesmereUIRaidToolsQuickFireUndo invisible secure key button: draws nothing
+EllesmereUIRaidToolsToggle key binding button (1x1, alpha 0, off-screen): draws nothing
+EllesmereUIUnitFrames_Hider pet battle hider, parent of its unit frames: draws nothing
+EllesmereUI_EscapeProxy hidden Escape proxy: draws nothing
+EllesmereUI_PadOverlayLayer gamepad layer for its popups, hidden till one opens
+
+# Opened by a click (windows, popups, tooltips, menus): left as they are.
+EUITeleportPopup its teleport-to-dungeon prompt, shown on joining a Group Finder group: left alone like a dialog
+EUITeleportButton inside EUITeleportPopup
+EUIClientGatePopup warning popup for an unsupported client
+EUIConfirmDimmer dimmer behind its confirm popup
+EUIConfirmMacroOverlay inside its confirm popup's button
+EUIConfirmPopup its confirm popup
+EUIInfoDimmer dimmer behind its info popup
+EUIInfoPopup its info popup
+EUIInputDimmer dimmer behind its input popup
+EUIInputPopup its input popup
+EUIKeysPopup party keystone list opened by /keys
+EUISpecAssignDimmer dimmer behind its spec assign popup
+EUISpecAssignPopup its spec assign popup
+EUIUpgCalcFrame gear upgrade calculator window (/euic)
+EUI_ClassicSpellbook its spellbook window, opened by the user
+EUI_ClassicTalents its talents window, opened by the user
+EUI_QuestDetails quest details window opened from its tracker
+EUI_TrainAllButton Train All button inside the trainer window
+EllesmereUIClickArea inside EllesmereUIFrame (its settings window)
+EllesmereUIDataBarsTip its data bar tooltip
+EllesmereUIDataBarsTipActions click layer over its data bar tooltip
+EllesmereUIFrame its settings window
+EllesmereUIMicroMenu its micro menu popup, parked off-screen till opened
+EllesmereUIPartyModeFrame disco spotlight overlay the user turns on
+EllesmereUIRaidBuffCheck raid buff check window (button or ready check)
+EllesmereUIRaidToolsTip its raid tools tooltip
+EllesmereUIScrollFrame inside EllesmereUIFrame (its settings window)
+EllesmereUI_GameMenuButton button inside the game menu
+EllesmereUI_HouseVisitFrame its house list window
+EllesmereUI_MenuFallbackDock View Houses button beside a unit menu
+EllesmereUI_UnlockMenuButton button inside the game menu
+EllesmereUnlockMode its unlock mode overlay

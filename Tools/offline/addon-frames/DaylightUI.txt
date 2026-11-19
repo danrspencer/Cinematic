@@ -1,0 +1,78 @@
+# DaylightUI's named frames that Support/DaylightUI.lua doesn't name, each with
+# why it needs no line there (Tools/addon-check.py check 3). A new frame of
+# its that's in neither = a MISS: decide it (a row, a fade, or here with why).
+# One per line: name or glob (*), a space, why. Checked against v1.9.5,
+# 2026-11-19.
+
+# On screen, faded through its fade areas (Support file AREAS: each area's
+# frames are read off its own fade engine).
+DaylightUIBuffs fade area Buffs.buffs (Buffs row)
+DaylightUIBuffsWeapons fade area Buffs.buffs (Buffs row)
+DaylightUIDebuffs fade area Buffs.debuffs (Buffs row)
+DaylightUIDebuffsWeapons never made: only the buff bar gets a weapon strip (Bar.lua CreateWeapons)
+DaylightUIChat fade area Chat.chat (Chat row)
+DaylightUIChatPanel inside DaylightUIChat (fades with it)
+DaylightUIChatTiles inside DaylightUIChatPanel (fades with it)
+DaylightUIChatDrawer inside DaylightUIChatPanel (fades with it)
+DaylightUIChatSide fade area Chat.side
+DaylightUIChatSidePanel inside DaylightUIChatSide (fades with it)
+DaylightUIInfoPanel fade area InfoPanel.panel (Minimap row)
+DaylightUIInfoPanelBody inside DaylightUIInfoPanel (fades with it)
+DaylightUIQuestTracker fade area Quests.tracker (Quest tracker row)
+DaylightUIPersonal fade area UnitFrames.personal (Personal resources row)
+DaylightUIPortrait_* in its unit's fade area (UnitFrames.<unit>)
+DaylightUIPowerBar_* in its unit's fade area (UnitFrames.<unit>)
+DaylightUIDruidBars in the player's fade area (UnitFrames.player)
+DaylightUIThreatTag_target in the target's fade area (UnitFrames.target)
+DaylightUIArenaHolder 1x1 holder; its flag carrier buttons are fade area UnitFrames.arena
+DaylightUICdmLayout* fade area ActionBars.cdm (Cooldown Manager row)
+DaylightUICdmPiece*_* inside DaylightUICdmLayout* (fades with it)
+DaylightUIThreatMeter inside DaylightUIThreatMeterFrame (its own row)
+DaylightUIBuffReminder inside DaylightUIBuffReminderHolder (its own row)
+DaylightUIInfoPanelEdge 0-width anchor point: draws nothing
+DaylightUIBuffsAnchor 1x1 anchor point: draws nothing
+DaylightUIDebuffsAnchor 1x1 anchor point: draws nothing
+DaylightUIBuffsHolder mover holder the buff bar is placed by: draws nothing
+DaylightUIDebuffsHolder mover holder the debuff bar is placed by: draws nothing
+DaylightUITrackerAnchor anchor point for the game's quest tracker: draws nothing
+DaylightUITooltipAnchor anchor point for tooltips: draws nothing
+
+# Draws instead of the game's own, which is all Cinematic hides.
+DaylightUIErrorText its error text, in place of the game's (UIErrorsFrame)
+
+# Hidden or invisible: never drawn.
+DaylightUIParkedBars hidden frame it puts the game's action bars away in
+DaylightUIBarKeys key binding catcher: draws nothing
+DaylightUIChatKey* key binding buttons: draw nothing
+DaylightUIPadBind* gamepad binding buttons: draw nothing
+DaylightUIPadKey* gamepad key buttons: draw nothing
+DaylightUIPadSecure* gamepad secure buttons: draw nothing
+DaylightUIPadLeft gamepad side button: draws nothing
+DaylightUIFishScene full-screen right-click catcher for fishing: draws nothing
+DaylightUIClickCastOpener click-cast binding button: draws nothing
+
+# Opened by a click (windows, cards, editors, previews): left as they are,
+# like the game's windows.
+DaylightUIOptions its settings window
+DaylightUIInstaller its setup window
+DaylightUIInstallerReload its setup's reload prompt
+DaylightUIAskReload its reload prompt
+DaylightUITourAsk its tour prompt
+DaylightUIProfileBox its profile import/export box
+DaylightUIMoverEditor its frame mover (unlock mode)
+DaylightUIBuffsEdgeEditor its buff bar edge editor
+DaylightUIBuffsPreview its buff bar preview (settings)
+DaylightUIDebuffsPreview its debuff bar preview (settings)
+DaylightUICdmEditor its Cooldown Manager editor
+DaylightUIChatCopy its chat copy window
+DaylightUIChatTalk its whisper conversation card (opened from a tile)
+DaylightUILinkBox its link copy box
+DaylightUIMeterBreakdown its meter breakdown window
+DaylightUIMeterReport its meter report window
+DaylightUIQuestJournal its quest log window
+DaylightUIQuestDetails its quest details card (right-click a quest)
+DaylightUILeaderCard its group leader card (opened from the leader tab)
+DaylightUISocialRaidTargets its social window's raid page buttons
+DaylightUISocialRaidTarget* its social window's raid page buttons
+DaylightUITrainAllButton a button on the trainer window
+DaylightUISweep its /dui sweep test label (a test command)

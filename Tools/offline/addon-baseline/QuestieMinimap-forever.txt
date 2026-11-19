@@ -1,0 +1,52 @@
+# version 12.11.0
+EnableMouse(false or a variable) in Questie/Modules/Options/QuestieOptionsControls.lua
+EnableMouse(false or a variable) in Questie/Modules/QuestieNameplate.lua
+EnableMouse(false or a variable) in Questie/Modules/Tracker/TrackerBaseFrame.lua
+EnableMouse(false or a variable) in Questie/Modules/Tracker/TrackerQuestFrame.lua
+frame $parent_Tab_
+frame $tabButton_
+frame QuestieDBMIntegration
+frame QuestieFrame
+frame QuestieFrame*
+frame QuestieFrameGroup
+frame QuestieGamepadMapTooltip
+frame QuestieOptionsTab_
+frame QuestieOptionsTab_*_*
+frame QuestieProfilerFrame
+frame QuestieProfilerIndicator
+frame QuestieScanningTooltip
+frame QuestieStandaloneSettings
+frame QuestieTrackerQuestTooltip
+frame QuestieTutorialAutoRejectInBattlegrounds
+frame QuestieTutorialChooseObjectiveType
+frame QuestieTutorialShowRunes
+frame QuestieWaypointMinimapTooltip
+frame QuestieWorldMapButtonTemplate
+frame Questie_AutoComplete_Frame
+frame Questie_BaseFrame
+frame Questie_HeaderFrame
+frame Questie_Sizer
+frame TrackedQuests
+frame TrackedQuestsScrollChildFrame
+frame TrackedQuestsScrollFrame
+frame linePool
+frame linePool.criteriaMark
+frame linePool.expandQuest
+frame linePool.expandZone
+frame linePool.playButton
+frame linePool.questFocus
+hooks AddQuestWatch
+hooks AutoQuestWatch_Insert
+hooks C_QuestLog:AddQuestWatch
+hooks C_QuestLog:RemoveQuestWatch
+hooks ChatFrame_OnHyperlinkShow
+hooks DeleteCursorItem
+hooks ManageFramePositions
+hooks QuestFrameGreetingPanel_OnShow
+hooks RemoveQuestWatch
+hooks ScrollFrame_OnScrollRangeChanged
+hooks StaticPopup_Show
+hooks UIParent_ManageFramePositions
+sets CVar calendarShowDarkmoon
+sets CVar instantQuestText
+sets CVar questPOI
