@@ -295,8 +295,53 @@ Smoke("camera: vista starts and stops, camera back", function(done)
 	end)
 end)
 
+-- Our skinned scroll bars show only while there's something to scroll to: a
+-- test list made short (no bar), tall (bar), short again (no bar), each read a
+-- moment on, once the game has worked out its range.
+Smoke("scroll bar: hidden when the page fits", function(done)
+	if not ns.SkinScroll then return done("skip", "no ns.SkinScroll") end
+	local scroll = CreateFrame("ScrollFrame", nil, UIParent, "UIPanelScrollFrameTemplate")
+	scroll:SetSize(300, 200)
+	scroll:SetPoint("CENTER")
+	scroll:SetAlpha(0)
+	-- (unseen and out of the mouse's way, even if a stopped run leaves it up)
+	scroll:EnableMouse(false)
+	scroll:EnableMouseWheel(false)
+	local content = CreateFrame("Frame", nil, scroll)
+	content:SetSize(300, 50)
+	scroll:SetScrollChild(content)
+	ns.SkinScroll(scroll)
+	local bar = scroll.ScrollBar
+	if not bar then
+		scroll:Hide()
+		return done("skip", "template has no ScrollBar")
+	end
+	local seen = {}
+	local function Read(label)
+		local range = scroll:GetVerticalScrollRange()
+		seen[#seen + 1] = ("%s: range %s, bar %s"):format(label,
+			(issecretvalue and issecretvalue(range)) and "secret" or ("%.0f"):format(range or 0),
+			bar:IsShown() and "shown" or "hidden")
+		return bar:IsShown()
+	end
+	Later(0.5, function()
+		local shortHidden = not Read("short")
+		content:SetHeight(800)
+		Later(0.5, function()
+			local tallShown = Read("tall")
+			content:SetHeight(50)
+			Later(0.5, function()
+				local againHidden = not Read("short again")
+				scroll:Hide()
+				scroll:SetParent(nil)
+				done((shortHidden and tallShown and againHidden) and "pass" or "fail", table.concat(seen, "; "))
+			end)
+		end)
+	end)
+end)
+
 ---------------------------------------------------------------------------
--- Guided steps: { name, say, wait = fn -> true once it's happening,
+-- Guided steps:{ name, say, wait = fn -> true once it's happening,
 -- hold = fn -> true while it lasts (or seconds), after = seconds once over }.
 local GUIDED = {
 	{ name = "guided: a fight", say = "Get in a fight: hit a target dummy or a mob, about 10 seconds, then stop.",

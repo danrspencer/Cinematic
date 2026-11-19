@@ -645,6 +645,18 @@ function ns.SkinScroll(scroll)
 		knob:SetShown(hd)
 		ShowArt(art, not hd)
 	end)
+	-- The bar only while there's something to scroll to: a page that fits
+	-- shows none (after the game's own handler, which shows it either way).
+	-- (A range come back secret, a frame on the page having held a fight's
+	-- secret value: the bar stays as it was.)
+	local function FitBar(self, _, yrange)
+		yrange = yrange or self:GetVerticalScrollRange()
+		if issecretvalue and issecretvalue(yrange) then return end
+		bar:SetShown((yrange or 0) >= 1)
+	end
+	scroll:HookScript("OnScrollRangeChanged", FitBar)
+	scroll:HookScript("OnShow", function(self) FitBar(self) end)
+	FitBar(scroll)
 	return scroll
 end
 

@@ -4661,6 +4661,13 @@ local function CreateRevealPanel()
 			banner.icon:SetDesaturated(true)
 			banner.reason, banner.page = text, page or "CineMode"
 		end
+		-- (As wide as its line needs, 400 at least, never past the page's edge:
+		-- at 400 the on line was cut off, "...comes back when...", 2026-11-19.)
+		local line = banner.line
+		local words = line.GetUnboundedStringWidth and line:GetUnboundedStringWidth() or line:GetStringWidth()
+		local room = (content:GetWidth() or 0) - 16
+		local want = 12 + 28 + 12 + math.ceil(tonumber(words) or 0) + BIG_W + 28 + 6
+		banner:SetWidth(math.max(400, room > 400 and math.min(want, room) or 400))
 		big.knob:ClearAllPoints()
 		if ns.IsCineModeOn() then
 			big.edge:SetColorTexture(0.42, 0.78, 0.48, 1)

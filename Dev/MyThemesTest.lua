@@ -426,6 +426,7 @@ local function Finish(done)
 			note and note.found or "-"))
 	end
 	run = nil
+	ns.MenuTestBackdrop("mythemes", false)
 	ns.PadTestBox(done and "Test done: your theme is back. /reload, then say \"check log\"." or "Test stopped.",
 		"", 1, 0.82, 0)
 	C_Timer.After(12, function() if not run then ns.PadTestBoxHide() end end)
@@ -496,6 +497,8 @@ function ns.MyThemesTest(args)
 		undo = Copy(db.styleThemeKept), backups = Copy(CinematicDB.styleThemeBackups),
 		deleted = Copy(CinematicDB.styleThemesDeleted), cineWasOn = ns.IsCineModeOn() }
 	run = { at = GetTime(), steps = steps, step = -1, notes = {} }
+	ns.MenuTestBackdrop("mythemes", true)
+	ns.debugNoCopyWindow = true -- (its copy window would sit over the shots)
 	-- (CineMode off for the run, as the Toggle CineMode key does it, so the
 	-- frames and bars the steps change are on screen and in the screenshots.
 	-- Back on at the end; a /reload brings it back by itself.)

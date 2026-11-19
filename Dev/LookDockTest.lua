@@ -132,6 +132,7 @@ local function Finish(done)
 	if not run then return end
 	local kept, this = run.kept, run
 	run = nil
+	ns.MenuTestBackdrop("lookdock", false)
 	local open = ns.LookPanelOpen and ns.LookPanelOpen()
 	if open then open:Hide() end
 	local db = ns.GetDB()
@@ -329,6 +330,8 @@ function ns.LookDockTest()
 	run = { at = GetTime(), pages = pages, index = 0, pass = 0, fail = 0, skip = 0,
 		kept = { lookPanel = db.lookPanel, previewOut = db.stylePreviewOut, previewPos = db.stylePreviewPos,
 			page = ns.lastOptionsPage } }
+	ns.MenuTestBackdrop("lookdock", true)
+	ns.debugNoCopyWindow = true -- (its copy window would sit over the checks)
 	-- (Both docked, as they start: spots you dragged the panel or the preview
 	-- to are put back after.)
 	db.lookPanel, db.stylePreviewPos = nil, nil

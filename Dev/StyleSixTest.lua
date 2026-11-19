@@ -197,6 +197,7 @@ local function Finish(done)
 			note and note.found or "-"))
 	end
 	run = nil
+	ns.MenuTestBackdrop("release6", false)
 	ns.PadTestBox(done and "Test done. /reload, then say \"check log\"." or "Test stopped.", "", 1, 0.82, 0)
 	C_Timer.After(12, function() if not run then ns.PadTestBoxHide() end end)
 end
@@ -258,6 +259,8 @@ function ns.StyleSixTest(args)
 	end
 	CinematicDB.styleSixLog = {}
 	run = { at = GetTime(), steps = steps, step = -1, notes = {} }
+	ns.MenuTestBackdrop("release6", true) -- (gone for the plate steps: the settings are closed)
+	ns.debugNoCopyWindow = true -- (its copy window would sit over the shots)
 	local db = ns.GetDB()
 	Say(("start: %s (game %s), CineMode %s, in combat %s, theme %s, plate theme %s, steps %s"):format(
 		ns.isRetail and "retail" or "Forever", tostring((select(4, GetBuildInfo()))), tostring(ns.lastCinematic),

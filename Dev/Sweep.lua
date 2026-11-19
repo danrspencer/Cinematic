@@ -1046,6 +1046,7 @@ function Finish(done)
 			this.fails, this.warns, GetTime() - this.at, this.seed))
 		Watch(false)
 		run = nil
+		ns.MenuTestBackdrop("sweep", false)
 		ns.PadTestBox(("Sweep %s: %d fail, %d warn. /reload, then say \"check log\"."):format(
 			done and "done" or "stopped", this.fails, this.warns), "", 1, 0.82, 0)
 		ns.Print(("settings sweep %s: %d fail, %d warn"):format(done and "done" or "stopped", this.fails, this.warns))
@@ -1161,6 +1162,10 @@ function ns.SettingsSweep(args, onDone)
 		ns.Print(("settings sweep: %d pages%s, about %d sec; don't touch anything; type it again to stop")
 			:format(#pages, pagesOnly and " (layout only)" or (", " .. #controls .. " settings"), math.ceil(secs)))
 	end
+	-- (A dark screen for the world while the settings are up; not in visual
+	-- mode, which shows each setting's effect, on the world as much as not.)
+	ns.MenuTestBackdrop("sweep", not visual)
+	ns.debugNoCopyWindow = true -- (its copy window would sit over the pages)
 	ns.SetOnUpdate(driver, Tick)
 	return true
 end

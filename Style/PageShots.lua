@@ -37,6 +37,43 @@ end
 
 local function Shoot() Screenshot() end -- (a function of ours: C_Timer refused the game's)
 
+-- A plain dark screen in place of the world while a menu test runs, so its
+-- screenshots show the settings, not the scenery through them (2026-11-19).
+-- Under every frame (BACKGROUND, level 0): only the world is covered, never a
+-- preview window, a bar or a frame a test looks at. Only while the settings
+-- window is up: a step without it (plates, the world) sees the world.
+-- ns.MenuTestBackdrop(owner, on): each test run its own owner; on till every
+-- owner has turned it off.
+local backdrop, backdropOwners, backdropHooked = nil, {}, false
+local function BackdropFit()
+	local panel = _G.SettingsPanel or _G.InterfaceOptionsFrame
+	local want = next(backdropOwners) ~= nil and panel and ns.Flag(panel:IsShown())
+	if not want then
+		if backdrop then backdrop:Hide() end
+		return
+	end
+	if not backdrop then
+		backdrop = CreateFrame("Frame", nil, UIParent)
+		backdrop:SetFrameStrata("BACKGROUND")
+		backdrop:SetFrameLevel(0)
+		backdrop:SetAllPoints(UIParent)
+		local fill = backdrop:CreateTexture(nil, "BACKGROUND", nil, -8)
+		fill:SetAllPoints()
+		fill:SetColorTexture(0.05, 0.05, 0.06, 1)
+	end
+	backdrop:Show()
+end
+function ns.MenuTestBackdrop(owner, on)
+	backdropOwners[owner] = on and true or nil
+	local panel = _G.SettingsPanel or _G.InterfaceOptionsFrame
+	if panel and not backdropHooked then
+		backdropHooked = true
+		panel:HookScript("OnShow", BackdropFit)
+		panel:HookScript("OnHide", BackdropFit)
+	end
+	BackdropFit()
+end
+
 local function Text(region)
 	local ok, words = pcall(region.GetText, region)
 	if ok and type(words) == "string" and words ~= "" then
@@ -279,6 +316,7 @@ ns.PageLayoutFindings = Measure
 
 local function Finish(text)
 	run = nil
+	ns.MenuTestBackdrop("pageshots", false)
 	if strip then strip:Hide() end
 	if watcher then watcher:UnregisterAllEvents() end
 	ns.Print(text)
@@ -505,6 +543,8 @@ function ns.PageShots(arg)
 	if db then db.pageShots = out end
 	local token = {}
 	run = token
+	ns.MenuTestBackdrop("pageshots", true)
+	ns.debugNoCopyWindow = true -- (its copy window would sit over the shots)
 	ns.Print(("pageshots: %d pages, about %d min - leave the mouse off the window; /cine debug pageshots off stops"):format(
 		last - first + 1, math.ceil((last - first + 1) * 6 / 60)))
 	Shots(pages, first, last, token, out)
