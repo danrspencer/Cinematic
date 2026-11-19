@@ -667,8 +667,13 @@ local function Restricted()
 	return IsRestricted ~= nil and ns.Check.True(IsRestricted())
 end
 
+-- (Waiting for the first line is retail's only. On Forever every hit before
+-- it counted as yours: after a login or /reload, standing by someone else's
+-- fight showed their hits and heals (2026-11-19). Forever's lines come with
+-- your first action of the session, so its hits wait for them from the start.)
 local function LogRunning()
-	if not logListening or not logLines or Restricted() then return false end
+	if not logListening or Restricted() then return false end
+	if ns.isRetail and not logLines then return false end
 	if not (C_CombatLog and C_CombatLog.AreFilteredEventsEnabled) then return false end
 	local ok, on = pcall(C_CombatLog.AreFilteredEventsEnabled)
 	return ok and Plain(on) and on == true

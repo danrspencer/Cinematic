@@ -67,6 +67,23 @@ if arg[1] and not update then
 			for _, gap in ipairs(gaps) do print("problem\tWhy window: " .. gap) end
 		end
 	end
+	-- Combat Text Style, whose hit (2026-11-19): on Forever hits wait for the
+	-- combat log's lines from login on, so others' hits and heals stay out
+	-- before your first line of the session (they all showed). Retail waits
+	-- for a first line before matching (its lines may never come).
+	do
+		local keptLog = rawget(_G, "C_CombatLog")
+		_G.C_CombatLog = { AreFilteredEventsEnabled = function() return true end,
+			IsCombatLogRestricted = function() return false end }
+		local ok, line = pcall(ns.CombatTextStateLine)
+		_G.C_CombatLog = keptLog
+		local running = ok and type(line) == "string" and line:match(" running=(%a+)")
+		local want = client == "retail" and "false" or "true"
+		if running ~= want then
+			print(("problem\tcombat text: before the first log line, matching hits to lines is %s (want %s): %s")
+				:format(tostring(running), want, ok and "" or tostring(line)))
+		end
+	end
 	-- Your own lines and Hide your messages' exception (Chat.lua): lines you type
 	-- with no bubble show chat, emotes and loot don't, and it's all off without it.
 	do
