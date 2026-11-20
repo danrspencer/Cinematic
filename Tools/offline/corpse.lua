@@ -90,6 +90,11 @@ ns.CorpseTest()
 Check("start logged", Has("start: Forever") ~= nil)
 Check("Dead and Corpse settings listed", Has("nameplateShowDead=") ~= nil)
 Check("soft interact held on", cvars.SoftTargetInteract == "3", cvars.SoftTargetInteract)
+-- (Forever: asking for the combat log is a forbidden action with secret values.)
+Check("combat log skipped with secret values", Has("COMBAT_LOG_EVENT_UNFILTERED=skipped") ~= nil)
+local cleu = false
+for _, frame in ipairs(wow.frames) do if frame._events.COMBAT_LOG_EVENT_UNFILTERED then cleu = true end end
+Check("no frame of the test registered the combat log", not cleu)
 Tick()
 Check("step 1 asks for a kill", box:find("KILL", 1, true) ~= nil, box)
 units.target = mob
@@ -97,15 +102,17 @@ combat = true
 Tick()
 Check("the kill kept", Has("the kill: Flesh Eating Worm " .. MOB) ~= nil)
 mob.dead = true
-combatLogInfo = { 0, "UNIT_DIED", false, nil, nil, 0, 0, MOB, "Flesh Eating Worm" }
-Fire("COMBAT_LOG_EVENT_UNFILTERED")
-Check("the death line noticed", Has("log UNIT_DIED: Flesh Eating Worm " .. MOB .. " (the kill)") ~= nil)
+Tick()
+Check("the death seen on the target", Has("the kill died (target reads dead)") ~= nil)
+Check("corpse read as target when it died", Has("just dead target: exists true, name Flesh Eating Worm") ~= nil)
 Tick()
 Check("step 2 waits for the fight", box:find("Finish the fight", 1, true) ~= nil, box)
+units.target = nil -- (auto loot clears the target before the fight ends)
 combat = false
 Tick(2)
-Check("corpse read as target", Has("corpse as target target: exists true, name Flesh Eating Worm") ~= nil)
+Check("target gone after the fight logged", Has("the corpse wasn't your target after the fight") ~= nil)
 Check("its tooltip logged", Has("'Skinnable'") ~= nil)
+units.target = mob
 Check("a screenshot", Has("screenshot (corpse targeted)") ~= nil)
 Tick()
 Check("step 3 asks for the mouse", box:find("MOUSE over the body", 1, true) ~= nil, box)
@@ -127,7 +134,7 @@ Tick(4)
 Check("result: target", Has("RESULT target: the corpse's name reads as your target") ~= nil)
 Check("result: mouseover not read", Has("RESULT mouseover: no name read on mouseover") ~= nil)
 Check("result: soft", Has("RESULT soft: soft interact picked the corpse (soft)") ~= nil)
-Check("result: death", Has("RESULT death: the death came in the combat log (UNIT_DIED)") ~= nil)
+Check("result: no death line", Has("RESULT death: no death line for it in the combat log") ~= nil)
 Check("result: plate", Has("RESULT plate: no plate on the corpse") ~= nil)
 Check("done box", box:find("Corpse test DONE", 1, true) ~= nil, box)
 Check("soft interact put back", cvars.SoftTargetInteract == "0", cvars.SoftTargetInteract)
@@ -135,7 +142,19 @@ Check("ticker stopped", ticker.cancelled == true)
 Check("events let go", Listening() == listenersBefore, Listening() .. " vs " .. listenersBefore)
 Check("no errors logged", not Has("error"))
 
--- 2. Typed again mid-run: stops.
+-- 2. A client without secret values: the combat log's death line moves it on.
+issecretvalue = nil -- luacheck: ignore 121
+units = { target = { guid = MOB, name = "Flesh Eating Worm", dead = false } }
+ns.CorpseTest()
+Check("combat log registered without secret values", Has("COMBAT_LOG_EVENT_UNFILTERED=true") ~= nil)
+Tick()
+combatLogInfo = { 0, "UNIT_DIED", false, nil, nil, 0, 0, MOB, "Flesh Eating Worm" }
+Fire("COMBAT_LOG_EVENT_UNFILTERED")
+Check("the death line noticed", Has("log UNIT_DIED: Flesh Eating Worm " .. MOB .. " (the kill)") ~= nil)
+Check("it moves on to the fight's end", Has("--- step calm") ~= nil)
+ns.CorpseTest()
+
+-- 3. Typed again mid-run: stops.
 units = { target = { guid = "Creature-9", name = "Rotted One", dead = false } }
 ns.CorpseTest()
 Tick()

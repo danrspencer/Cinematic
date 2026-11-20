@@ -230,7 +230,9 @@ local function Tick()
 			end
 		elseif guid and guid == run.guid and Dead("target") then
 			Say("  the kill died (target reads dead)")
-			Dump("target", "just dead")
+			-- (Counts for the target result too: looting can clear the target before
+			-- the fight ends, as auto loot did on Forever, 2026-11-20.)
+			run.found.target = Dump("target", "just dead")
 			Go("calm")
 		end
 		Prompt("1/4: Target an enemy you can kill quickly, and KILL it. Stay close to its body.",
@@ -248,7 +250,7 @@ local function Tick()
 		if GetTime() - run.calmSettled < 1.5 then return end
 		local guid = Guid("target")
 		if guid and guid == run.guid then
-			run.found.target = Dump("target", "corpse as target")
+			run.found.target = Dump("target", "corpse as target") or run.found.target
 		else
 			Say("  the corpse wasn't your target after the fight (target " .. tostring(guid) .. ")")
 		end
@@ -376,7 +378,13 @@ function ns.CorpseTest()
 	local registered = {}
 	for _, event in ipairs({ "COMBAT_LOG_EVENT_UNFILTERED", "COMBAT_LOG_MESSAGE", "NAME_PLATE_UNIT_ADDED",
 		"NAME_PLATE_UNIT_REMOVED", "LOOT_OPENED", "LOOT_CLOSED", "PLAYER_SOFT_INTERACT_CHANGED" }) do
-		registered[#registered + 1] = event .. "=" .. tostring(ns.Check.RegisterEvent(run.events, event))
+		-- (Not the combat log on clients with secret values: asking is a forbidden
+		-- action there, as in CardMoments.lua; Forever's red window, 2026-11-20.)
+		if event == "COMBAT_LOG_EVENT_UNFILTERED" and issecretvalue then
+			registered[#registered + 1] = event .. "=skipped (secret values: addons may not)"
+		else
+			registered[#registered + 1] = event .. "=" .. tostring(ns.Check.RegisterEvent(run.events, event))
+		end
 	end
 	Say("events: " .. table.concat(registered, ", "))
 	run.events:SetScript("OnEvent", function(...)
