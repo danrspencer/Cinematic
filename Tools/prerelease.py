@@ -68,6 +68,11 @@ OFFLINE_TESTS = [
     ("reloads as before on retail, retail", "Tools/offline/reload.lua", "retail"),
     ("detached parts follow our fade (FlareUI's gryphons)", "Tools/offline/gryphons.lua"),
     ("loose parts survey (/cine debug loose) finds exactly the detached parts", "Tools/offline/loosesurvey.lua"),
+    ("dead mob test (/cine debug deadmob) steps and verdicts", "Tools/offline/corpse.lua"),
+    ("a logout forgets the last tab under each icon, forever", "Tools/offline/hublasttab.lua", "forever"),
+    ("a logout forgets the last tab under each icon, retail", "Tools/offline/hublasttab.lua", "retail"),
+    ("Allow offscreen nameplates: the old tick moved, Auto / Always / Never, forever", "Tools/offline/offscreenallow.lua", "forever"),
+    ("Allow offscreen nameplates: the old tick moved, Auto / Always / Never, retail", "Tools/offline/offscreenallow.lua", "retail"),
 ]
 
 
