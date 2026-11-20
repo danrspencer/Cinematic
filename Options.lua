@@ -18345,6 +18345,7 @@ local function CreateTooltipPanel()
 		Level = { L["Level (friends)"], L["The level line of players and NPCs you can't attack."] },
 		LevelEnemy = { L["Level (enemies)"], L["The level line of players and NPCs you can attack."] },
 		Spec = { L["Spec and class"], L["A player's spec and class line (\"Fury Warrior\")."] },
+		Location = { L["Location"], L["The zone under a party member's class when they're out of sight (\"Stormwind City\")."] },
 		Type = { L["Creature type"], L["The kind of creature: Elemental, Beast, Humanoid and so on."] },
 		Corpse = { L["Corpse"], L["The Corpse line on a dead player, NPC or mob."] },
 		Faction = { L["Faction and PvP"], L["The Horde or Alliance line and the PvP line."] },

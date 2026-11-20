@@ -4907,6 +4907,28 @@ STEPS[#STEPS + 1] = function()
 		for _, point in pairs(ns.db.profileResetPoints or {}) do Split(point) end
 		ns.db.playerCastTabV1 = true
 	end
+	-- The Tooltips page's zone line (a party member's out of sight) moved
+	-- off the Spec and class row onto its own, Location: it starts as the
+	-- Spec row was set, here and in saved profiles. Once.
+	if not ns.db.tooltipLocationV1 then
+		local function Copy(t)
+			if type(t) ~= "table" then return end
+			for _, column in ipairs({ "First", "Later" }) do
+				if t["tooltipShowSpec" .. column] ~= nil and t["tooltipShowLocation" .. column] == nil then
+					t["tooltipShowLocation" .. column] = t["tooltipShowSpec" .. column]
+				end
+			end
+		end
+		Copy(ns.db)
+		for _, saved in pairs(ns.db.profiles or {}) do
+			if type(saved) == "table" then
+				Copy(saved)
+				Copy(saved.settings)
+			end
+		end
+		for _, point in pairs(ns.db.profileResetPoints or {}) do Copy(point) end
+		ns.db.tooltipLocationV1 = true
+	end
 end
 
 -- Runs them all, each on its own: an error is logged and reported (the

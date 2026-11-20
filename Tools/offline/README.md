@@ -23,6 +23,9 @@ looks for `lua5.1`. (Don't put a `lua5.1` stand-in on PATH: Windows asks what to
 - `partyflicker.lua`: a stand-in for DaylightUI's party tile dimming itself by a secret range answer
   (SetAlphaFromBoolean), checked against our fade: its dim kept while not faded, our fade back at once while faded.
   An optional .toc argument runs it on other code (a copy with an older Frames.lua, say).
+- `tooltiplocation.lua`: the Tooltips page's Location row. A party member's zone on their short tooltip goes
+  by it, apart from Spec and class, and a full tooltip's faction line under the class isn't taken for the zone; the
+  update starts Location as Spec was set.
 - `cardwait.lua`: the Rested card waiting while DaylightUI's zone title shows (ns.AddCardWait), on a clock of its
   own: waits, shows once the title's gone, gives up after 8 s, no wait without the title or for other cards.
 - `notchgap.lua <forever|retail>`: full-screen effects (ns.CoverWorld: letterbox, tint edges, death screen, Focus,

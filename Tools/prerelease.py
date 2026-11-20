@@ -42,6 +42,7 @@ HOME = os.path.expanduser("~")
 OFFLINE_TESTS = [
     ("party flicker (DaylightUI range fade)", "Tools/offline/partyflicker.lua"),
     ("card wait (Rested card behind DaylightUI's zone title)", "Tools/offline/cardwait.lua"),
+    ("tooltip Location row (zone apart from class)", "Tools/offline/tooltiplocation.lua"),
     ("cast bar other kind's look, forever", "Tools/offline/castlook.lua", "forever"),
     ("cast bar other kind's look, retail", "Tools/offline/castlook.lua", "retail"),
     ("Mac notch covers, forever", "Tools/offline/notchgap.lua", "forever"),

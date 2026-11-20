@@ -341,8 +341,9 @@ local function LinesToCut(tooltip, count, unit, object)
 				return "Spec" -- (a player's "Fury Warrior")
 			elseif unit and IsClassName(text) then
 				return "Spec" -- (a party member's short tooltip: the class alone)
-			elseif unit and IsClassName(Left(i - 1):GetText()) then
-				return "Spec" -- (and the zone under the class there: "Stormwind City")
+			elseif unit and IsClassName(Left(i - 1):GetText()) and not IsFactionLine(text) then
+				return "Location" -- (and the zone under the class there: "Stormwind City";
+				-- not a full tooltip's "Alliance" under its class line)
 			elseif i == 2 and unit and Left(3) and IsClassName(Left(3):GetText()) then
 				return "Guild" -- (the short tooltip's guild, over its class: "Requiem")
 			elseif Same(text, creatureType) then
@@ -564,6 +565,9 @@ end
 -- the rows read as the game (and other addons) laid them out.
 local leaveLines = false
 
+-- (For the offline check, Tools/offline/tooltiplocation.lua.)
+ns.TooltipLinesToCut = LinesToCut
+
 local function CutLines(tooltip, object)
 	local okCount, count = pcall(tooltip.NumLines, tooltip)
 	if leaveLines or not okCount or type(count) ~= "number" or count < 2 then
@@ -687,7 +691,7 @@ local function CutWhenShown(tooltip, kind)
 	C_Timer.After(0, function() RunPendingCut(tooltip) end)
 end
 
-local LINE_PARTS = { "Guild", "Level", "LevelEnemy", "Spec", "Type", "Corpse", "Faction", "Rep", "Threat", "Quest",
+local LINE_PARTS = { "Guild", "Level", "LevelEnemy", "Spec", "Location", "Type", "Corpse", "Faction", "Rep", "Threat", "Quest",
 	"Hint" }
 local function AnyLineCut()
 	for _, part in ipairs(LINE_PARTS) do
