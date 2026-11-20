@@ -29,9 +29,9 @@ local TIPS = {
 	menu = "Hold to bring up a wheel of the game's menu buttons (character, spellbook, quest log...), " ..
 		"the ones on your menu bar: point at one and let go to open its window, even with the UI hidden. " ..
 		"Tap it instead and the wheel stays up for you to click one.",
-	marker = "Hold to bring up a wheel of the raid target markers (skull, cross, square...) for your " ..
-		"target, or with none, whatever the cursor is on: point at one and let go to put it on them, or at None to take theirs off. Tap it instead " ..
-		"and the wheel stays up for you to click one.",
+	marker = "Hold to bring up a wheel of the raid target markers (skull, cross, square...): point at one " ..
+		"and let go to put it on your target, or on whatever the cursor is on if you have no target. " ..
+		"Point at None to take theirs off. Tap it instead and the wheel stays up for you to click one.",
 	world = "Hold to bring up a wheel of the ground markers (the colored lights you drop on the floor): " ..
 		"point at one and let go, and it drops under the cursor. Picking one that's down moves it; Clear " ..
 		"all takes them all up. Tap it instead and the wheel stays up for you to click one. Only in a group.",
@@ -70,13 +70,13 @@ end
 -- now (each: label, and icon with trim and color, or Paint(icon, under)).
 -- extras: the player can put icons of their own on it (MarkerWheel.lua).
 -- switch: its page's switch (switchTip: what it does, Top).
-local ON_TIP = "On: its key opens this wheel, and it can be on the master wheel."
+local ON_TIP = "When on, its key opens this wheel, and it can be on the master wheel."
 local WHEELS = {
 	{ key = "master", label = "Master wheel", title = "Master Wheel", action = "CLICK CinematicMasterWheelButton:LeftButton",
-		switch = "wheelMasterOn", switchTip = "On: its key opens the master wheel.",
+		switch = "wheelMasterOn", switchTip = "When on, its key opens the master wheel.",
 		Entries = function() return SlotsOf("master") end },
 	{ key = "yours", label = "Your wheels", title = "Your Wheels", switch = "wheelYoursOn",
-		switchTip = "On: your wheels' keys open them, and they can be on the master wheel." },
+		switchTip = "When on, your wheels' keys open them, and they can be on the master wheel." },
 	{ key = "camera", label = "Camera wheel", title = "Camera Wheel", action = "CINEMATIC_CAMWHEEL",
 		switch = "wheelCameraOn", switchTip = ON_TIP,
 		Entries = function()

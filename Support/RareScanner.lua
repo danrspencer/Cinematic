@@ -14,7 +14,7 @@ local L = ns.L
 table.insert(ns.ADDON_FRAMES, {
 	key = "rarescanner", addon = "RareScanner", label = "RareScanner",
 	about = L["its alert button"],
-	note = L["Rare spotted's card can show in place of it for rares (Card Settings > Rare spotted)."],
+	note = L["For rares, the Rare spotted card can show in its place (Card Settings > Rare spotted)."],
 	names = { "RARESCANNER_BUTTON" },
 })
 
@@ -35,8 +35,8 @@ ns.WhenAddonLoads("RareScanner", function()
 	row = ns.AddConflict({ key = "card:rare", addon = "RareScanner", label = "Rare spotted card", group = "scenes",
 		noBoth = true, default = "ours", theirs = function() return true end,
 		ours = function() return ns.CardOn("rare") end,
-		about = "A rare NPC it finds: Card Vision's Rare spotted card (its button goes as the card shows), or " ..
-			"its own alert button (the card stays quiet for it). Treasures and events keep its button either way" })
+		about = "When it finds a rare NPC: Card Vision's Rare spotted card (its button hides when the card " ..
+			"shows), or its own alert button (no card). Treasures and events keep its button either way" })
 	-- (The pick Card Settings had before, rareScannerAlert, carried over once.)
 	local db = ns.GetDB()
 	db.conflictPicks = db.conflictPicks or {}

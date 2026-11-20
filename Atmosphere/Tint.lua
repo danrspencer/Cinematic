@@ -30,9 +30,9 @@ local TINT_PRESETS = {
 		top = { 1, 0.7, 0.45 }, bottom = { 0.6, 0.45, 0.85 },
 		tip = L["Orange at the top fading to purple at the bottom, like a sunset."] },
 	{ key = "sepia", label = L["Sepia-ish"], mode = "MOD", color = { 0.95, 0.8, 0.55 },
-		tip = L["Warm brownish yellow, old-photo warmth. (The world can't be truly desaturated.)"] },
+		tip = L["Warm brownish yellow, like an old photo. The world can't be fully desaturated."] },
 	{ key = "dreamy", label = L["Dreamy"], mode = "ADD", color = { 0.3, 0.22, 0.12 },
-		tip = L["A soft, hazy warm glow over the scene."] },
+		tip = L["A warm haze over everything."] },
 	{ key = "custom", label = L["Custom"], mode = "MOD",
 		tip = L["Your own color, chosen with the color picker below."] },
 	{ key = "timeofday", label = L["Time of day"], mode = "MOD", dynamic = true,
@@ -2031,7 +2031,7 @@ function ns.CreateDeathVisionPanel(kit)
 
 	local strength = stack:Add(kit.Slider(content, "deathScreenStrength", L["Strength"], 10, 100, 5,
 		"%d%%", 100), "slider")
-	kit.Tooltip(strength, L["How dim the world and how dark the edges get."])
+	kit.Tooltip(strength, L["How dim the world gets and how dark the edges get."])
 	kit.GreyUnless(strength, On)
 	local creep = stack:Add(kit.Slider(content, "deathVignetteTime", L["Edges creep in over"], 1, 30, 1,
 		L["%d sec"]), "slider")

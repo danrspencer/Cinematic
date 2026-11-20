@@ -3159,7 +3159,7 @@ function ns.CreateUnitStylePanel(kit)
 	end
 
 	local switch = kit.PageSwitch(content, "ufStyle", L["Enable Page"],
-		L["On: the unit frames look as this page says; off: the game's own look."], intro, Changed)
+		L["Turn this on to style the unit frames as this page says, or off to keep the game's own look."], intro, Changed)
 	local stack = kit.Stack(switch, "check")
 	local rows = ns.StyleRows(kit, content, stack, Changed, "ufStyle")
 
@@ -3288,7 +3288,7 @@ function ns.CreateUnitStylePanel(kit)
 				-- (By health: only where the game has color curves.)
 				if ns.CanColorByHealth then
 					healthChoices[#healthChoices + 1] = { "health", L["By health"],
-						L["Its color below at full health, turning to the At half and Empty colors as health drops."] }
+						L["Uses the color below at full health, shifting to the At half and Empty colors as health drops."] }
 				end
 				look.Choices(L["Health:"], "ufHealthColor", healthChoices, Editable)
 				local function HealthIs(a, b)
@@ -3311,7 +3311,7 @@ function ns.CreateUnitStylePanel(kit)
 				local function Grads(key, what)
 					look.Choices(what, key, {
 						{ "off", L["Off"] },
-						{ "shade", L["Darker"], L["It fades to a darker one of its own color, whatever that is."] },
+						{ "shade", L["Darker"], L["It fades to a darker shade of its own color."] },
 						{ "on", L["Your color"], L["It fades to the color below."] },
 					}, Editable)
 					local stem = key:gsub("Gradient$", "Grad")
@@ -3335,7 +3335,7 @@ function ns.CreateUnitStylePanel(kit)
 			end,
 			font = { "ufFont", L["The font for names."], test = Editable },
 			textSize = function(look)
-				look.Slider("ufNameSize", L["Size"], 50, 150, 5, "%d%%", 100, L["The name's size, next to the game's."],
+				look.Slider("ufNameSize", L["Size"], 50, 150, 5, "%d%%", 100, L["The name's size compared to the game's."],
 					Editable)
 			end,
 			textColor = function(look)
@@ -3425,7 +3425,7 @@ function ns.CreateUnitStylePanel(kit)
 				pick:SetPoint("LEFT", name, "RIGHT", 4, 0)
 				pick.pageSwitch = false
 				kit.GreyUnless(pick, rows.On)
-				kit.Tooltip(pick, L["This frame's look: the Default row's, or its own."])
+				kit.Tooltip(pick, L["Whether this frame uses the Default row's look or its own."])
 			end
 		end
 		local button = ns.PanelButton(content)

@@ -596,7 +596,7 @@ local function Explain(entry)
 				conflict.addon, L[conflict.label], ns.ConflictPickLabel(pick), picked and "" or L[" (not picked yet)"]),
 				"Addon Conflicts")
 			if pick == "theirs" then
-				Add(out, "off", L["Cinematic's stands aside while it's on. Ours plays Cinematic's instead"],
+				Add(out, "off", L["Cinematic's version stands aside while it's on. Pick Ours to play Cinematic's instead"],
 					"Addon Conflicts")
 			end
 		end

@@ -1848,7 +1848,7 @@ function ns.ShoulderCamDemoBlocked()
 		return L["Shoulder Cam is paused while the gamepad UI is on: the game keeps your character centered in it."]
 	end
 	if ns.FeatureYieldedTo and ns.FeatureYieldedTo("shoulderCam") then
-		return L["Another addon has the shoulder camera (DynamicCam): the Shoulder Cam stands aside for it."]
+		return L["Another addon (DynamicCam) is running a shoulder camera, so the Shoulder Cam stays off."]
 	end
 end
 function ns.ShoulderCamDemo()
@@ -2542,9 +2542,9 @@ function ns.CreateShoulderCamPanel(kit)
 	-- (A fourth on Forever, which has a gamepad UI: why it's not for that yet.)
 	local tabList = {
 		{ L["Shoulder Cam"], L["Where the camera sits, when it turns, and when it steps back behind you."] },
-		{ L["Follow HUD"], L["The frames that follow you: which slide with you as the camera sits over your shoulder."],
+		{ L["Follow HUD"], L["Which frames slide with you while the camera is over your shoulder."],
 			flip = "shoulderCamFrames" }, -- (a right-click: Frames follow you)
-		{ L["Cameras"], L["Which of Cinematic's cameras the Shoulder Cam stays on through."] },
+		{ L["Cameras"], L["Which of Cinematic's cameras keep the Shoulder Cam on while they play."] },
 	}
 	if not ns.isRetail then
 		tabList[4] = { L["Gamepad"], L["Why the Shoulder Cam pauses while the gamepad UI is on."] }
@@ -2561,7 +2561,7 @@ function ns.CreateShoulderCamPanel(kit)
 		{ key = ROW_KEY, label = L["Shoulder Cam"], alwaysKey = "shoulderCamAlways",
 			alwaysOn = function() return ns.GetDB().shoulderCamAlways end,
 			setAlways = function(value) ns.GetDB().shoulderCamAlways = value ns.ApplyShoulderCam() end,
-			alwaysTip = L["Over your shoulder wherever you are. (The other columns then have nothing to add.)"],
+			alwaysTip = L["Over your shoulder everywhere, so the other columns don't matter."],
 			apply = ns.ApplyShoulderCam },
 	}, L["Shoulder Cam"])
 	stack:Continue(lastRow, "label")
@@ -2594,11 +2594,11 @@ function ns.CreateShoulderCamPanel(kit)
 		get = function() return ns.db.shoulderCamSpotFar or ns.db.shoulderCamSpot or 0.2 end,
 		set = function(value) ns.db.shoulderCamSpotFar = value end }, L["Spot zoomed out"], 0, 40, 1, "%d%%", 100),
 		"slider")
-	kit.Tooltip(spotFar, L["How far from the middle you sit when zoomed out. Lower than Spot on screen keeps the camera off walls, which only catch it zoomed out."])
+	kit.Tooltip(spotFar, L["How far from the middle you sit when zoomed out. Set it lower than Spot on screen to keep the camera from catching on walls, which only happens zoomed out."])
 	kit.GreyUnless(spotFar, IfOn)
 	local spotFarAt = stack:Add(kit.Slider(content, "shoulderCamSpotFarAt", L["Zoomed out at"], 8, 30, 1,
 		L["%d yards"]), "slider")
-	kit.Tooltip(spotFarAt, L["How far away the camera is when you sit at Spot zoomed out. From 5 yards out to here your spot moves from Spot on screen to it."])
+	kit.Tooltip(spotFarAt, L["The camera distance where you reach Spot zoomed out. Between 5 yards and this distance, you slide from Spot on screen to Spot zoomed out."])
 	kit.GreyUnless(spotFarAt, IfOn)
 	local swapTime = stack:Add(kit.Slider(content, "shoulderCamSwapTime", L["Swap takes"], 0, 3, 0.1,
 		L["%.1f sec"]), "slider")
@@ -2615,7 +2615,7 @@ function ns.CreateShoulderCamPanel(kit)
 	-- (A wait before coming back in, user 2026-11-17: straight back on stepping outside was jarring.)
 	local backAfter = stack:Add(kit.Slider(content, "shoulderCamBackAfter", L["Back after"], 0, 10, 0.5,
 		L["%.1f sec"]), "slider")
-	kit.Tooltip(backAfter, L["How long the Shoulder Cam waits before coming back over your shoulder once it can again: you step outside or get off your mount. Going back in or getting on again in that time starts the wait over."])
+	kit.Tooltip(backAfter, L["How long the Shoulder Cam waits to come back over your shoulder after you step outside or get off your mount. Going back in or mounting again during the wait starts it over."])
 	kit.GreyUnless(backAfter, IfOn)
 
 	-- Turn to NPCs and Turn to your target: Show in rows, each one's box before
@@ -2629,7 +2629,7 @@ function ns.CreateShoulderCamPanel(kit)
 			alwaysKey = "shoulderCamTalkTurnAlways",
 			alwaysOn = function() return ns.GetDB().shoulderCamTalkTurnAlways end,
 			setAlways = function(value) ns.GetDB().shoulderCamTalkTurnAlways = value talkRead.at = -1 end,
-			alwaysTip = L["Turns to who you talk to wherever you are. (The other columns then have nothing to add.)"],
+			alwaysTip = L["Turns to who you talk to everywhere, so the other columns don't matter."],
 			showTip = L["The camera turns toward the NPC you talk to while their window is open."],
 			showChanged = function() if ns.ApplyShoulderCam then ns.ApplyShoulderCam() end end,
 			apply = function() talkRead.at = -1 end,
@@ -2756,7 +2756,7 @@ function ns.CreateShoulderCamPanel(kit)
 	-- Beside each camera's tick: the seconds it takes to go back behind you as
 	-- that camera starts, and back over your shoulder as it ends. Empty: the
 	-- usual time (shown greyed in it). Greyed while ticked: no pause then.
-	local TIME_TIP = L["Seconds the camera takes to move behind you for this camera; empty uses %s."]:format(BLEND_TIME)
+	local TIME_TIP = L["How many seconds the camera takes to move behind you for this camera. Leave it empty to use %s."]:format(BLEND_TIME)
 	local function TimeBox(parent, check, timeKey, allowKey)
 		kit.RecordKey(parent, timeKey)
 		local box = ns.SkinEditBox(CreateFrame("EditBox", nil, parent, "InputBoxTemplate"))
@@ -2823,8 +2823,9 @@ function ns.CreateShoulderCamPanel(kit)
 	camTop:SetPoint("TOPLEFT", cams, "TOPLEFT", 0, 1)
 	local cstack = kit.Stack(camTop, "check", true)
 	local allowHead = cstack:Header(cams, L["Allow the Shoulder Cam"])
-	cstack:Note(cams, L["Unticked, the camera goes back behind you while that camera plays and comes back over " ..
-		"your shoulder as it ends. Ticked, it stays: you keep your spot on the screen as the camera turns round you."],
+	cstack:Note(cams, L["When unticked, the camera moves behind you while that camera plays and comes back over your " ..
+		"shoulder when it ends. When ticked, it stays over your shoulder and you keep your spot on the " ..
+		"screen as the camera turns around you."],
 		440)
 	local ALLOW_TIP = L["Keeps the camera over your shoulder while this camera plays."]
 	local timeHead

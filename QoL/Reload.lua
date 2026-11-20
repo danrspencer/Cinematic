@@ -334,7 +334,7 @@ button:SetScript("OnEnter", function(self)
 	GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
 	GameTooltip:SetText(L["Reload the UI"])
 	if ns.Setting("reloadKeepWindows") then
-		GameTooltip:AddLine(L["The windows you have open open again after."], 1, 1, 1, true)
+		GameTooltip:AddLine(L["Windows you have open reopen after the reload."], 1, 1, 1, true)
 	end
 	GameTooltip:AddLine(L["Drag to move it."], 0.7, 0.7, 0.7, true)
 	GameTooltip:Show()

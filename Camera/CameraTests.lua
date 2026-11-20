@@ -127,9 +127,9 @@ tests["Quest Cam"] = {
 -- lands it. Moving by hand ends it, as it ends those cameras.
 local TRAVEL = {
 	["Flight Cam"] = { mode = "flight", setting = "eventFlightCamera",
-		tip = "Pretends you've taken off on a flight path: the flight camera runs for 30 seconds " ..
-			"where you stand (with no route known, it never knows when you'll land), then lands. " ..
-			"Moving, or clicking Stop, ends it." },
+		tip = "Pretends you've taken off on a flight path. The flight camera runs for 30 seconds where you " ..
+			"stand, then lands (with no real route, it can't tell when you'd land). Moving or clicking Stop " ..
+			"ends it." },
 	["RP Walk Cam"] = { mode = "walk", setting = "walkCamera",
 		tip = "Pretends you're auto-walking: the RP walk camera runs for 30 seconds where you " ..
 			"stand. Moving, or clicking Stop, ends it." },

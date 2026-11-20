@@ -1228,7 +1228,7 @@ local function MakeWindow()
 		GameTooltip:SetOwner(self, "ANCHOR_TOP")
 		GameTooltip:SetText(ns.L["Copy over changes"])
 		if adds then
-			GameTooltip:AddLine(ns.L["Put the %d points the plan adds into your talents window, for its Apply Changes."]:format(adds),
+			GameTooltip:AddLine(ns.L["Puts the %d points the plan adds into your talents window, ready for you to click Apply Changes."]:format(adds),
 				1, 1, 1, true)
 		elseif why then
 			GameTooltip:AddLine(why, 1, 0.1, 0.1, true)

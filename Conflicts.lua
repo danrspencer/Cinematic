@@ -290,8 +290,8 @@ function ns.CreateConflictsPanel(kit)
 	local empty = kit.Label(content, "GameFontDisable", L["None of your loaded addons has its own version " ..
 		"of a Cinematic feature switched on right now."])
 	empty:SetPoint("TOPLEFT", heads, "BOTTOMLEFT", 0, -10)
-	local note = kit.Label(content, "GameFontDisableSmall", L["Style rows have no Both: one look wins. A row " ..
-		"you haven't picked plays theirs, as Theirs does."])
+	local note = kit.Label(content, "GameFontDisableSmall", L["Style rows have no Both option, since only one look can win. A row you haven't picked uses " ..
+		"theirs, like Theirs does."])
 	note:SetWidth(600)
 
 	local function Row(i)
@@ -522,8 +522,8 @@ local function CreateWindow()
 	window.rest:SetPoint("RIGHT", window.next, "LEFT", -8, 0)
 	window:SetScript("OnHide", function()
 		if Unpicked() > 0 then
-			ns.Print(L["Addon Conflicts: unpicked ones play the other addon's version. This comes back next login, " ..
-				"or pick on Addons > Conflicts."])
+			ns.Print(L["Addon Conflicts: any you haven't picked use the other addon's version. This shows again next " ..
+				"login unless you pick on Addons > Conflicts."])
 		end
 	end)
 end

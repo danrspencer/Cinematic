@@ -185,7 +185,7 @@ function ns.CreatePlateIconsPage(kit)
 			alwaysKey = always,
 			alwaysOn = function() return ns.GetDB()[always] end,
 			setAlways = function(value) ns.GetDB()[always] = value Changed() end,
-			alwaysTip = L["Shows everywhere, in CineMode and out. (The other columns then have nothing to add.)"],
+			alwaysTip = L["Shows everywhere, in and out of CineMode, so the other columns don't matter."],
 			apply = Changed }
 	end
 	local lastRow = ns.ShowTable(content, header, rows, L["Nameplate Icons"])
@@ -211,6 +211,6 @@ function ns.TargetMarksShowRow(onChange)
 			ns.GetDB()[ALWAYS_KEY.TargetArrow] = value
 			if onChange then onChange() end
 		end,
-		alwaysTip = L["Shows everywhere, in CineMode and out. (The other columns then have nothing to add.)"],
+		alwaysTip = L["Shows everywhere, in and out of CineMode, so the other columns don't matter."],
 		apply = onChange }
 end

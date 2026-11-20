@@ -57,7 +57,7 @@ local KINDS = {
 	{ kind = "command", setting = "kbColorCommand", preset = "teal", label = "Menus and movement",
 		tip = "Keys bound to anything else: moving, targeting, opening windows, other addons' commands." },
 	{ kind = "unbound", setting = "kbColorUnbound", preset = "dark", label = "Unbound keys",
-		tip = "Keys with nothing bound to them with the modifiers shown (Ctrl+the key, say): free to use." },
+		tip = "Keys with nothing bound to them with the modifiers shown (Ctrl plus the key, for example): free to use." },
 	{ kind = "modifier", setting = "kbColorModifier", preset = "each", label = "Modifiers",
 		tip = "Shift, Ctrl and Alt: lit while you hold them, or after clicking them on the map." },
 }
@@ -1362,7 +1362,7 @@ local function CreateBoard()
 	grip:SetScript("OnEnter", function(self)
 		GameTooltip:SetOwner(self, "ANCHOR_TOP")
 		GameTooltip:SetText(L["Drag to stretch the map"], 1, 1, 1)
-		GameTooltip:AddLine(L["Right-click for the size Key size makes."], nil, nil, nil, true)
+		GameTooltip:AddLine(L["Right-click to go back to the size set by Key size."], nil, nil, nil, true)
 		GameTooltip:Show()
 	end)
 	grip:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -1536,8 +1536,8 @@ function ns.CreateKeyboardMapPage(kit)
 
 	-- (Off: the map doesn't open, and closes if it's up: KeyboardMapOpen.)
 	local switch = kit.PageSwitch(content, "keyboardMap", L["Enable Page"],
-		L["On: the map opens with its key or /cine keys. Off: it doesn't open at all; this page keeps its " ..
-			"settings for when you turn it back on."], intro, function(value)
+		L["When on, the map opens with its key or /cine keys. When off, it doesn't open at all, and this " ..
+			"page keeps its settings for when you turn it back on."], intro, function(value)
 			if not value then ns.KeyboardMapClose() end
 			Changed()
 		end)
@@ -1555,7 +1555,7 @@ function ns.CreateKeyboardMapPage(kit)
 	open:SetPoint("LEFT", second, "RIGHT", 16, 0)
 	local function OpenText() open:SetText(ns.KeyboardMapShown() and L["Close the map"] or L["Open the map"]) end
 	open:SetScript("OnClick", ns.KeyboardMapToggle)
-	kit.Tooltip(open, L["Opens the map till you close it (also /cine keys)."])
+	kit.Tooltip(open, L["Opens the map until you close it (also /cine keys)."])
 	ns.KeyboardMapShownChanged = OpenText
 	OpenText()
 	open.Refresh = OpenText -- (greyed with the page's switch)

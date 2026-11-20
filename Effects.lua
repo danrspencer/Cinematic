@@ -4061,12 +4061,12 @@ function ns.PlatesWhy()
 	end
 	if #named > 0 then
 		table.sort(named)
-		Add("on", L["Names stay on their plates, the rest of the plate hidden (Names rows): %s"]:format(
+		Add("on", L["Names rows keep names on their plates and hide the rest: %s"]:format(
 			table.concat(named, ", ")))
 	end
 	if placeSuffix == "Instances" then
-		Add("off", L["In dungeons and raids the game doesn't let addons fade friendly plates: Friendly plates in " ..
-			"dungeons and raids decides them"])
+		Add("off", L["In dungeons and raids the game doesn't let addons fade friendly plates, so the Friendly plates " ..
+			"in dungeons and raids setting decides them"])
 		if ns.InGroup() then
 			for _, kind in ipairs(ns.PLATE_INSTANCE_KINDS) do
 				if ns.db["plateGroup" .. kind] then

@@ -570,7 +570,7 @@ local function CopyFrame(chatFrame)
 	frame:SetFontObject(ChatFontNormal)
 	if ns.WhyRegister then
 		ns.WhyRegister(frame, L["Chat message"], "Chat", {
-			L["Show just those messages is on: a message that shows chat comes up here on its own, " ..
+			L["Show just those messages is on, so a message that would bring up chat shows here by itself, " ..
 				"without the chat window"] })
 	end
 	-- (Hidden till its first line: a new frame starts shown, and ShowCopy

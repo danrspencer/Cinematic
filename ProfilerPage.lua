@@ -677,7 +677,7 @@ function ns.CreateProfilerPanel(kit)
 		if count == 0 then
 			empty:SetText(ns.ProfileGameMetric and ns.ProfileGameMetric("addon", "RecentAverageTime") == nil
 				and L["The game's profiler isn't on this client: use a recording below."]
-				or (PageOn() and L["No samples yet (one a second)."] or L["Off: right-click the Profiler icon to sample."]))
+				or (PageOn() and L["No samples yet (one a second)."] or L["It's off. Right-click the Profiler icon to start sampling."]))
 			empty:Show()
 		else
 			empty:Hide()
@@ -868,7 +868,7 @@ function ns.CreateProfilerPanel(kit)
 			wipe(filtered)
 		end
 		addonEmpty:SetText(on and L["The game's profiler isn't on this client."]
-			or L["Off: right-click the Profiler icon to sample."])
+			or L["It's off. Right-click the Profiler icon to start sampling."])
 		if on and next(addonFilter) then
 			wipe(filtered)
 			for _, addon in ipairs(list) do
@@ -977,10 +977,8 @@ function ns.CreateProfilerPanel(kit)
 	local RECORD_TILE = 138
 	local measuredTile = Tile(L["Cinematic, timed"], nil, status, L["What the addon's timers measured: ms a " ..
 		"frame, and its share of the frame."], RECORD_TILE)
-	local gameTile = Tile(L["The game's figure"], measuredTile, nil, L["What the game measured for Cinematic " ..
-		"meanwhile, the timers' parts and all the rest."], RECORD_TILE)
-	local garbageTile = Tile(L["Garbage"], gameTile, nil, L["Memory made and thrown away, a second: the game " ..
-		"spends time clearing it up."], RECORD_TILE)
+	local gameTile = Tile(L["The game's figure"], measuredTile, nil, L["What the game measured for Cinematic over the same time, including what the timers don't cover."], RECORD_TILE)
+	local garbageTile = Tile(L["Garbage"], gameTile, nil, L["Memory used and thrown away each second. The game spends time cleaning it up."], RECORD_TILE)
 	local slowTile = Tile(L["Slow frames"], garbageTile, nil, L["Frames where the addon took over 5 ms, and " ..
 		"their share of all frames."], RECORD_TILE)
 	local worstTile = Tile(L["Worst frame"], slowTile, nil, L["The most the addon took in one frame."], RECORD_TILE)
@@ -1022,7 +1020,7 @@ function ns.CreateProfilerPanel(kit)
 		GameTooltip:AddLine(L["average %.4f ms a call, worst %.2f ms"]:format(data.average, data.worst), 1, 1, 1)
 		GameTooltip:AddLine(L["%.1f KB of garbage a second"]:format(data.kb), 1, 1, 1)
 		if row.child then
-			GameTooltip:AddLine(L["(Called by the part above: its time is part of that one's.)"], 0.7, 0.7, 0.7, true)
+			GameTooltip:AddLine(L["(Called by the part above, so its time is counted in that one.)"], 0.7, 0.7, 0.7, true)
 		end
 		GameTooltip:Show()
 	end

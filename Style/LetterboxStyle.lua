@@ -15,19 +15,19 @@ local L = ns.L
 local EFFECT_PAGES = {
 	letterbox = { name = "Letterbox", page = "Letterbox", style = "Letterbox Style",
 		tip = "Where and when the bars show.", styleTip = "How the letterbox bars look and come in.",
-		intro = "Black bars at the top and bottom of the screen in CineMode, like a film's. Where and when they " ..
-			"show: the row below (nothing ticked: off). Their size and look: the Style tab. The Visual Effects " ..
-			"page's Enable Page turns them off too.",
-		switchTip = "On: the bars show as the row below says. Off: no letterbox anywhere; the row and its " ..
-			"Style tab keep their settings for when you turn this back on." },
+		intro = "Black bars at the top and bottom of the screen in CineMode, like in a movie. The row below " ..
+			"sets where and when they show; with nothing ticked, they're off. Set their size and look on " ..
+			"the Style tab. The Visual Effects page's Enable Page turns them off too.",
+		switchTip = "When on, the bars show where the row below says. Turn it off for no letterbox anywhere; the " ..
+			"row and its Style tab keep their settings for when you turn it back on." },
 	tint = { name = "Tint", page = "Tint", style = "Tint Style",
 		tip = "Where and when the tint shows.",
 		styleTip = "The color grading: a preset, the time of day and each zone's mood.",
-		intro = "The color grading over the game world in CineMode. Where and when it shows: the row below " ..
-			"(nothing ticked: off). Its preset, the time of day and the zones' tints: the Style tab. The Visual " ..
-			"Effects page's Enable Page turns it off too. The UI isn't tinted.",
-		switchTip = "On: the tint shows as the row below says. Off: no tint anywhere; everything on this page " ..
-			"and its Style tab keeps its settings for when you turn this back on." },
+		intro = "The color grading over the game world in CineMode. The row below sets where and when it shows; " ..
+			"with nothing ticked, it's off. Set its preset, time of day and zone tints on the Style tab. " ..
+			"The Visual Effects page's Enable Page turns it off too. The UI isn't tinted.",
+		switchTip = "When on, the tint shows where the row below says. Turn it off for no tint anywhere; this page " ..
+			"and its Style tab keep their settings for when you turn it back on." },
 }
 
 -- Under the Letterbox tab's row: the bars for a few seconds on a place new
@@ -134,7 +134,7 @@ function ns.CreateEffectPanel(kit, effect)
 		{ key = key, label = L[info.name], alwaysKey = alwaysKey,
 			alwaysOn = function() return ns.GetDB()[alwaysKey] end,
 			setAlways = function(value) ns.GetDB()[alwaysKey] = value end,
-			alwaysTip = L["Shows all through CineMode, fights and the Calm Timer after them."],
+			alwaysTip = L["Shows the whole time in CineMode, including fights and the Calm Timer after them."],
 			apply = function()
 				local switch = ns.EFFECT_SWITCHES and ns.EFFECT_SWITCHES[effect]
 				if switch then ns.GetDB()[switch] = ns.RowOnAnywhere(key, ns.GetDB()[alwaysKey]) end
@@ -165,7 +165,7 @@ function ns.CreateLetterboxStylePanel(kit)
 	end
 
 	local switch = kit.PageSwitch(content, "letterboxStyle", L["Enable Page"],
-		L["On: the bars look as this page says; off: Cinematic's plain black bars."],
+		L["When on, the bars look the way this page sets them. When off, they're Cinematic's plain black bars."],
 		intro, Changed)
 	local stack = kit.Stack(switch, "check")
 	local rows = ns.StyleRows(kit, content, stack, Changed, "letterboxStyle")
@@ -218,7 +218,7 @@ function ns.CreateLetterboxStylePanel(kit)
 	stack:Add(preview, "label")
 	ns.StylePopout(preview, kit.Tooltip) -- (StylePages.lua)
 	-- Test: the bars out, then back in once they're gone, as at a fight's start and end.
-	ns.StylePreviewTest(over, kit, L["Takes the bars out and brings them back in, as at a fight's start and end."],
+	ns.StylePreviewTest(over, kit, L["Takes the bars out and brings them back in, like at the start and end of a fight."],
 		function()
 			target, comeBack = 0, true
 		end)
@@ -227,7 +227,7 @@ function ns.CreateLetterboxStylePanel(kit)
 	stack:Header(content, L["Size"])
 	rows.Choices(L["Set by:"], "letterboxSizeBy", {
 		{ "height", L["Height"], L["Each bar a share of the screen's height."] },
-		{ "aspect", L["A film's frame"], L["Makes the space between the bars the shape of a film, on any screen."] },
+		{ "aspect", L["A film's frame"], L["Shapes the space between the bars like a movie screen, on any monitor."] },
 	})
 	rows.Slider("letterboxSize", L["Bar height"], 0, 25, 1, "%d%%", 100,
 		L["How tall each bar is, as a share of the screen's height."],
@@ -265,7 +265,7 @@ function ns.CreateLetterboxStylePanel(kit)
 	})
 	rows.Slider("letterboxTime", L["How long"], 0, 30, 1, function(value)
 		return value == 0 and L["With the UI"] or ("%.1f s"):format(value / 10)
-	end, 10, L["How long the bars take to come in or go; 0 matches the UI's fade."])
+	end, 10, L["How long the bars take to come in or go. Set to 0 to match the UI's fade."])
 
 	canvas:SetScript("OnShow", kit.PageShown(kit.Refresh, content))
 	canvas:Hide()

@@ -559,7 +559,7 @@ function ns.CreateTooltipStylePanel(kit)
 	end
 
 	local switch = kit.PageSwitch(content, "tooltipStyle", L["Enable Page"],
-		L["On: tooltips look as this page says; off: the game's own look."], intro, Changed)
+		L["When on, tooltips look the way this page sets them. When off, they use the game's own look."], intro, Changed)
 	local stack = kit.Stack(switch, "check")
 	local rows = ns.StyleRows(kit, content, stack, Changed, "tooltipStyle")
 
@@ -587,7 +587,7 @@ function ns.CreateTooltipStylePanel(kit)
 				{ "none", L["None"] },
 			})
 			look.Choices(L["Color:"], "tooltipBarColor", {
-				{ "game", L["The game's"], L["Green, or as the game colors it for the unit."] },
+				{ "game", L["The game's"], L["Green, or the color the game gives that unit."] },
 				{ "custom", L["Custom"], L["A color of your own (below)."] },
 			}, BarOn)
 			look.Chips(L["Its color"], { "tooltipBarR", "tooltipBarG", "tooltipBarB" }, L["The health bar's color, for Custom."],
@@ -596,7 +596,7 @@ function ns.CreateTooltipStylePanel(kit)
 			-- own, and which way. As Unit Frames'.)
 			look.Choices(L["Gradient:"], "tooltipGradient", {
 				{ "off", L["Off"] },
-				{ "shade", L["Darker"], L["It fades to a darker one of its own color, whatever that is."] },
+				{ "shade", L["Darker"], L["It fades to a darker shade of its own color."] },
 				{ "on", L["Your color"], L["It fades to the color below."] },
 			}, BarOn)
 			look.Chips(L["Fades to"], { "tooltipGradR", "tooltipGradG", "tooltipGradB" }, L["The color it fades to."],

@@ -443,8 +443,8 @@ end)
 
 ns.WhenAddonLoads("DaylightUI_InfoPanel", function()
 	ns.AddConflict({ key = "style:minimap", addon = LABEL, label = "Minimap look", group = "style", noBoth = true,
-		about = "Its square minimap: left as DaylightUI draws it, or dressed by the Style hub's Interface Recolor " ..
-			"page as well (its ring and buttons in the theme's color)",
+		about = "Its square minimap: left as DaylightUI draws it, or also colored by the Style hub's Interface " ..
+			"Recolor page, which puts its ring and buttons in the theme's color",
 		theirs = function()
 			local dui = DUI()
 			return dui and dui.Get and dui:Get("InfoPanel", "map.enabled") == true or false
@@ -474,8 +474,9 @@ do
 		if type(fonts) ~= "table" then return end
 		row = ns.AddConflict({ key = "style:damageFont", addon = LABEL, label = "Damage number font", group = "style",
 			noBoth = true, restart = true,
-			about = "The game's floating numbers: blanked by the Combat Text Style page's Hide all the game's " ..
-				"floating text, or in DaylightUI's damage font. Shows from the next game start",
+			about = "The game's floating numbers: hidden by the Combat Text Style page's Hide all the game's " ..
+				"floating text, or shown in DaylightUI's damage font. Takes effect the next time you start the " ..
+				"game",
 			theirs = function()
 				return type(fonts.DamageWanted) == "function" and fonts.DamageWanted() ~= nil or false
 			end,

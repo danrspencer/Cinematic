@@ -15,11 +15,11 @@ ns.DEFAULTS.plateTheme = "main"
 
 -- The themes that stand alone, after the main themes' own.
 local OWN = {
-	{ key = "clean", name = "Clean", tip = "A flat bar with a thin black line round it. Nothing else.",
+	{ key = "clean", name = "Clean", tip = "Just a flat bar with a thin black border.",
 		texture = "flat", border = "custom", size = 1, color = { 0, 0, 0 }, ground = { 0, 0, 0, 0.6 } },
-	{ key = "minimal", name = "Minimal", tip = "A flat bar with no line round it.", texture = "flat", border = "none",
+	{ key = "minimal", name = "Minimal", tip = "A flat bar with no border.", texture = "flat", border = "none",
 		ground = { 0, 0, 0, 0.35 } },
-	{ key = "game", name = "The game's", tip = "The game's own bars. Nothing changed.", texture = "game", border = "game" },
+	{ key = "game", name = "The game's", tip = "The game's own bars, unchanged.", texture = "game", border = "game" },
 }
 
 -- The list (made once the main themes are known): { key, name, tip,

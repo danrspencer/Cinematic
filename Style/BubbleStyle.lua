@@ -68,7 +68,7 @@ function ns.CreateBubbleStylePanel(kit)
 				{ "game", L["The game's"], L["The game's own bubble."] },
 				{ "dark", L["Dark"], L["A flat dark bubble."] },
 				{ "custom", L["Custom"], L["A flat bubble in a color of your own (below)."] },
-				{ "none", L["None"], L["Just the words, over the world: an outline helps them read."] },
+				{ "none", L["None"], L["Just the words, with no bubble. An outline makes them easier to read."] },
 			})
 			look.Chips(L["Its color"], { "bubblesBackR", "bubblesBackG", "bubblesBackB" },
 				L["The bubble's color, for Custom."], function(db) return rows.On(db) and db.bubblesBack == "custom" end)
@@ -131,9 +131,9 @@ function ns.CreateBubbleStylePanel(kit)
 	rows.Check("speechBehindSink", L["Sink as lines come in"],
 		L["Older lines slide down as new ones come in."], Behind)
 	rows.Slider("speechBehindScale", L["Size"], 50, 100, 5, "%d%%", 100,
-		L["How big speech from behind you is, next to a bubble overhead: smaller sounds further away."], Behind)
+		L["How big speech from behind you is compared to a bubble overhead. Smaller makes it seem farther away."], Behind)
 	rows.Slider("speechBehindAlpha", L["Opacity"], 30, 100, 5, "%d%%", 100,
-		L["How solid speech from behind you is: fainter sounds muffled, out of view."], Behind)
+		L["How solid speech from behind you looks. Fainter makes it seem muffled and out of view."], Behind)
 	local function Tailed(db) return Behind(db) and db.bubblesBack ~= "none" and db.bubblesTail end
 	local tailTop = rows.Check("speechBehindTailTop", L["Tail on top"],
 		L["Puts the bubble's tail on top, pointing up."], Tailed)

@@ -1820,7 +1820,7 @@ local function BuildCastPage(kit, spec)
 	end
 
 	local switch = kit.PageSwitch(content, spec.switch, L["Enable Page"],
-		L["On: the cast bars look as this page says; off: the game's own look."], intro, Changed)
+		L["When on, the cast bars look the way this page sets them. When off, they use the game's own look."], intro, Changed)
 	local stack = kit.Stack(switch, "check")
 	local rows = ns.StyleRows(kit, content, stack, Changed, spec.switch)
 
@@ -2153,7 +2153,7 @@ local function BuildCastPage(kit, spec)
 				list[#list + 1] = { "default", L["Default's"], L["They look as the Default row says."] }
 				if FRAME_IDS[id] then
 					list[#list + 1] = { "frame", L["Unit frame's"],
-						L["Part of the unit frame: its fill, border and font, right under its bars."] }
+						L["Makes it part of the unit frame, with its fill, border and font, right under its bars."] }
 				end
 				list[#list + 1] = { "own", L["Their own"], L["These bars use their own look from the tabs here."] }
 				look.Segments(L["These bars"], { get = function() return LookPick(id) end, set = function(value)
@@ -2170,31 +2170,31 @@ local function BuildCastPage(kit, spec)
 					{ L["Can't be interrupted"], COLOR_KEYS.locked,
 						L["Pick the color of a cast or channel that can't be interrupted."] },
 					{ L["Interrupted"], COLOR_KEYS.stop,
-						L["Pick the color of a cast that was interrupted (when the game says: not in every fight)."] },
+						L["Pick the color of an interrupted cast. The game doesn't report this in every fight."] },
 				}, Filled)
 			end,
 			ground = function(look)
 				look.Slider("plateCastBack", L["Dark ground"], 0, 100, 5, "%d%%", 100,
-					L["How dark it is behind the fill (with a fill of your own; the game's keeps its own)."], Filled)
+					L["How dark it is behind the fill. This only works with a fill of your own; the game's keeps its own."], Filled)
 				-- (Its size: the nameplates' (and Default's, for them), and yours its width.)
 				if not id or id == "PLATE" then
 					if not ns.isRetail then
 						look.Slider("plateCastWidth", L["Width"], 50, 150, 5, "%d%%", 100,
-							L["Its width, next to the game's, about its middle (nameplates only)."], Editable)
+							L["Its width compared to the game's, growing out from its middle. Nameplates only."], Editable)
 					end
 					look.Slider("plateCastHeight", L["Height"], 50, 300, 10, "%d%%", 100,
-						L["The cast bar's height, next to the game's."],
+						L["The cast bar's height compared to the game's."],
 						Editable)
 				elseif id == "PLAYER" then
 					local playerSizes = look.Boxes()
-					local widthTip = L["Your cast bar's width, about the point it hangs from (its height and place: " ..
-						"Edit Mode's)."]
+					local widthTip = L["Your cast bar's width, growing out from where it's anchored. Its height and position come from " ..
+						"Edit Mode."]
 					playerSizes:Pick(L["Width"], "plateCastPlayerWidthUnit", "pct", L["Its width as a percent of the game's."],
 						Editable)
 					playerSizes:Box("", "plateCastPlayerWidth", 20, 200, 5, "%d", 100, widthTip,
 						function(db) return Editable(db) and db.plateCastPlayerWidthUnit ~= "px" end, "%")
 					playerSizes:Pick("", "plateCastPlayerWidthUnit", "px",
-						L["Its width in pixels on screen: the same number on two bars, the same width."], Editable, function()
+						L["Its width in screen pixels, so the same number gives two bars the same width."], Editable, function()
 							local db = ns.GetDB()
 							if (tonumber(db.plateCastPlayerWidthPx) or 0) <= 0 then
 								db.plateCastPlayerWidthPx = PlayerBarPixels() or 200
@@ -2208,7 +2208,7 @@ local function BuildCastPage(kit, spec)
 			icon = function(look)
 				look.Check("plateCastIcon", L["The spell's icon"], nil, Editable)
 				look.Slider("plateCastIconSize", L["Size"], 50, 300, 10, "%d%%", 100,
-					L["The icon's size, next to the game's."],
+					L["The icon's size compared to the game's."],
 					function(db) return Editable(db) and ns.StyleKeyGet(Field("plateCastIcon")) end)
 				look.Check("plateCastShield", L["The shield on casts that can't be interrupted"],
 					L["The game's shield over the icon while the cast can't be interrupted."], Editable)
@@ -2241,7 +2241,7 @@ local function BuildCastPage(kit, spec)
 				look.Choices(L["Shadow:"], "plateCastShadow", {
 					{ "general", ns.SharedStyleSource("plateCastShadow"), L["As the Style hub's General page says."] },
 					{ "game", L["The game's"] },
-					{ "on", L["Shadow"], L["A dark copy of the letters just behind them, down and to the right."] },
+					{ "on", L["Shadow"], L["A dark shadow behind the letters, down and to the right."] },
 					{ "none", L["None"] },
 				}, Editable)
 				look.Check("plateCastTimer", L["Seconds left at its right end"],
@@ -2288,7 +2288,7 @@ local function BuildCastPage(kit, spec)
 			-- game's, Default's or its own.)
 			button:SetScript("OnClick", function() OpenLook(id) end)
 		else
-			kit.Tooltip(button, L["Every kind of cast bar's look while its row says Default."])
+			kit.Tooltip(button, L["The look every cast bar uses while its row is set to Default."])
 			button:SetScript("OnClick", function() OpenLook(nil) end)
 			-- (A line under it, as Name Style's: the rows below go by it.)
 			local line = content:CreateTexture(nil, "ARTWORK")
@@ -2324,10 +2324,11 @@ function ns.CreateUnitCastStylePanel(kit)
 	BuildCastPage(kit, { page = "Unit Cast Style", title = "Cast Style", tabs = "units", switch = "unitCastStyle",
 		ids = { "TARGET", "BOSS" }, default = true,
 		slots = { { "TARGET", "unit", 2 }, { "BOSS", "boss", 3 } }, spots = { { 0.28, 0.45 }, { 0.72, 0.45 } },
-		intro = L["How the unit frames' cast bars look: your target's and focus's, and the bosses' and arena " ..
-		"enemies'. Each row's These bars picks its look: the game's (they start so), the Default row's, or its own, " ..
-		"set in its Look panel. The Default row is every cast bar's base look, yours and the nameplates' too while " ..
-		"theirs says so. Changes show at once, here and on bars casting now."] })
+		intro = L["How the unit frames' cast bars look: your target's, your focus's, and those of bosses and " ..
+		"arena enemies. Each row's These bars picks its look: the game's (the starting choice), the " ..
+		"Default row's, or its own, set in its Look panel. The Default row is the base look for every " ..
+		"cast bar, including yours and the nameplates' while they're set to use it. Changes show right " ..
+		"away, here and on bars that are casting now."] })
 end
 
 -- Your cast bar: the Unit Frames icon's Your Cast Bar tab, its own since
@@ -2337,8 +2338,9 @@ function ns.CreatePlayerCastStylePanel(kit)
 	BuildCastPage(kit, { page = "Player Cast Style", title = "Your Cast Bar", tabs = "units", switch = "playerCastStyle",
 		ids = { "PLAYER" }, defaultName = L["Default's (Cast Bars)"],
 		slots = { { "PLAYER", "player", 1 } }, spots = { { 0.5, 0.55 } }, previewH = 110,
-		intro = L["How your cast bar looks: the game's (it starts so), the Default row's (on the Cast Bars tab), the " ..
-		"unit frame's, or its own, set in its Look panel. Changes show at once, here and on your casts."] })
+		intro = L["How your cast bar looks: the game's (the starting choice), the Default row's (on the Cast Bars " ..
+		"tab), the unit frame's, or its own, set in its Look panel. Changes show right away, here and " ..
+		"on your casts."] })
 end
 
 -- The nameplates' cast bars: the Nameplates hub's Cast Bar Style. Their
@@ -2347,9 +2349,9 @@ function ns.CreatePlateCastStylePanel(kit)
 	BuildCastPage(kit, { page = "Cast Bar Style", title = "Cast Bar Style", tabs = "plates", ids = { "PLATE" },
 		switch = "plateCastStyle",
 		defaultName = L["Default's (Unit Frames)"],
-		intro = L["How the nameplates' cast bars look: the Default row's (on the Unit Frames icon's Cast Style tab), " ..
-		"or their own, set in their Look panel. Whether they show in CineMode: the Nameplates page's Plate parts " ..
-		"grid. Changes show at once, here and on bars casting now."] })
+		intro = L["How the nameplates' cast bars look: the Default row's (on the Unit Frames icon's Cast Style " ..
+		"tab), or their own, set in their Look panel. The Nameplates page's Plate parts grid sets " ..
+		"whether they show in CineMode. Changes show right away, here and on bars that are casting now."] })
 end
 
 -- One sample cast bar, for the General page's nameplate preview: dressed as

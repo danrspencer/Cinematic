@@ -216,7 +216,7 @@ local function Gather()
 end
 
 local STATE_TIPS = {
-	ours = "Cinematic's value is on now. Your own comes back when it's done, or with Keep yours.",
+	ours = "Cinematic's value is in use now. Yours comes back when it's done, or when you pick Keep yours.",
 	changed = "In use by Cinematic, but you changed it yourself, so yours stands for now. Cinematic changes it " ..
 		"again next time it needs it, unless you pick Keep yours. Use ours puts ours back now.",
 	idle = "Yours. Cinematic changes it only while it needs it, then puts yours back.",

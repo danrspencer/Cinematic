@@ -86,9 +86,10 @@ function ns.NewShotFor(set)
 	ns.myShotsSelect = id
 	ns.OpenOptions("My Shots")
 end
-ns.CUSTOM_CAMERA_TIP = "The camera it plays: one that runs where you stand, a camera script, or a shot of yours " ..
-	"(New shot... makes one and opens My Shots). The flight, RP walk, auto-run, quest and chat cameras aren't " ..
-	"here: they need you flying, walking or talking to an NPC, and have scenes of their own."
+ns.CUSTOM_CAMERA_TIP = "The camera it plays: one that runs where you stand, a camera script, or a shot of yours (New " ..
+	"shot... makes one and opens My Shots). The flight, RP walk, auto-run, quest and chat cameras " ..
+	"aren't listed here because they need you flying, walking or talking to an NPC, and they have " ..
+	"their own scenes."
 
 -- Where the lines read and write a scene's settings: list() its triggers (a
 -- copy), setList(list), and get/set for until, after, name, camera, music,
@@ -280,7 +281,7 @@ local function BuildLines(parent, store, kit)
 		store.setList(list)
 		Saved()
 	end)
-	Tooltip(add, L["Another thing that starts this scene: any one of its triggers starts it."])
+	Tooltip(add, L["Another trigger for this scene. Any one of its triggers starts it."])
 	local placed -- (the line the actions sit on now)
 	local block = CreateFrame("Frame", nil, parent)
 	block.Refresh = function()
@@ -438,7 +439,7 @@ function ns.BuildTriggerDraft(parent, kit)
 		own[#own + 1] = At("Camera", check, x)
 	end
 	Tick(L["Music"], "music", LABEL_W + 170, L["Music starts as its camera starts (Audio page)."])
-	Tick("CineMode", "cine", LABEL_W + 260, L["Brings CineMode on while its camera runs, if Start in CineMode is off."])
+	Tick("CineMode", "cine", LABEL_W + 260, L["Turns CineMode on while its camera runs, if Start in CineMode is off."])
 
 	save = ns.PanelButton(panel)
 	save:SetSize(90, 22)
@@ -515,8 +516,8 @@ end
 function ns.ConfirmDeleteBuiltInTrigger(key, name, done)
 	if not StaticPopupDialogs.CINEMATIC_DELETE_BUILTIN_TRIGGER then
 		StaticPopupDialogs.CINEMATIC_DELETE_BUILTIN_TRIGGER = {
-			text = L["Delete the scene %s? It starts no camera until you bring it back with Add back, above the " ..
-				"rows (its settings are kept)."],
+			text = L["Delete the scene %s? It won't start a camera until you bring it back with Add back, above the " ..
+				"rows. Its settings are kept."],
 			button1 = DELETE or L["Delete"], button2 = CANCEL or L["Cancel"],
 			OnAccept = function(_, data) data() end,
 			timeout = 0, whileDead = true, hideOnEscape = true,
@@ -589,7 +590,7 @@ local window
 local WHY = {
 	newer = "This is from a newer Cinematic: update it to add this one.",
 	other = "That isn't a scene or shot: profiles go on the Profiles page, wheels on Your wheels.",
-	broken = "That isn't all of it: copy it again, every letter.",
+	broken = "That isn't the whole thing. Copy it again, all of it.",
 	full = "No room for it: delete a scene or shot first.",
 }
 local function Window()

@@ -763,7 +763,7 @@ function ns.ReadSharedVitalsTheme(text)
 	if not data then
 		return nil, why == "newer" and L["This is from a newer Cinematic: update it to add this one."]
 			or why == "other" and L["That isn't a Vitals theme."]
-			or why == "broken" and L["That isn't all of it: copy it again, every letter."] or nil
+			or why == "broken" and L["That isn't the whole thing. Copy it again, all of it."] or nil
 	end
 	local from = ORIGINAL[data.from]
 	if not from or from.game then from = ns.LOW_HEALTH_THEMES[1] end
@@ -2513,7 +2513,7 @@ end
 -- hub under one icon, a folder tab each (VitalsTabs).
 local function VitalsTabs(content, title, picked)
 	ns.VisionTabs(content, title, "Vitals Vision", "Vitals Style", picked,
-		L["When the edges close in, the health bars and how fast."],
+		L["At what health the edges close in, and how fast."],
 		L["How it looks: the theme, our art and Blizzard's, the shadow and the heartbeat."])
 end
 
@@ -3035,7 +3035,7 @@ function ns.CreateVitalsStylePanel(kit)
 
 	rows.Colors(L["Theme colors"], {
 		{ L["Shadow"], ColorKeys("shadow"), L["The dark edges' color, at full Shadow tint."] },
-		{ L["Flash"], ColorKeys("flash"), L["A big hit's flash, and the color the world drains toward."] },
+		{ L["Flash"], ColorKeys("flash"), L["The color of a big hit's flash, and the color the world fades to."] },
 	}, Themed)
 
 	local function Beating(d) return On(d) and d.lowHealthPulse end
@@ -3049,10 +3049,10 @@ function ns.CreateVitalsStylePanel(kit)
 	local function ThemeBeating(d) return Beating(d) and Themed(d) end
 	local themeBeat = rows.Boxes()
 	themeBeat:Box(L["Theme's speed"], Field("bpm", 1), 30, 200, 5, "%d", 100,
-		L["This theme's heartbeat, next to the beats a minute above (slower for a creeping theme)."], ThemeBeating,
+		L["This theme's heartbeat speed, relative to Beats a minute above. A creeping theme beats slower."], ThemeBeating,
 		"%")
 	themeBeat:Box(L["Theme's throb"], Field("pulse", 1), 0, 300, 10, "%d", 100,
-		L["How much this theme throbs, next to Throb above."], ThemeBeating, "%")
+		L["How much this theme throbs, relative to Throb above."], ThemeBeating, "%")
 	rows.Check("lowHealthFlash", L["Flash on big hits"],
 		L["The edges flash when a big hit lands."])
 	local function Flashing(d) return On(d) and d.lowHealthFlash end
@@ -3096,15 +3096,14 @@ function ns.CreateVitalsStylePanel(kit)
 		if ThemeValue("edge") == "Frost" then list[#list + 1] = { value = "Frost", text = L["Frost"] } end
 		list[#list + 1] = { value = "none", text = L["None"] }
 		return list
-	end, L["The theme's art that soaks in from the edges."], Themed, 200)
+	end, L["The theme's art that spreads in from the edges."], Themed, 200)
 	rows.Colors(L["Colors"], {
 		{ L["Art"], ColorKeys("body"), L["The art's color."] },
-		{ L["Glow"], ColorKeys("glow"), L["The glow round it, added on as light (Glow's only color)."] },
+		{ L["Glow"], ColorKeys("glow"), L["The glow around the art, added as light. This is Glow's only color."] },
 	}, Themed)
 	rows.Boxes():Box(L["Glow strength"], Field("glowAlpha", 1), 0, 100, 5, "%d", 100,
-		L["How strong the glow is, next to the art."], Themed, "%")
-	TickBeside(Opacity("lowHealthBloodAlpha", L["The theme's art soaking in from the edges as they close in " ..
-		"(blood, smoke, a glow...)."], Ours), "lowHealthSparks", L["Sparks"], L["The theme's sparks (motes, " ..
+		L["How strong the glow is compared to the art."], Themed, "%")
+	TickBeside(Opacity("lowHealthBloodAlpha", L["The theme's art (blood, smoke, a glow) that spreads in from the edges as they close in."], Ours), "lowHealthSparks", L["Sparks"], L["The theme's sparks (motes, " ..
 		"stars, lightning) and the haze drifting over the edges."], Ours)
 	-- (Each reach in two: the top and bottom's, as a share of the height, and the sides', of the width.)
 	local function Reaches(key, test)
@@ -3216,14 +3215,14 @@ function ns.CreateVitalsStylePanel(kit)
 		local boxes = rows.Boxes(swatch)
 		boxes:Box(L["Amount"], SparkField(i, function(info) return info.rate or 0 end,
 			function(info, v) info.rate = v end), 0, 120, 5, "%d", 1,
-			L["How many come a minute at full (a big hit brings a few more)."], Used(i))
+			L["How many appear per minute at full strength. A big hit adds a few more."], Used(i))
 		boxes:Box(L["Size"], SparkField(i, function(info)
 			local base = SPARK_KINDS[KindOf(info)]
 			return info.size[2] / base.size[2]
 		end, function(info, v)
 			local base = SPARK_KINDS[KindOf(info)]
 			info.size = { base.size[1] * v, base.size[2] * v }
-		end), 20, 300, 10, "%d", 100, L["How big they are, next to the usual."], Used(i), "%")
+		end), 20, 300, 10, "%d", 100, L["How big they are compared to normal."], Used(i), "%")
 		local from = Choose(SparkField(i, function(info) return info.at or "any" end, function(info, v)
 			info.at = v ~= "any" and v or nil
 		end), function()
@@ -3333,8 +3332,8 @@ function ns.CreateVitalsStylePanel(kit)
 		end
 		local function HasPortal(d) return Themed(d) and ns.VitalsEditedTheme().portal ~= nil end
 		for _, row in ipairs({
-			{ "out", PORTAL_OUT, "Start distance", -20, 10, 0.5, "%.1f", "Where it is as the edges start in (bigger: nearer, so bigger on screen)." },
-			{ "distance", PORTAL_FULL, "Full distance", -20, 10, 0.5, "%.1f", "Where it is at full: its rim should frame the screen." },
+			{ "out", PORTAL_OUT, "Start distance", -20, 10, 0.5, "%.1f", "Where it sits as the edges start to close in. A bigger value brings it nearer, so it looks bigger on screen." },
+			{ "distance", PORTAL_FULL, "Full distance", -20, 10, 0.5, "%.1f", "Where it sits at full strength. Its rim should frame the screen." },
 			{ "scale", 1, "Size", 0.2, 4, 0.1, "%.1f", "The model's size." },
 		}) do
 			local slider = stack:Add(kit.Slider(content, PortalField(row[1], row[2]), row[3], row[4], row[5], row[6],
@@ -3408,10 +3407,10 @@ function ns.CreateVitalsStylePanel(kit)
 	if ns.isRetail and ns.SCREEN_EFFECT_PICKS then
 		effectTab = tabbed.Begin()
 		stack:Header(content, L["Game effect"])
-		local about = stack:Add(kit.Label(content, "GameFontHighlightSmall", L["One of the game's own full-screen " ..
-			"effects as it plays them: an edge shape with moving layers inside it, in its own colors, over all the " ..
-			"rest. Unlike the Blizzard tab's still patterns, it's the whole effect. It closes in from past the edges " ..
-			"as you weaken, with the art's opacity."]), "label")
+		local about = stack:Add(kit.Label(content, "GameFontHighlightSmall", L["One of the game's own full-screen effects, played the way the game plays it: an edge shape " ..
+			"with moving layers inside, in its own colors, over everything else. Unlike the still patterns " ..
+			"on the Blizzard tab, this is the whole effect. It closes in from past the edges as you weaken, " ..
+			"using the art's opacity."]), "label")
 		about:SetWidth(PREVIEW_W)
 		about:SetJustifyH("LEFT")
 		local effectName = stack:Add(kit.Label(content, "GameFontHighlight", L["Theme's game effect"]), "label")
@@ -3462,11 +3461,11 @@ function ns.CreateVitalsStylePanel(kit)
 		local function HasEffect(d) return Themed(d) and Effect() ~= nil end
 		local effectBoxes = rows.Boxes(past)
 		effectBoxes:Box(L["Opacity"], EffectPart("alpha", 1), 0, 100, 5, "%d", 100,
-			L["How strong it is at full (times the art's opacity)."], HasEffect, "%")
+			L["How strong it is at full, multiplied by the art's opacity."], HasEffect, "%")
 		effectBoxes:Box(L["Reach"], EffectPart("reach", 0.5), 0, 100, 5, "%d", 100,
-			L["Where its edge sits: 50 as the game has it. Higher comes in further at full (100: a third of " ..
-			"the way to the middle; far in, the outer part fills in solid), lower pushes it out past the " ..
-			"screen so less of it shows."], HasEffect, "%")
+			L["Where its edge sits. 50 is where the game puts it. Higher brings it further in at full (at 100 " ..
+			"it's a third of the way to the middle, and the outer part fills in solid). Lower pushes it out " ..
+			"past the screen so less of it shows."], HasEffect, "%")
 		tabbed.Finish(effectTab)
 	end
 
@@ -3475,7 +3474,7 @@ function ns.CreateVitalsStylePanel(kit)
 	do
 		local order = { general, theirs, ours, swirlTab }
 		local list = {
-			{ L["General"], L["The strength, reach and brightness of it all, the shadow, the heartbeat and big hits."] },
+			{ L["General"], L["Overall strength, reach and brightness, plus the shadow, the heartbeat and big hits."] },
 			{ "Blizzard", L["The game's own screen effects, cut to an edge, over ours."] },
 			{ L["Cinematic"], L["The theme's own art and its sparks."] },
 			{ L["Swirl"], L["The theme's swirl: up to two layers turning over the screen."] },
@@ -3563,7 +3562,7 @@ function ns.CreateVitalsVisionPanel(kit)
 	local title = kit.Label(content, "GameFontNormalLarge", L["Vitals Vision"])
 	VitalsTabs(content, title, 1)
 	local intro = kit.PageIntro(content, title,
-		L["As your health drops, the screen's edges close in so you feel it."])
+		L["As your health drops, the edges of the screen close in."])
 	local function Changed()
 		ns.RefreshLowHealth()
 	end
@@ -3599,7 +3598,7 @@ function ns.CreateVitalsVisionPanel(kit)
 		{ key = ROW_KEY, label = L["Vitals Vision"], alwaysKey = "lowHealthAlways",
 			alwaysOn = function() return ns.GetDB().lowHealthAlways end,
 			setAlways = function(value) ns.GetDB().lowHealthAlways = value Changed() end,
-			alwaysTip = L["Shows wherever you are. (The other columns then have nothing to add.)"],
+			alwaysTip = L["Shows everywhere, so the other columns don't change anything."],
 			apply = Changed },
 	}, L["Vitals Vision"])
 	stack:Continue(lastRow, "label")
@@ -3626,8 +3625,8 @@ function ns.CreateVitalsVisionPanel(kit)
 	stack:Header(content, L["Screen edges"])
 	TickRow("lowHealthEdges", L["Screen edges"],
 		L["The screen's edges close in as your health drops."], {
-			{ "Start", L["Starts"], 10, 100, L["Your health the edges start creeping in below."] },
-			{ "Full", L["Full"], 0, 90, L["Your health the edges are all the way in at (under Starts)."] },
+			{ "Start", L["Starts"], 10, 100, L["The edges start closing in when your health drops below this."] },
+			{ "Full", L["Full"], 0, 90, L["The edges are all the way in when your health drops to this. Keep it below Starts."] },
 		}, "lowHealth")
 	Boxes({ "lowHealthCalm", L["Strength out of combat"], 0, 100, 5, "%d%%", 100,
 		L["How strong the edges are out of a fight."], Edges },
@@ -3657,7 +3656,7 @@ function ns.CreateVitalsVisionPanel(kit)
 
 	stack:Header(content, L["Damage taken alert"])
 	Boxes({ "lowHealthFlashHit", L["A big hit takes"], 2, 40, 1, "%d%%", 100,
-			L["The share of your health a hit has to take at once to count as big."], Edges },
+			L["How much of your health one hit has to take to count as a big hit."], Edges },
 		{ "lowHealthFlashAdded", L["Or hits adding up to"], 5, 60, 1, "%d%%", 100,
 			L["Smaller hits that add up to this much of your health count as a big one."], Edges })
 

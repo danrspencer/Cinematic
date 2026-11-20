@@ -764,7 +764,7 @@ function ns.ShowMeWhen(key, name)
 			return L["Out of fights"], true, L["Whenever you're out of a fight."]
 		end
 		if not (others or quiet) then return L["Off"], false, L["Not in this profile."] end
-		return L["Sometimes"], true, L["At the moments its Show in row ticks."]
+		return L["Sometimes"], true, L["When its Show in row has it ticked."]
 	end
 	if key == "camera" then
 		local scenes, _, picks = Scenes(base)

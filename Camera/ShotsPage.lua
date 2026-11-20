@@ -62,8 +62,7 @@ function ns.CreateMyShotsPanel(kit)
 	kit.AddControl(newShot)
 	local test = Button(L["Test"], 60, L["Plays this shot now; press again or move to stop."],
 		function() if Shot() then ns.TestShot(Shot()) end end)
-	local share = Button(L["Share"], 64, L["Text to send a friend: they add this shot with Import here or on " ..
-		"their Scenes page."], function()
+	local share = Button(L["Share"], 64, L["Copies text you can send a friend, who adds this shot with Import here or on their Scenes page."], function()
 		if Shot() then ns.ShowCameraShare(ns.ExportShot(Shot()), (L["Share %s"]):format(ns.ShotName(Shot()))) end
 	end)
 	local import = Button(L["Import"], 64, L["Add a scene or shot a friend shared (the text from their Share " ..
@@ -145,7 +144,7 @@ function ns.CreateMyShotsPanel(kit)
 		Changed()
 	end)
 	base:SetPoint("LEFT", baseLabel, "LEFT", 66, 0)
-	kit.Tooltip(base, L["The camera this shot moves like."])
+	kit.Tooltip(base, L["The camera whose moves this shot uses."])
 	kit.AddControl(base)
 
 	local sliders = {}
@@ -164,7 +163,7 @@ function ns.CreateMyShotsPanel(kit)
 	reset:SetSize(220, 22)
 	reset:SetText(L["Use the camera's own numbers"])
 	reset.searchSkip = true
-	kit.Tooltip(reset, L["Clears this shot's numbers, so each follows its camera's own setting again."])
+	kit.Tooltip(reset, L["Clears this shot's numbers so they go back to its camera's own settings."])
 	reset:SetScript("OnClick", function()
 		if Shot() then
 			ns.ResetShot(Shot())

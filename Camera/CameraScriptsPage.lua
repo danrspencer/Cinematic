@@ -64,29 +64,29 @@ local RULE_NAMES = { camera = "You move the camera", fight = "A fight starts", w
 	closed = "Its quest window closes", done = "Its steps run out" }
 -- (The rules a few words don't say enough for: the dropdown's tooltip.)
 local RULE_TIPS = {
-	window = "A quest giver's, a vendor's, the game menu, your bags...: any window that pauses the cameras (Pause cameras in windows on the Scenes page). Pause: it waits where it is, however long the window's open, and carries on as it closes. Scenes a window starts (a quest giver, an Interaction) aren't held by their own window.",
+	window = "Any window that pauses the cameras, like a quest giver's, a vendor's, the game menu or your bags (see Pause cameras in windows on the Scenes page). Pause waits where it is for as long as the window is open, and carries on when it closes. A scene started by a window (a quest giver, an Interaction) isn't held by its own window.",
 	closed = "Played for a quest giver: you accepted, handed in or picked the next quest, and their window closed. Pause: it stops where it is (a zoom in under way too) and holds that many seconds before going on; its trigger ending meanwhile (the conversation's over 3 seconds after the last window) waits for it, so the zoom back out comes after the pause. The next quest's window opening carries on at once. Leaving (Escape, Goodbye) isn't this: that ends the trigger.",
-	done = "Every step played, for a trigger. Hold: it stays where it got to until its trigger's over, then runs When it ends. (Played by hand, with Run, there's no trigger: When it ends runs.)",
+	done = "Every step has played, for a trigger. Hold keeps the camera where it got to until the trigger is over, then runs When it ends. When you play it by hand with Run there's no trigger, so When it ends runs right away.",
 }
 local ACTION_NAMES = { stop = "Stop, leave it there", putback = "Run When it ends", pause = "Pause, then carry on",
 	restart = "Start again", ignore = "Carry on", hold = "Hold till its trigger ends" }
 local HINTS = {
-	rotate = "Turns the view. Picked once: one way for every such turn in the script. Slow down None ends at full speed, for a turn the same way next to carry straight on; Speed match: seconds to go from that speed to its own.",
-	tilt = "Positive tilts down, negative up; beside a turn (Together) both go at once. Random Give or take: to Height from where the scene started, give or take Higher by and Lower by, picked each time. Slow down None ends at full speed, for a tilt the same way next to carry straight on; Speed match: seconds to go from that speed to its own.",
-	zoom = "Zooms to this many yards from you, or (From: your zoom) this many further out than you were as it started. Random Between two: somewhere from Nearest to Up to, picked each time. Top speed (yards a second): quicker if it gets there sooner; 0 goes by Seconds. Past max: beyond the game's own limit.",
-	wait = "Until: seconds, or a Hearthstone or teleport cast that many seconds from done, that many seconds before landing, back to life, someone new talks, or a fly-by's time (on a flight: random times between the Fly-by settings' From and To, each done before landing; on a route not flown before, one soon after takeoff; none left, it waits till the flight's over). Waiting on something, steps added while it's picked go inside it and run meanwhile, easing to a stop when it's time.",
+	rotate = "Turns the view. Picked once uses the same direction for every such turn in the script. Slow down None ends at full speed, so a turn the same way right after carries straight on. Speed match is the seconds it takes to go from that speed to its own.",
+	tilt = "Positive tilts down, negative tilts up. Next to a turn (Together), both happen at once. Random Give or take tilts to Height from where the scene started, give or take Higher by and Lower by, picked fresh each time. Slow down None ends at full speed, so a tilt the same way right after carries straight on. Speed match is the seconds it takes to go from that speed to its own.",
+	zoom = "Zooms to this many yards from you, or with From: your zoom, this many yards further out than where you were when it started. Random Between two picks a distance from Nearest to Up to each time. Top speed (yards a second) gets there sooner if it's quicker; 0 goes by Seconds. Past max goes beyond the game's own limit.",
+	wait = "Until can be a number of seconds, a Hearthstone or teleport cast that many seconds from done, that many seconds before landing, coming back to life, someone new talking, or a fly-by's time. On a flight, fly-by times are random between the Fly-by settings' From and To, each before landing. On a route you haven't flown before, one comes soon after takeoff, and with none left it waits until the flight is over. While it waits on something, steps you add with it picked go inside it and run meanwhile, easing to a stop when it's time.",
 	together = "Runs the steps inside it at once; it's done when the longest is. Pick it and add steps to put them inside.",
-	["repeat"] = "Runs the steps inside it again. 0 times: until the camera ends (the preview shows three).",
+	["repeat"] = "Runs the steps inside it again. 0 times means until the camera ends (the preview shows three).",
 	emote = "Your character does this emote (a word, like wave or cheer).",
-	putback = "Undoes every turn, tilt and zoom this scene made, all at once, by adding up its own turns (the game never says which way the camera points). If you move the camera yourself, it starts counting again from where you leave it. Zoom too off: the zoom stays, for a Zoom beside it in a Together to bring back at its own speed.",
-	keepup = "Runs until the camera ends, or the Wait it's in: put it in a Together beside the rest. The one an Aim at (Who's talking) swung to, walking off past Framing degrees from the middle (or where the swing left them) while their bubble shows, is followed by a steady turn their way, Top speed (degrees a second) at most, easing to a stop once they're back. Turn at most: degrees from where the camera started. The script's other turns wait meanwhile. Not beside a Follow your turns.",
-	behind = "Swings the view round behind you over this many seconds, turning at Turn speed (degrees a second) at most; the height stays. Only while you're moving (a flight, walking or running): standing still, the game doesn't turn the camera. Where it ends counts as where the scene started, for Undo its turns and Sway.",
+	putback = "Undoes every turn, tilt and zoom this scene made, all at once, by adding up its own turns (the game never says which way the camera points). If you move the camera yourself, it starts counting again from there. With Zoom too off, the zoom stays, so a Zoom next to it in a Together can bring it back at its own speed.",
+	keepup = "Runs until the camera ends or until the Wait it's in, so put it in a Together next to the rest. When the NPC an Aim at (Who's talking) swung to walks more than Framing degrees from the middle (or from where the swing left them) while their bubble shows, the camera follows with a steady turn their way, at most Top speed (degrees a second), easing to a stop once they're back. Turn at most is the limit in degrees from where the camera started. The script's other turns wait meanwhile. Don't put it next to a Follow your turns.",
+	behind = "Swings the view around behind you over this many seconds, turning at most Turn speed (degrees a second); the height stays. It only works while you're moving (a flight, walking or running), since the game doesn't turn the camera while you stand still. Where it ends counts as where the scene started, for Undo its turns and Sway.",
 	sway = "A random spot within Arc of where the camera was as this sway first ran, At least that far on; then it creeps on at Drift degrees a second through Pause, easing off before the edge. Middle: favor spots near the middle. Camp Tent Keep clear: with a Camp Tent seen nearby (your cursor was on it), each sway ends well away from it and never turns past it, and one first seen mid-turn with the tent ahead slows it to a stop (the camera goes through tents).",
-	spin = "Round and round from Start speed, speeding up by Speed-up each second to Top speed (degrees a second); 0 seconds: until the camera ends. Speed match: seconds to go from the turn before's speed to its own.",
-	aim = "Where you clicked: turns Degrees toward the side of the screen you clicked who you're talking to, as the quest cam does. Who's talking: swings toward the NPC talking now by their chat bubble, leaving them Degrees off the middle, as Chat Cam does. Not found (opened with a key, no bubble on screen): a turn either way, stay, or look round (a full turn at most) for their bubble. Top speed (degrees a second): slower than Seconds if the turn would go faster; 0 goes by Seconds.",
+	spin = "Spins round and round from Start speed, speeding up by Speed-up each second to Top speed (degrees a second). 0 seconds means until the camera ends. Speed match is the seconds it takes to go from the previous turn's speed to its own.",
+	aim = "Where you clicked turns Degrees toward the side of the screen where you clicked the person you're talking to, like the quest cam does. Who's talking swings toward the NPC talking now by their chat bubble, leaving them Degrees off the middle, like Chat Cam does. If they're not found (opened with a key, no bubble on screen), it can turn either way, stay, or look around (a full turn at most) for their bubble. Top speed (degrees a second) slows the turn below Seconds if it would go faster; 0 goes by Seconds.",
 	play = "Plays another camera's steps here, as they are now (a built-in one with your settings), then goes on. Not its stop rules or When it ends.",
 	endMusic = "Fades out the music a camera started, over this many seconds, and ends it (your own game music is left alone). The next steps go on meanwhile. Put it in When it ends to stop the music as the scene ends.",
-	follow = "Runs until the camera ends: put it in a Together beside the rest. While you turn, the view holds its direction instead of swinging round with you. Glide after seconds of not turning, it glides round after you, to where it was before you turned: Laziness (seconds) says how lazily (the further off, the quicker), Top speed (degrees a second) the fastest, Speed-up how quickly it gets going and slows down. Corners: bigger turns glide back quicker, small ones gentler. Steering: several turns in a row glide sooner and quicker; then Steering: lower (degrees) brings the camera down that far, no lower than Lowest tilt below where it started, and Steering: closer (yards) brings it in that much inside your distance, at once and until you settle down (0: neither). Fall behind at most (degrees, 0: no limit): the furthest it lets you turn away from the view; past it, the view turns with you. The script's other turns wait while it glides, then carry on.",
+	follow = "Runs until the camera ends, so put it in a Together next to the rest. While you turn, the view holds its direction instead of swinging around with you. After Glide after seconds of not turning, it glides around after you, back to where it was before you turned. Laziness (seconds) sets how lazily it follows (the further off, the quicker), Top speed (degrees a second) the fastest it goes, and Speed-up how quickly it gets going and slows down. Corners makes bigger turns glide back quicker and small ones more slowly. Steering: several turns in a row make it glide sooner and quicker. Steering: lower (degrees) then brings the camera down that far, no lower than Lowest tilt below where it started, and Steering: closer (yards) brings it that much closer than your distance, right away and until you settle down (0 turns both off). Fall behind at most (degrees, 0 for no limit) is the furthest you can turn away from the view before it turns with you. The script's other turns wait while it glides, then carry on.",
 }
 local function Translate(map)
 	for key, text in pairs(map) do map[key] = L[text] end
@@ -1011,7 +1011,7 @@ local function MakeEditor(content)
 		-- page.StepSettings.)
 		local settings = page.StepSettings and page.StepSettings(self, locked and step.set or nil) or 0
 		self.hint:SetText(settings > 0 and L["Made from these settings. Copy the camera to change the step itself."]
-			or step.k == "ending" and L["Runs when the camera ends, whatever ends it (its stop rules say which do). Every camera has it: it can't be removed. Pick it and add steps to put them inside."]
+			or step.k == "ending" and L["Runs when the camera ends, whatever ends it (its stop rules say what does). Every camera has one and it can't be removed. Pick it and add steps to put them inside."]
 			or locked and L["A built-in camera: Copy it to change it."] or HINTS[step.k] or "")
 		local rows = locked and 0 or math.ceil(#fields / PER_ROW)
 		local graphH = 0
@@ -1094,7 +1094,7 @@ function ns.CreateCameraScriptsPanel(kit)
 	-- play no camera and ours play as we ship them, CameraScripts.lua's
 	-- ns.CameraScriptToPlay. Hidden: the page's places below are fixed.)
 	kit.PageSwitch(content, "cameraScriptsPage", L["Enable Page"],
-		L["Lets scenes play your scripts, and our cameras play your changes to theirs."], intro, function()
+		L["Lets scenes play your scripts, and lets our cameras use your changes to their scripts."], intro, function()
 			if ns.CameraRowsChanged then ns.CameraRowsChanged() end
 		end)
 
@@ -1217,7 +1217,7 @@ function ns.CreateCameraScriptsPanel(kit)
 	-- (After Delete; after Copy for a built-in one, which has no Delete: see Layout.)
 	page.share = Button(content, L["Share"], 56)
 	page.share:SetScript("OnClick", function() ShowShare(true) end)
-	kit.Tooltip(page.share, L["A string of this script to give to friends."])
+	kit.Tooltip(page.share, L["This script as text to share with friends."])
 
 	-- (What it is and what starts it: the camera button's tip.)
 	-- Run, beside Share: moves the real camera through it; Stop while it's
@@ -1359,7 +1359,7 @@ function ns.CreateCameraScriptsPanel(kit)
 			row.box:SetScript("OnEnterPressed", function(self) Commit(self) self:ClearFocus() end)
 			row.box:SetScript("OnEditFocusLost", Commit)
 			WheelNumber(row.box, function() return 5 end)
-			kit.Tooltip(row.box, L["A soft haze around the screen's edges while this camera runs; 0 turns it off."])
+			kit.Tooltip(row.box, L["A haze around the edges of the screen while this camera runs. Set to 0 to turn it off."])
 		else
 			row.pick = Choice(row, 150, function() return { "no", "yes" } end,
 				function() return page.script and (page.script.button and "yes" or "no") end,
@@ -1856,8 +1856,8 @@ function ns.CreateCameraScriptsPanel(kit)
 			page.share:SetPoint("LEFT", not page.builtin and page.delete or script.edited and page.reset or page.copy,
 				"RIGHT", 4, 0)
 			page.tipStatus = not page.builtin and L["Yours: change anything."]
-				or script.edited and L["Built in and changed by you; Reset puts ours back."]
-				or L["Built in, from your settings; any change keeps it as your own."]
+				or script.edited and L["A built-in camera you've changed. Reset puts ours back."]
+				or L["A built-in camera, made from your settings. Any change you make saves it as your own."]
 			y = top + 4
 			local keys = ns.CameraScriptTriggers(script.id)
 			local names = {}

@@ -550,8 +550,8 @@ local SHOW_IN_TABS = {
 	minimap = {
 		{ "Show", "HUD:minimap", "CineMode hides the minimap: pick which parts show, and when." },
 		{ "Show Advanced", "Minimap", "What brings the hidden minimap up for a while." },
-		{ "Keep Open", "Minimap Keep Open", "Where and while what the minimap stays up the whole time: zones, " ..
-			"indoors, a tracked quest, tracking." },
+		{ "Keep Open", "Minimap Keep Open", "When the minimap stays up the whole time: in certain zones, indoors, with a tracked quest, or " ..
+			"while tracking." },
 	},
 	quests = {
 		{ "Show", "HUD:quests", "CineMode hides the quest tracker: pick when it shows." },
@@ -2558,8 +2558,7 @@ local LOOK_BUILD = {
 				and ns.L["As the Visions Style page says."] or ns.L["As the Style hub's General page says."] }
 		end
 		list[#list + 1] = { "game", ns.L["The game's"] }
-		list[#list + 1] = { "on", ns.L["Shadow"], ns.L["A dark copy of the letters just behind them, down and to " ..
-			"the right."] }
+		list[#list + 1] = { "on", ns.L["Shadow"], ns.L["A dark shadow behind the letters, down and to the right."] }
 		list[#list + 1] = { "none", ns.L["None"] }
 		return look.Choices(ns.L["Shadow:"], made[1], list, made.test)
 	end,
@@ -3056,7 +3055,7 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf, panel)
 			words:SetTextColor(1, 0.82, 0)
 			local from = head.from
 			TipOn(self, from and from.own and from.parent and ns.L["Back to %s."]:format(from.parent)
-				or ns.L["This setting back to its usual."])
+				or ns.L["Puts this setting back to its default."])
 		end)
 		reset:SetScript("OnLeave", function()
 			words:SetTextColor(0.6, 0.6, 0.6)
@@ -3997,7 +3996,7 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf, panel)
 			-- changes (every counted setting as it starts); let go, as it is.
 			if preview then
 				compare = Tool(ns.L["Hold to compare"], 124,
-					ns.L["Hold it down to see the sample without this row's own changes: before, then after."])
+					ns.L["Hold it down to see the sample without this row's own changes, then let go to see them again."])
 				compare:SetPoint("LEFT", tools, "LEFT", 0, 0)
 				local holding = false
 				local function Hold(on)
@@ -4115,8 +4114,8 @@ function ns.StyleRows(kit, content, stack, changed, switchKey, fieldOf, panel)
 				return word or ns.L["Reset all"]
 			end
 			resetAll:SetScript("OnEnter", function(self)
-				TipOn(self, ResetLabel() == ns.L["Reset all"] and ns.L["Every setting in this panel back to how it starts."]
-					or ns.L["Every setting in this panel back to inherited: the row takes its look from above again."])
+				TipOn(self, ResetLabel() == ns.L["Reset all"] and ns.L["Puts every setting in this panel back to its default."]
+					or ns.L["Puts every setting in this panel back to inherited, so the row takes its look from above again."])
 			end)
 			resetAll:SetScript("OnLeave", function() GameTooltip:Hide() end)
 			resetAll:SetScript("OnClick", function()

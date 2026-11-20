@@ -180,7 +180,7 @@ function ns.CreateCombatTextStylePanel(kit)
 	-- off: all on it off; Texts' off: every text off, CombatTextTexts.lua).
 	local hosts, _, TabsShown = ns.PageTabsBelow(content, preview, {
 		{ L["General"], L["Turn our numbers on, and hide the game's."] },
-		{ L["Look"], L["Each text starts out as the one it's under; a change to one changes only that one."] },
+		{ L["Look"], L["Each text starts out looking like the one it's under. Changing one only changes that one."] },
 	}, "Combat Text Style/page", nil, nil, nil, function()
 		local was = focus
 		focus = nil -- (the mix again; a text's Look panel opened plays that text)
@@ -212,7 +212,7 @@ function ns.CreateCombatTextStylePanel(kit)
 	-- while it's set, and picking it with a row on The game's asks first.
 	-- How ours look: the Look tab.
 	local general = stack:Header(content, L["Who draws the numbers"])
-	stack:Note(content, L["Ours follow the Look tab. The game's are the game's own, as it draws them."], 560)
+	stack:Note(content, L["Ours follow the Look tab. The game's look the way the game normally draws them."], 560)
 	-- (group: your pet's fourth cell, Game's in groups, 110 wide; the row
 	-- ends at 620, inside the page's 600-plus width.)
 	local COL = { ours = 210, game = 310, none = 410, group = 510 }
@@ -332,21 +332,21 @@ function ns.CreateCombatTextStylePanel(kit)
 		local function Pick(value) return function() GetDB()[key] = value Applied() end end
 		Cell(line, L["Ours"], "ours", L["Ours, in the Look tab's look."], Pick("ours"),
 			function() return By(key) == "ours" end)
-		Cell(line, L["The game's"], "game", L["The game's own numbers, as it draws them."], Pick("game"),
+		Cell(line, L["The game's"], "game", L["The game's own numbers, the way it normally draws them."], Pick("game"),
 			function() return By(key) == "game" end, function() return not XpHidden() end,
-			L["Set XP and other floating text to The game's first: with it on None the game draws none of its numbers."])
+			L["Set XP and other floating text to The game's first. While it's on None, the game draws none of its numbers."])
 		Cell(line, L["None"], "none", L["No numbers for these."], Pick("none"),
 			function() return By(key) == "none" end)
 		if row.pet then
 			Cell(line, L["Game's in groups"], "group",
-				L["Ours when you're on your own; the game's own, every pet hit, in a group or raid."], Pick("group"),
+				L["Ours when you're solo. In a group or raid, the game's own, which show every pet hit."], Pick("group"),
 				function() return By(key) == "group" end, function() return not XpHidden() end,
-				L["Set XP and other floating text to The game's first: with it on None the game draws none of its numbers."], 110)
+				L["Set XP and other floating text to The game's first. While it's on None, the game draws none of its numbers."], 110)
 			local holder, note = RowNote(1, 0.83, 0.62)
 			holder.Refresh = function()
 				local grouped = (IsInGroup and IsInGroup()) or (IsInRaid and IsInRaid())
 				note:SetText(grouped and L["You're in a group: only your pet's spells show now. Its swings look the same as your group's."]
-					or L["In a group, ours show only your pet's spells: its swings look the same as your group's. The game's shows every pet hit, in its own look."])
+					or L["In a group, ours only show your pet's spells, since its swings look the same as everyone else's. The game's shows every pet hit in its own look."])
 				note:SetShown(By(key) == "ours")
 			end
 			kit.AddControl(holder)
@@ -379,7 +379,7 @@ function ns.CreateCombatTextStylePanel(kit)
 	xpName:SetPoint("LEFT", xp, "LEFT", 0, 0)
 	Cell(xp, L["The game's"], "game", L["The game's floating text: XP gained and the rest."],
 		function() SetXpHidden(false) end, function() return not XpHidden() end)
-	Cell(xp, L["None"], "none", L["Hides all the game's floating text, its numbers too; needs a log out and back in."],
+	Cell(xp, L["None"], "none", L["Hides all the game's floating text, damage numbers included. Log out and back in to apply."],
 		function()
 			if XpHidden() then return end
 			local using = {}
@@ -402,7 +402,7 @@ function ns.CreateCombatTextStylePanel(kit)
 		else
 			xpNote:SetTextColor(0.62, 0.62, 0.62)
 			xpNote:SetText(XpHidden() and L["With it hidden the game draws none of its numbers, so The game's is grayed out in the rows above."]
-				or L["None hides all of the game's floating text, its numbers too, and takes a log out and back in."])
+				or L["None hides all of the game's floating text, damage numbers included. It takes a log out and back in."])
 		end
 	end
 	kit.AddControl(xpHolder)
@@ -417,7 +417,7 @@ function ns.CreateCombatTextStylePanel(kit)
 	-- own word beside it.
 	-- (Looks to start from, over the table: many texts set at once.)
 	local lookTop = stack:Header(content, L["Quick settings"])
-	stack:Help(content, L["Each row sets many texts at once; change any of them after in the table below."])
+	stack:Help(content, L["Each row sets many texts at once. You can change any of them afterward in the table below."])
 	local function Set(id, setting, value) ns.GetDB()[CT.Key(id, setting)] = value end
 	-- Three rows, each one choice of its own (2026-11-18: one line of looks
 	-- read as one choice, two of them lit at once): spell colors, which texts
@@ -494,16 +494,16 @@ function ns.CreateCombatTextStylePanel(kit)
 				for _, node in ipairs(CT.NODES) do if not node.pet and ShowsOff(node.id) then return false end end
 				return true
 			end, L["Every text is on."], {} },
-			{ L["Crits and misses"], L["Only your crits and misses; plain hits and heals off."], function()
+			{ L["Crits and misses"], L["Shows only your crits and misses, with plain hits and heals turned off."], function()
 				AllShow()
 				for _, id in ipairs(HITS) do Set(id, "Show", false) end
 			end, function()
 				for _, id in ipairs(HITS) do if not ShowsOff(id) then return false end end
 				for _, id in ipairs(CRITS) do if ShowsOff(id) then return false end end
 				return true
-			end, L["Plain hits and heals are off, crits and misses on: switch any back in the table."],
+			end, L["Plain hits and heals are off and crits and misses are on. Switch any of them back in the table."],
 				{ "damage", "swing", "ability", "spell", "heal" } },
-			{ L["No swings"], L["Your auto attacks, their crits and misses off."], function()
+			{ L["No swings"], L["Turns off your auto attacks, along with their crits and misses."], function()
 				AllShow()
 				for id in pairs(SWINGS) do Set(id, "Show", false) end
 			end, function()
@@ -521,23 +521,23 @@ function ns.CreateCombatTextStylePanel(kit)
 				function() return PlaceIs("stack") end, "", {} },
 			{ L["On top"], L["All in one spot."], function() PlaceAs("top") end,
 				function() return PlaceIs("top") end, "", {} },
-			{ L["Make room"], L["Crits and your casts in the middle; the rest move aside."], function() PlaceAs("room") end,
+			{ L["Make room"], L["Crits and your casts show in the middle, and the rest move aside."], function() PlaceAs("room") end,
 				function() return PlaceIs("room") end, "", {} },
 		} },
 		-- (Pet hits, 2026-11-19: small to start, or as big as yours.)
 		{ L["Pet hits"], {
-			{ L["Small"], L["Your pet's hits smaller than yours."], function() PetAs(nil) end,
+			{ L["Small"], L["Your pet's hits show smaller than yours."], function() PetAs(nil) end,
 				function() return PetOurs() and CT.Get("pet", "Size") == 0.7 end, "", { "damage", "pet" } },
-			{ L["Same as yours"], L["Your pet's hits as big as yours."], function() PetAs(1) end,
+			{ L["Same as yours"], L["Your pet's hits show as big as yours."], function() PetAs(1) end,
 				function() return PetOurs() and CT.Get("pet", "Size") == 1 end, "", { "damage", "pet" } },
 		} },
 		{ L["Size"], {
 			{ L["The game's"], L["As big as the game's numbers."], function() Scale("Size", false) Kind("Size", false) end,
 				function() return ScaleIs("Size", 1) and KindOff("Size") end, "", {} },
-			{ L["Smaller"], L["Every number three quarters of the game's size."],
+			{ L["Smaller"], L["Every number is three quarters of the game's size."],
 				function() Kind("Size", false) Scale("Size", true) end,
 				function() return ScaleIs("Size", 0.75) and KindOff("Size") end, "", {} },
-			{ L["By hit kind"], L["Swings smaller; spells and heals bigger the longer their cast."],
+			{ L["By hit kind"], L["Swings are smaller, and spells and heals get bigger the longer their cast."],
 				function() Scale("Size", false) Kind("Size", true) end,
 				function() return ScaleIs("Size", 1) and KindIs("Size") end, "", { "damage", "swing", "spell", "heal" } },
 		} },
@@ -546,10 +546,10 @@ function ns.CreateCombatTextStylePanel(kit)
 			{ L["The game's"], L["On screen as long as the game's numbers."],
 				function() Scale("Time", false) Kind("Time", false) end,
 				function() return ScaleIs("Time", 1) and KindOff("Time") end, "", {} },
-			{ L["Shorter"], L["Every number goes in three quarters of the game's time."],
+			{ L["Shorter"], L["Every number stays three quarters as long as the game's."],
 				function() Kind("Time", false) Scale("Time", true) end,
 				function() return ScaleIs("Time", 0.75) and KindOff("Time") end, "", {} },
-			{ L["By hit kind"], L["Swings shorter; spells and heals stay longer the longer their cast."],
+			{ L["By hit kind"], L["Swings stay up for less time, and spells and heals stay longer the longer their cast."],
 				function() Scale("Time", false) Kind("Time", true) end,
 				function() return ScaleIs("Time", 1) and KindIs("Time") end, "", { "damage", "swing", "spell", "heal" } },
 		} },
@@ -564,7 +564,7 @@ function ns.CreateCombatTextStylePanel(kit)
 	local resetWords = resetAll:GetFontString()
 	resetAll:SetSize(math.max(90, (resetWords and resetWords:GetStringWidth() or 60) + 24), 22)
 	resetAll:SetPoint("LEFT", lookTop, "LEFT", 400, 0)
-	kit.Tooltip(resetAll, L["Everything on this tab back to how it starts."])
+	kit.Tooltip(resetAll, L["Puts everything on this tab back to its defaults."])
 	local OWN_FEW = { CT.Key("all", "Together"), CT.Key("all", "Tags"), CT.Key("all", "Numbers"), "combatTextKeepLast" }
 	resetAll:SetScript("OnClick", function()
 		for _, node in ipairs(CT.NODES) do
@@ -729,8 +729,8 @@ function ns.CreateCombatTextStylePanel(kit)
 				look.Font("Font", L["The font for it."], nil, { "game", L["The game's"] })
 			end,
 			textSize = function(look)
-				look.Slider("Size", L["Size"], 50, 300, 5, "%d%%", 100, L["How big it is, next to the game's."])
-				look.Slider("CritScale", L["Crit size"], 100, 300, 5, "%d%%", 100, L["How big its crits are, next to its hits."])
+				look.Slider("Size", L["Size"], 50, 300, 5, "%d%%", 100, L["How big it is compared to the game's."])
+				look.Slider("CritScale", L["Crit size"], 100, 300, 5, "%d%%", 100, L["How big its crits are compared to its hits."])
 				if Casts(id) then
 					look.Slider("CastSize", L["Bigger per second of cast"], 0, 50, 5, "+%d%%", 100,
 						L["Longer casts show bigger numbers, up to 150%; instants and unknown casts stay 100%."])
@@ -768,7 +768,7 @@ function ns.CreateCombatTextStylePanel(kit)
 			tags = id == "damage" and function(look)
 				look.Section(L["Partly landed"])
 				look.Check(CT.Key("all", "Tags"), L["Tag hits that partly landed"],
-					L["Adds (Glancing), (Blocked), (Resisted) after the number; how much is secret in a fight."])
+					L["Adds (Glancing), (Blocked) or (Resisted) after the number. In a fight, the amount is hidden."])
 			end,
 			-- (All texts': how hits landing together sit, and the last hit.)
 			together = id == "all" and function(look)
@@ -776,7 +776,7 @@ function ns.CreateCombatTextStylePanel(kit)
 					{ "side", L["Side by side"], L["Side by side, as the game's."] },
 					{ "stack", L["Stacked"], L["Each one a little higher than the last."] },
 					{ "top", L["On top"], L["All in one spot."] },
-					{ "room", L["Make room"], L["Crits and your casts in the middle; the rest move aside."] },
+					{ "room", L["Make room"], L["Crits and your casts show in the middle, and the rest move aside."] },
 				})
 			end,
 			lastHit = id == "all" and function(look)
@@ -799,15 +799,15 @@ function ns.CreateCombatTextStylePanel(kit)
 				look.Section(L["Motion"])
 				look.Segments(L["Moves"], "Move", MoveChoices())
 				look.Pair(true)
-				look.Slider("Climb", L["Climb"], 0, 300, 10, "%d%%", 100, L["How far it moves, next to the game's."])
-				look.Slider("Time", L["Time on screen"], 30, 300, 10, "%d%%", 100, L["How long it stays, next to the game's."])
+				look.Slider("Climb", L["Climb"], 0, 300, 10, "%d%%", 100, L["How far it moves compared to the game's."])
+				look.Slider("Time", L["Time on screen"], 30, 300, 10, "%d%%", 100, L["How long it stays compared to the game's."])
 				look.Pair(false)
 				if Casts(id) then
 					look.Slider("CastTime", L["Longer per second of cast"], 0, 50, 5, "+%d%%", 100,
 						L["Longer casts stay longer, up to 150%; instants and unknown casts stay 100%."])
 				end
-				look.Slider("Fade", L["Fades from"], 10, 95, 5, "%d%%", 100, L["How far through its time it starts to fade."])
-				look.Segments(L["Pops in"], "Pop", { { true, L["On"], L["Grows big for a moment, then settles, as the game's crits do."] },
+				look.Slider("Fade", L["Fades from"], 10, 95, 5, "%d%%", 100, L["How far into its time on screen it starts to fade."])
+				look.Segments(L["Pops in"], "Pop", { { true, L["On"], L["Grows big for a moment, then settles, like the game's crits."] },
 					{ false, L["Off"] } })
 			end,
 		})
@@ -926,7 +926,7 @@ function ns.CreateCombatTextStylePanel(kit)
 		knob:SetColorTexture(0.95, 0.95, 0.95, 1)
 		switch:SetScript("OnClick", function() Flip(id) end)
 		kit.Tooltip(switch, node.crit and L["Shows these crits or not."]
-			or L["Shows it or not; off, the texts under it go too (crits have their own)."])
+			or L["Shows or hides it. Turning it off hides the texts under it too, except crits, which have their own."])
 		local chip = row:CreateTexture(nil, "ARTWORK")
 		chip:SetSize(12, 12)
 		chip:SetPoint("LEFT", switch, "RIGHT", 8, 0)
@@ -963,7 +963,7 @@ function ns.CreateCombatTextStylePanel(kit)
 		button:SetPoint("LEFT", row, "LEFT", ROW_X, 0)
 		button.searchLabel = L[node.label]
 		kit.Tooltip(button, id == "all" and L["Every text's look; each row below starts from it."]
-			or L["This text's own look, over the one it's under."])
+			or L["This text's own look, on top of the one above it."])
 		button:SetScript("OnClick", function() OpenRow(id) end)
 		button.opensLook = true -- (opens a Look panel: /cine debug lookdock clicks one a page)
 		function button.Refresh(self)
@@ -1015,7 +1015,7 @@ function ns.CreateCombatTextStylePanel(kit)
 			edit:SetScript("OnEnterPressed", Save)
 			edit:SetScript("OnEditFocusLost", Save)
 			edit:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
-			kit.Tooltip(edit, (L["Your own word in place of the game's (%s); empty: the game's."]):format(CT.Word(id, true)))
+			kit.Tooltip(edit, (L["Your own word in place of the game's (%s). Leave it empty to use the game's."]):format(CT.Word(id, true)))
 			edit.Refresh = function(self)
 				if not self:HasFocus() then self:SetText((ns.GetDB() or {})[CT.Key(id, "Word")] or "") end
 				self:SetEnabled(Ours(ns.GetDB() or {}) and true or false)

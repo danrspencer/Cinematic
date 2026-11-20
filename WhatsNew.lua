@@ -46,8 +46,8 @@ end
 local function CreateFeaturesPanel(kit)
 	local canvas, content = kit.CreateScrollPage()
 	local last = Heading(kit, content, L["New Features"],
-		L["What's new in Cinematic, newest first. Show me opens the page a feature is on. " ..
-		"Every change, fixes too, is on the All Changes page."])
+		L["What's new in Cinematic, newest first. Show me opens the page a feature is on. Every change, " ..
+		"including fixes, is on the All Changes page."])
 
 	local entries = {}
 	for i, entry in ipairs(ns.CHANGELOG_FEATURES or {}) do
@@ -375,8 +375,8 @@ local function CreateHelpPanel(kit)
 	local openLog = Button(L["Open the log"], logText, function() ns.ShowLog() end)
 
 	local slowText = Section(L["Is Cinematic slowing your game?"],
-		L["Turn on the Profiler page and record a while of your usual play (a fight too), then click Copy " ..
-		"report there and send it with your bug report."], openLog)
+		L["Turn on the Profiler page and record some of your usual play, including a fight. Then click " ..
+		"Copy report there and send it with your bug report."], openLog)
 	Button(L["Open the Profiler"], slowText, function() ns.OpenOptions("Profiler") end)
 
 	canvas:SetScript("OnShow", kit.PageShown(function() end, content))

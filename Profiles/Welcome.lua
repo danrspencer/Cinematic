@@ -37,7 +37,7 @@ local LEVELS = ns.WELCOME_LEVELS
 local OWN_PROFILE = "My setup"
 local SECTIONS = {}
 local VISIONS = { label = "Visions", page = "Heal Vision", question = "Which Visions do you want?",
-	about = "Helpers you tick on: each shows you something only when it matters.", visions = true }
+	about = "Helpers you turn on: each one only shows up when you need it.", visions = true }
 -- (The Style hub's themes, a row each: StyleThemes.lua. Not a slot: a theme is
 -- its own set of settings, which no slot's choices touch.)
 local THEMES = { label = "Theme", page = "Style Themes", question = "How should your UI look?",
@@ -401,8 +401,8 @@ local DEMO_ROW = {
 	{ key = "bars", label = "Letterbox", icon = "Interface\\Icons\\Spell_Shadow_ShadesOfDarkness", group = "atmo",
 		tip = "Black bars at the top and bottom of the screen, like in a movie." },
 	{ key = "tint", label = "Tint", icon = "Interface\\Icons\\INV_Misc_Gem_Variety_02", group = "atmo",
-		tip = "The world's colors shift with the time of day and the zone, with soft dark edges and " ..
-			"weather to match." },
+		tip = "The world's colors shift with the time of day and the zone, with darker edges and weather to " ..
+			"match." },
 	{ key = "camera", label = "Camera", icon = "Interface\\Icons\\INV_Misc_Spyglass_03", group = "cam",
 		tip = "The camera moves on its own at quiet moments: on flights, when you go AFK, by a campfire. " ..
 			"This shows a half turn around you; move the camera yourself to stop it." },
@@ -466,8 +466,8 @@ local SHELF_MORE = {
 	{ key = "roll", label = "Roll Vision", icon = "Interface\\Icons\\INV_Misc_Dice_01", group = "vis",
 		tip = "Group loot rolls in a window: who picked what." },
 	{ key = "tele", label = "Teleport", icon = "Interface\\Icons\\Spell_Arcane_TeleportStormWind", group = "vis",
-		tip = "As you cast your Hearthstone or a teleport, a portal opens around you and the world fades " ..
-			"out as you leave." },
+		tip = "As you cast your Hearthstone or a teleport, a portal opens around you and the screen fades out " ..
+			"as you leave." },
 	{ key = "cards", label = "Card Vision", icon = "Interface\\Icons\\INV_Misc_Book_09", group = "vis",
 		tip = "Title cards when you enter a new zone, level up or start a fight." },
 	{ key = "plates", label = "Nameplates", icon = "Interface\\Icons\\Ability_Hunter_SniperShot", group = "ui",
@@ -478,7 +478,7 @@ local SHELF_MORE = {
 		tip = "Damage and heal numbers in a cleaner style." },
 	-- (the Mouseover page's own icon, a pointing hand)
 	{ key = "mouseover", label = "Mouseover", icon = "Interface\\Cursor\\Point", group = "ui",
-		tip = "Point at where a faded frame lives and it comes back, with its group." },
+		tip = "Mouse over the spot where a faded frame sits and it comes back, along with its group." },
 	{ key = "cdflash", label = "Cooldown Flash", icon = "Interface\\Icons\\Spell_Nature_TimeStop", group = "ui",
 		tip = "A spell's icon flashes in the middle of the screen as it comes off cooldown." },
 	{ key = "speech", label = "Speech", icon = "Interface\\Icons\\Ability_Warrior_RallyingCry", group = "ui",
@@ -496,7 +496,7 @@ local NOTICE_LINES = {
 	vitals = "The screen's edges close in as your health drops.",
 	emote = "A card pops up when someone emotes at you or buffs you, so you can answer in one click.",
 	cards = "Title cards when you enter a new zone, level up or start a fight.",
-	tele = "A portal opens as you hearth or teleport, and the world fades out.",
+	tele = "A portal opens as you hearth or teleport, and the screen fades out.",
 }
 -- The tour, in the plan's order: the highlights one after another. Emote
 -- Vision's card stays up till it goes (up to 60 s): 15 here. The Shoulder Cam
@@ -674,8 +674,8 @@ local function BuildDemoRow(page, width)
 	start:SetScript("OnEnter", function(self)
 		if startFor then self:SetBackdropBorderColor(unpack(LIT)) end
 		about:SetText("|cffffd100" .. L["Start in CineMode"] .. "|r   " ..
-			L["On: CineMode comes in by itself between fights, fading your UI. Off: your UI stays as it is, " ..
-			"unless a camera brings CineMode on."] .. (startFor and "" or " " .. L["Pick a profile first."]))
+			L["When on, CineMode comes in by itself between fights and fades your UI. When off, your UI stays " ..
+			"as it is unless a camera brings CineMode on."] .. (startFor and "" or " " .. L["Pick a profile first."]))
 	end)
 	start:SetScript("OnLeave", function(self)
 		self:SetBackdropBorderColor(unpack(EDGE))

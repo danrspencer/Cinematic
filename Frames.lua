@@ -2358,7 +2358,7 @@ ns.COMBAT_SHOW = {
 	-- since their game has its own focus target setting).
 	{ key = "focustot", label = L["Focus target of target"], default = true, frames = { "FocusFrameToT" },
 		noHoverRow = true, showKey = ns.isClassicEra and "unitPartsFocusToT" or nil,
-		showTip = L["Unticked, the focus's target frame never shows."],
+		showTip = L["Untick this and the focus's target frame never shows."],
 		showChanged = function() if ns.ApplyUnitFrameParts then ns.ApplyUnitFrameParts() end end },
 	-- The game's circle on the ground under your target: not a frame but a
 	-- setting (Effects.lua, ns.RowOnNow). Always ticked to start with
@@ -2400,7 +2400,7 @@ ns.COMBAT_SHOW = {
 	-- The white outline round your target's frame.
 	{ key = "raidtarget", label = L["Target highlight"], default = false, addon = "Blizzard_CompactRaidFrames",
 		page = "raid", groups = { "raidtarget" }, part = true,
-		tip = L["The white outline round your target's raid frame."] },
+		tip = L["The white outline around your target's raid frame."] },
 	-- The ready check's tick, cross or question mark. (It ignores its frame's
 	-- alpha, staying bright on dimmed frames: faded here, it goes with them.)
 	{ key = "raidready", label = L["Ready check"], default = false, addon = "Blizzard_CompactRaidFrames",
@@ -2765,7 +2765,7 @@ end
 ns.HOVER_TRIGGERS = {
 	{ key = "chat", label = L["Chat message"], tip = L["A chat window peeking for a new message (Chat page)."] },
 	{ key = "whisper", label = L["Unread whisper"],
-		tip = L["A whisper tab waiting to be read, while that keeps chat up (Chat page)."] },
+		tip = L["An unread whisper tab, when the Chat page keeps chat up for whispers."] },
 	{ key = "typing", label = L["Typing"], tip = L["Typing in chat."] },
 	{ key = "aura", label = L["New buff or debuff"], tip = L["A buff or debuff peek (Buffs/debuffs page)."] },
 	{ key = "ping", label = L["Minimap ping"], tip = L["A group member pinging the minimap (Minimap page)."] },
@@ -3514,7 +3514,7 @@ function ns.IsFriendlyShowOn(key) return IsListOn("friendlyShow", key, TARGET_SH
 ns.PLACE_SHOW = {
 	{ list = "bgShow", label = L["BGs & arenas"], tip = L["Show all through CineMode in battlegrounds and arenas."] },
 	{ list = "worldShow", label = L["Open world"],
-		tip = L["Show all through CineMode out in the world, inns included (capital cities are Cities)."] },
+		tip = L["Show all through CineMode out in the world, including inns (capital cities count as Cities)."] },
 	{ list = "cityShow", label = L["Cities"], tip = L["Show all through CineMode in capital cities."] },
 	{ list = "groupShow", label = L["Grouped"],
 		tip = L["Show all through CineMode while you're in a party or raid, wherever you are."] },
@@ -13572,8 +13572,8 @@ do
 			addMode = C_Timer.NewTicker(ADD_MODE_CHECK, CheckUnderMouse)
 			ns.addModeToList = toList and true or nil
 			if toList then
-				ns.Print(L["Hover Find: hover over the frames you want, then click Stop: they go on the Find frames " ..
-					"list, to add. The game's own frames and ones already faded are left out."])
+				ns.Print(L["Hover Find: hover over the frames you want, then click Stop to put them on the Find frames " ..
+					"list, ready to add. The game's own frames and ones already faded are left out."])
 			else
 				ns.Print(L["add mode: hover over the frames to fade. Type /cine add mode again to fade them " ..
 					"(or /cine add cancel to drop them). The game's own frames and ones already faded are left out."])

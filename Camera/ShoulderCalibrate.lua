@@ -416,8 +416,8 @@ function ns.BuildShoulderCalibrateTab(host, kit)
 	top:SetPoint("TOPLEFT", host, "TOPLEFT", 0, 1)
 	local stack = kit.Stack(top, "check")
 	stack:Header(host, L["Calibrate"])
-	stack:Note(host, L["If you sit too far to the side or too close to the middle on foot, in a form or on a " ..
-		"mount, calibrate it (each mount on its own). Share sends us your numbers so everyone gets them."], 440)
+	stack:Note(host, L["If your character sits too far to the side or too close to the middle, calibrate it. Do it on " ..
+		"foot, in each form and on each mount. Share sends us your numbers so everyone gets them."], 440)
 	local now = stack:Add(kit.Label(host, "GameFontNormal", ""), "label")
 	now:SetWidth(440)
 	now:SetJustifyH("LEFT")
@@ -492,7 +492,7 @@ function ns.BuildShoulderCalibrateTab(host, kit)
 		row.reset:SetText(L["Reset"])
 		if ns.SkinButton then ns.SkinButton(row.reset) end
 		row.reset:SetScript("OnClick", function(self) ns.ShoulderCalibrationReset(self.key) end)
-		kit.Tooltip(row.reset, L["Stops using this measurement: the built-in size comes back."])
+		kit.Tooltip(row.reset, L["Stops using this measurement and goes back to the built-in size."])
 		rows[i] = row
 		return row
 	end

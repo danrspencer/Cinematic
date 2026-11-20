@@ -87,8 +87,9 @@ function ns.CreateVisionsStylePanel(kit)
 	-- (Off: every Vision on "Visions Style" goes by the Style hub's General
 	-- page instead, and the text size is 100%: StylePages.lua's FromGeneral.)
 	local switch = kit.PageSwitch(content, "visionsStyle", L["Enable Page"],
-		L["On: the Visions that follow this page look as it says. Off: they go by the Style hub's General page, " ..
-			"at their own text size; this page keeps its settings for when you turn it back on."],
+		L["When this is on, the Visions that follow this page look as it says. When it's off, they use " ..
+			"the Style hub's General page at their own text size, and this page keeps its settings for when " ..
+			"you turn it back on."],
 		intro, Changed)
 	local stack = kit.Stack(switch, "check")
 	-- (Greyed with the Style hub's Enable Style too.)
@@ -103,11 +104,11 @@ function ns.CreateVisionsStylePanel(kit)
 	rows.Choices(L["Shadow:"], "visionStyleShadow", {
 		{ "general", L["Interface Style"], L["As the Style hub's General page says."] },
 		{ "game", L["The game's"] },
-		{ "on", L["Shadow"], L["A dark copy of the letters just behind them, down and to the right."] },
+		{ "on", L["Shadow"], L["A dark shadow behind the letters, down and to the right."] },
 		{ "none", L["None"] },
 	})
 	rows.Slider("visionStyleTextSize", L["Text size"], 70, 150, 5, "%d%%", 100,
-		L["Every Vision's words bigger or smaller, times each one's own size on its page (cards too)."])
+		L["Makes every Vision's text bigger or smaller, on top of each one's own size on its page (cards too)."])
 	rows.Texture(L["Bar texture:"], "visionStyleTexture", L["The bar fill for every Vision that follows this page."], nil, { 0.25, 0.75, 0.3 }, OWN)
 	rows.Border(L["Border:"], "visionStyleBorder", { game = OWN }, L["The border for every Vision part that follows this page."])
 

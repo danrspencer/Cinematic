@@ -95,7 +95,7 @@ function ns.CreateQuestItemStylePanel(kit)
 	end
 
 	local switch = kit.PageSwitch(content, "questItemStyle", L["Enable Page"],
-		L["On: the button looks as this page says; off: like the game's extra ability button."], intro, Changed)
+		L["When on, the button looks the way this page sets it. When off, it looks like the game's extra ability button."], intro, Changed)
 	local stack = kit.Stack(switch, "check")
 	local rows = ns.StyleRows(kit, content, stack, Changed, "questItemStyle")
 
@@ -114,7 +114,7 @@ function ns.CreateQuestItemStylePanel(kit)
 		border = { "questItemFrame", L["The frame around the button: the game's or one of ours."], label = L["Frame:"], opts = { game = true } },
 	})
 	rows.Check("questItemZoom", L["Zoom the icon in to cut its own border"],
-		L["Icons have a dark border of their own: zoomed in a little, it's cut off."])
+		L["Icons have their own dark border. Zooming in a little cuts it off."])
 
 	stack:Header(content, L["When it's ready"])
 	local function Glowing(db) return rows.On(db) and db.questItemGlow ~= "none" end
@@ -143,7 +143,7 @@ function ns.CreateQuestItemStylePanel(kit)
 		L["Shows the key you've bound to it in its top corner."])
 	rows.Look(L["Look:"], L["Text"], {
 		font = { "questItemFont", nil },
-		outline = { "questItemOutline", L["A black border round its numbers."],
+		outline = { "questItemOutline", L["A black border around its numbers."],
 			names = { [0] = L["None"], L["Thin"], L["Thick"] } },
 		textSize = false, -- (sized to the button)
 		outlineColor = function(look)

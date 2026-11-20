@@ -208,8 +208,9 @@ function ns.CreateTintStylePanel(kit)
 		L["The color grading over the game world."])
 	-- (Off: the tint keeps to its plain look, the defaults: Tint.lua's Look.)
 	local switch = kit.PageSwitch(content, "tintStyle", L["Enable Page"],
-		L["On: the tint looks as this page says. Off: its plain look, the default preset with no zone, area or " ..
-			"time of day colors of your own; this page keeps its settings for when you turn it back on."],
+		L["When on, the tint looks the way this page sets it. When off, it uses the plain look: the " ..
+			"default preset, with none of your own zone, area or time of day colors. This page keeps its " ..
+			"settings for when you turn it back on."],
 		intro, function() ns.RefreshTint() end)
 	for _, key in ipairs({ "tintPreset", "timeTintStrength", "tintClock" }) do kit.RecordKey(content, key) end
 
@@ -607,7 +608,7 @@ function ns.CreateTintStylePanel(kit)
 	local strength = Section(content, 100)
 	sections[#sections + 1] = strength
 	strength.tab = "look"
-	Heading(kit, strength, L["Strength"], L["For every look (a place can have its own: Zone mood)."])
+	Heading(kit, strength, L["Strength"], L["Applies to every look. A place can have its own on Zone mood."])
 	local strengthSlider = kit.Slider(strength, "tintStrength", L["Strength"], 5, 100, 1, "%d%%", 100, function()
 		ns.RefreshTint()
 		UpdatePreview()
@@ -1229,7 +1230,7 @@ function ns.CreateTintStylePanel(kit)
 			if not tile then
 				tile = LookTile(tint.key, SMALL_W, 50, 24)
 				TipOn(tile, function()
-					return (tile.tintName or "") .. "\n" .. L["Your own tint; click it again once picked to change it."]
+					return (tile.tintName or "") .. "\n" .. L["Your own tint. Once it's picked, click it again to change it."]
 				end)
 				mineTiles[i] = tile
 				tiles[#tiles] = nil -- (painted below, not with the built-in ones)

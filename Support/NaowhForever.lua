@@ -107,7 +107,7 @@ ns.WhenAddonLoads("NaowhForever_QoL", function()
 	ns.AddConflict({ key = "style:damageMeter", addon = "Naowh Forever", label = "Damage meter look", group = "style",
 		noBoth = true,
 		about = "How the game's damage meter looks: the Interface Recolor page's theme on it, or Naowh " ..
-			"Forever's Default Damage Meter. Ours puts the theme on over its look",
+			"Forever's Default Damage Meter. Picking ours puts the theme on top of its look",
 		theirs = function()
 			local naowh = Naowh()
 			local settings = naowh and naowh.QoLSettings

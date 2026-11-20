@@ -108,7 +108,7 @@ local function Tile(parent, kit, onClick)
 		GameTooltip:AddLine(self.script and L["Click to see its script and the scenes that play it."]
 			or L["A new camera of yours, with a few steps to start from."], 0.8, 0.8, 0.8, true)
 		if self.script and MenuUtil and MenuUtil.CreateContextMenu then
-			GameTooltip:AddLine(L["Right-click: copy it, or rename, describe, change the icon of or delete one of yours."],
+			GameTooltip:AddLine(L["Right-click to copy it, or to rename, describe, change the icon of or delete one of yours."],
 				0.6, 0.6, 0.6, true)
 		end
 		GameTooltip:Show()
@@ -258,7 +258,7 @@ function ns.CameraManager(kit, canvas, content, title, intro, switch, helper)
 	copy:SetSize(110, 22)
 	copy:SetText(L["Copy to yours"])
 	copy:SetPoint("LEFT", run, "RIGHT", 6, 0)
-	kit.Tooltip(copy, L["A copy of this camera's script, yours to change, and its tab opened."])
+	kit.Tooltip(copy, L["Makes a copy of this camera's script for you to change, and opens its tab."])
 
 	local function Fit()
 		C_Timer.After(0, function() kit.FitContentHeight(content) end)

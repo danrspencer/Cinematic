@@ -478,7 +478,7 @@ function ns.CreateSkyrideCamPanel(kit)
 		{ key = ROW_KEY, label = L["Skyriding Cam"], alwaysKey = "skyrideCamAlways",
 			alwaysOn = function() return ns.GetDB().skyrideCamAlways end,
 			setAlways = function(value) ns.GetDB().skyrideCamAlways = value end,
-			alwaysTip = L["Wherever you skyride. (The other columns then have nothing to add.)"] },
+			alwaysTip = L["Everywhere you skyride, so the other columns don't matter."] },
 	}, L["Skyriding Cam"])
 
 	-- The rest in folder tabs, a group each (two rows of them), as the Game
@@ -562,7 +562,7 @@ function ns.CreateSkyrideCamPanel(kit)
 
 	Section("surge", L["Surge Forward"])
 	Tick("skyrideSurge", L["Zoom out"], L["Surge Forward pulls the camera out for a moment, then lets it drift back."])
-	Slider("skyrideSurgeYards", L["By"], 1, 15, 1, YARDS, L["How far past your cruise distance (Take off's)."],
+	Slider("skyrideSurgeYards", L["By"], 1, 15, 1, YARDS, L["How far past your cruise distance (set in Take off) the camera goes."],
 		"skyrideSurge")
 	Slider("skyrideSurgeTime", L["Over"], 1, 5, 0.5, SECS, nil, "skyrideSurge")
 	Slider("skyrideSurgeHold", L["Hold"], 0, 5, 0.5, SECS, HOLD_TIP, "skyrideSurge")
@@ -578,7 +578,7 @@ function ns.CreateSkyrideCamPanel(kit)
 	Section("whirl", L["Whirling Surge"])
 	Tick("skyrideWhirl", L["Zoom out"], L["Whirling Surge throws the camera out fast, then lets it catch up slowly."])
 	Slider("skyrideWhirlYards", L["To"], 10, 39, 1, YARDS, nil, "skyrideWhirl")
-	Slider("skyrideWhirlTime", L["Over"], 0.5, 5, 0.5, SECS, L["0.5: a snap, as quick as the game's zoom goes."],
+	Slider("skyrideWhirlTime", L["Over"], 0.5, 5, 0.5, SECS, L["At 0.5 it's a snap, as fast as the game's zoom can go."],
 		"skyrideWhirl")
 	Slider("skyrideWhirlHold", L["Hold"], 0, 5, 0.5, SECS, HOLD_TIP, "skyrideWhirl")
 	Slider("skyrideWhirlBack", L["Back over"], 1, 10, 0.5, SECS, L["How long it takes to come back to your " ..
@@ -587,13 +587,12 @@ function ns.CreateSkyrideCamPanel(kit)
 	Section("halt", L["Aerial Halt"])
 	Tick("skyrideHalt", L["Swing around and zoom in"], L["Aerial Halt swings the camera around for a close shot of you hovering."])
 	Slider("skyrideHaltDeg", L["By"], 30, 180, 10, DEGREES, nil, "skyrideHalt")
-	Slider("skyrideHaltYards", L["Zoom in to"], 0, 25, 1, YARDS, L["How close the camera comes in; 0 keeps its distance."], "skyrideHalt")
+	Slider("skyrideHaltYards", L["Zoom in to"], 0, 25, 1, YARDS, L["How close the camera comes in. Set to 0 to keep its distance."], "skyrideHalt")
 	Slider("skyrideHaltTime", L["Over"], 1, 5, 0.5, SECS, nil, "skyrideHalt")
 	Slider("skyrideHaltHold", L["Hold"], 0, 5, 0.5, SECS, HOLD_TIP, "skyrideHalt")
 
 	Section("wind", L["Second Wind"])
-	Tick("skyrideWind", L["Zoom in and back"], L["Second Wind takes the camera in a little, like a breath, " ..
-		"then back out."])
+	Tick("skyrideWind", L["Zoom in and back"], L["Second Wind brings the camera in a little, then back out."])
 	Slider("skyrideWindYards", L["By"], 1, 10, 1, YARDS, nil, "skyrideWind")
 	Slider("skyrideWindTime", L["Over"], 1, 5, 0.5, SECS, L["Each way."], "skyrideWind")
 
@@ -626,13 +625,13 @@ function ns.CreateSkyrideCamPanel(kit)
 	Slider("skyrideCamLand", L["Start after landing"], 0, 5, 0.25, L["%.2f sec"],
 		L["How long you stay landed before the camera starts coming back."])
 
-	local FASTEST_TIP = L["The fastest the camera moves; quicker moments take longer instead."]
+	local FASTEST_TIP = L["The fastest the camera can move. Moves that would go faster take longer instead."]
 	Section("blend", L["Blend"])
 	Slider("skyrideMaxTurn", L["Fastest turn"], 30, 360, 10, L["%d degrees a second"], FASTEST_TIP)
 	Slider("skyrideMaxTilt", L["Fastest tilt"], 10, 90, 5, L["%d degrees a second"], FASTEST_TIP)
 	Slider("skyrideMaxZoom", L["Fastest zoom"], 5, 40, 1, L["%d yards a second"], FASTEST_TIP)
 	Slider("skyrideBlend", L["Blend into the next move"], 0, 2, 0.25, L["%.2f sec"],
-		L["Slides one move smoothly into the next; 0 stops first."])
+		L["Blends one move into the next. At 0 the camera stops between moves."])
 
 	Section("cine", L["CineMode"])
 	kit.GreyUnless(Put(kit.Check(content, "skyrideCine", L["CineMode while skyriding"],

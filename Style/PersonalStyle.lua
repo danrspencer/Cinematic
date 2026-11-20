@@ -764,7 +764,7 @@ function ns.CreatePersonalStylePanel(kit)
 	end
 
 	local switch = kit.PageSwitch(content, "prdStyle", L["Enable Page"],
-		L["On: the bars look as this page says; off: the game's own look."], intro, Changed)
+		L["When on, the bars look the way this page sets them. When off, they use the game's own look."], intro, Changed)
 	local stack = kit.Stack(switch, "check")
 	local rows = ns.StyleRows(kit, content, stack, Changed, "prdStyle")
 
@@ -824,7 +824,7 @@ function ns.CreatePersonalStylePanel(kit)
 			local function Grads(key, what)
 				look.Choices(what, key, {
 					{ "off", L["Off"] },
-					{ "shade", L["Darker"], L["It fades to a darker one of its own color, whatever that is."] },
+					{ "shade", L["Darker"], L["It fades to a darker shade of its own color."] },
 					{ "on", L["Your color"], L["It fades to the color below."] },
 				})
 				local stem = key:gsub("Gradient$", "Grad")
@@ -854,7 +854,7 @@ function ns.CreatePersonalStylePanel(kit)
 				line.nameWidth = 90
 				line:Pick(label, unit, "pct", L["Its width as a percent of the game's."], test)
 				line:Box("", key, 20, 200, 5, "%d", 100, tip, function(db) return test(db) and db[unit] ~= "px" end, "%")
-				line:Pick("", unit, "px", L["Its width in pixels on screen: the same number on two bars, the same width."],
+				line:Pick("", unit, "px", L["Its width in screen pixels, so the same number gives two bars the same width."],
 					test, function()
 						local db = ns.GetDB()
 						if (tonumber(db[key .. "Px"]) or 0) <= 0 then
@@ -864,25 +864,24 @@ function ns.CreatePersonalStylePanel(kit)
 				line:Box("", key .. "Px", 10, 2000, 5, "%d", 1, tip, function(db) return test(db) and db[unit] == "px" end,
 					"px")
 			end
-			WidthLine(L["Health width"], "prdHealthWidth", "health", L["The health bar's width, about its middle."])
-			WidthLine(L["Power width"], "prdPowerWidth", "power", L["The power bar's width, about its middle."])
+			WidthLine(L["Health width"], "prdHealthWidth", "health", L["The health bar's width, growing out from its middle."])
+			WidthLine(L["Power width"], "prdPowerWidth", "power", L["The power bar's width, growing out from its middle."])
 			if ns.PERSONAL_MANA then
 				WidthLine(L["Mana width"], "prdManaWidth", "mana",
-					L["The mana bar's width, about its middle (a percent of the game's power bar's)."], ManaOn)
+					L["The mana bar's width as a percent of the game's power bar, growing out from its middle."], ManaOn)
 			end
 			look.Slider("prdHealthHeight", L["Health height"], 0, 100, 5, "%d%%", 100,
-				L["The health bar's height, next to the game's."])
+				L["The health bar's height compared to the game's."])
 			look.Slider("prdPowerHeight", L["Power height"], 0, 100, 5, "%d%%", 100,
-				L["The power bar's height, next to the game's."])
+				L["The power bar's height compared to the game's."])
 			look.Slider("prdPiecesScale", L["Class resource"], 0, 100, 5, "%d%%", 100,
-				L["How big your class resource is, next to the game's size."])
+				L["How big your class resource is compared to the game's size."])
 			if ns.PERSONAL_MANA then
 				look.Slider("prdManaHeight", L["Mana height"], 0, 100, 5, "%d%%", 100,
-					L["The mana bar's height, next to the power bar's."], ManaOn)
+					L["The mana bar's height compared to the power bar's."], ManaOn)
 			end
 		end,
-		border = { "prdBorder", L["The bars' border: the game's, or one of ours (Custom: its thickness and color " ..
-			"under it)."], opts = { game = true } },
+		border = { "prdBorder", L["The bars' border: the game's or one of ours. Custom sets its thickness and color below."], opts = { game = true } },
 	})
 
 	canvas:SetScript("OnShow", kit.PageShown(kit.Refresh, content))

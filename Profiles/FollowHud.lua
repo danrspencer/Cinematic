@@ -227,8 +227,8 @@ local PIECE_TEXT = {
 	stack = { "Center stack", "Your health and power (picked above) at the bottom middle, with the cast bar, " ..
 		"Cooldown Manager and swing timers, so they slide with you as one. Makes an Edit Mode layout called " ..
 		"Follow HUD from the one you're on: everything else in it stays as you had it." },
-	sizes = { "Same width", "The Personal Resource Display, cast bar and swing timers made one width. Off: your " ..
-		"own sizes stay." },
+	sizes = { "Same width", "Makes the Personal Resource Display, cast bar and swing timers the same width. Turn this off " ..
+		"to keep your own sizes." },
 	portraits = { "Portraits each side", "Your player and target frames each side of the stack (with the player " ..
 		"frame picked above, the target frame alone). They don't slide with you: the game locks them in fights." },
 	prdOn = { "Personal Resource Display on", "Turns on the game's Personal Resource Display, the stack's root." },

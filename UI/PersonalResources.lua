@@ -747,7 +747,7 @@ function ns.YourFrameWhy(setting, entry, afterFight, fighting, add)
 		end
 		if nfPower and PowerNotFull(db, row, manaBar) then
 			add("on", (row == "prdmana" and L["Your mana isn't full yet (%s)"]
-				or L["Your power isn't full yet, or your rage or the like isn't drained (%s)"]):format(pTag), pKey)
+				or L["Your power isn't full yet, or your rage (or similar) isn't empty yet (%s)"]):format(pTag), pKey)
 			shown = true
 			if pCol == 2 then calmKey = calmKey or pKey end
 		end
@@ -874,12 +874,12 @@ function ns.CreatePersonalResourcesPanel(kit)
 	-- left one's. A frame this client hasn't, no row.
 	stack:Header(content, L["Keep up"])
 	local function Fights(db) return db.stayInCombat end
-	local SHARES = L["Stays up while it's under this share."]
+	local SHARES = L["Stays up while it's below this amount."]
 	local COLUMNS = {
 		{ L["In combat"], L["While you're in a fight."] .. " " .. SHARES .. " " ..
 			L["Wait at pull holds it back at a fight's start."] },
 		{ L["In Calm Timer"], L["After a fight, a fall or coming back to life, until the Calm Timer runs out."] .. " " .. SHARES },
-		{ L["Out of combat"], L["Neither in a fight nor after one: drinking in town, say."] .. " " .. SHARES },
+		{ L["Out of combat"], L["Not in a fight or just after one, like drinking in town."] .. " " .. SHARES },
 	}
 	-- (The mana text's: redrawn as it's ticked, PersonalManaCost.lua.)
 	local function Redraw()
@@ -937,7 +937,7 @@ function ns.CreatePersonalResourcesPanel(kit)
 	local FADE_W = 68 -- (its 56 box with a little room: at 76 the grid ran 4 past the page, 2026-11-17)
 	local fadeLeft = total + LINK_W / 2
 	total = fadeLeft + FADE_W
-	local FADE_TIP = L["Fades it in as your health drops, fully up at this share."]
+	local FADE_TIP = L["Fades it in as your health drops, fully shown at this amount."]
 	local function CenterX(c) return left[c] + COL_W / 2 end
 	holder = CreateFrame("Frame", nil, content)
 	holder:SetSize(total, 1)

@@ -623,8 +623,8 @@ local function CopyReport()
 			end
 		end
 	end
-	ns.ShowReportText(L["Why is it showing? report"], L["Press Ctrl+C to copy this, then paste it to us on Discord " ..
-		"or in a bug report. It lists every tab: each row, whether it's showing or on, and why, and what happened lately."],
+	ns.ShowReportText(L["Why is it showing? report"], L["Press Ctrl+C to copy this, then paste it to us on Discord or in a bug report. It lists every " ..
+		"tab and row, whether each is showing or on and why, and what happened lately."],
 		table.concat(out, "\n"))
 end
 
@@ -1203,8 +1203,8 @@ local function MakeView(host, onPick, extra)
 	view.empty:SetJustifyH("LEFT")
 	view.note = list:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
 	view.note:SetJustifyH("LEFT")
-	view.note:SetText(L["Only frames Cinematic fades are listed: the addons it knows, and the frames you add on the " ..
-		"Addons > Frames. For any other addon's frame, use Pick a frame on screen."])
+	view.note:SetText(L["Only frames Cinematic fades are listed: the addons it knows, and the frames you add on Addons " ..
+		"> Frames. For any other addon's frame, use Pick a frame on screen."])
 	MakeDetail(view)
 
 	-- The Calm Timer bar (placed by Fill, at the list's top while it runs):

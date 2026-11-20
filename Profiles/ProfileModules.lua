@@ -169,7 +169,7 @@ ns.PROFILE_MODULES = {
 	-- Edit Mode layouts
 	Layout("layout-preset", "Game's own layout", ns.LAYOUT_PRESET, "forever",
 		"The game's own layout (Modern or Classic), which the fades and mouseover groups are made for, " ..
-		"not one the player's moved things in."),
+		"not one you've moved things around in."),
 	Layout("layout-retail", "Retail Inspired layout", "Retail Inspired", "forever",
 		"Action bars centered along the bottom, the micro menu and bags in the corner, the XP bars under them, " ..
 		"as on retail. Fights bring up the player frame, not the personal resource display, which isn't kept " ..
@@ -255,9 +255,9 @@ ns.PROFILE_MODULES = {
 
 	-- What fades, and when
 	{ key = "recovering", name = "Up while recovering", scope = { "Standard Frames/top", "Personal Resources" },
-		tip = "The player frame stays up in fights, after them while health or " ..
-		"power isn't full (rage and the like: until back to 0), and out of combat while health is under 95% or " ..
-		"power under 50%.",
+		tip = "The player frame stays up in fights, after them while health or power isn't full (for rage and " ..
+		"the like, until it's back to 0), and out of combat while health is under 95% or power under " ..
+		"50%.",
 		apply = function(set)
 			KeepUpPlayer(set, true) -- (the PRD's: the layout's)
 		end },
@@ -266,7 +266,7 @@ ns.PROFILE_MODULES = {
 		apply = function(set) set("fadeUI", false) end },
 	-- (Stored the other way round: Exit CineMode's In combat ticked = stayInCombat off.)
 	{ key = "exit-in-combat", name = "Exit CineMode in combat", scope = { "CineMode/Exit CineMode" },
-		tip = "A fight brings the whole UI back (Exit CineMode: In combat ticked).",
+		tip = "A fight brings the whole UI back (In combat ticked under Exit CineMode).",
 		apply = function(set) set("stayInCombat", false) end },
 	{ key = "solo-only", name = "Solo in the world only", scope = { "CineMode/Exit CineMode" },
 		tip = "On only while you're out in the world on your own: off in dungeons, raids, PvP and groups.",
@@ -276,7 +276,7 @@ ns.PROFILE_MODULES = {
 			end
 		end },
 	{ key = "minimap-off-in-fights", name = "No minimap in fights", scope = { "Standard Frames/Minimap" },
-		tip = "No minimap in fights, nor its header, buttons, zone name, clock and the objective boxes under it.",
+		tip = "Hides the minimap in fights, along with its header, buttons, zone name, clock and the objective boxes under it.",
 		apply = function(set)
 			set("combatShow", All({ "minimap", "minimapheader", "minimaptracking", "minimapcalendar", "minimapzone",
 				"minimapclock", "belowminimap" }, false))
@@ -316,13 +316,13 @@ ns.PROFILE_MODULES = {
 	-- Cinema's, page by page (keys pure-: what it was called before)
 	{ key = "pure-frames", name = "Cinema: frames",
 		scope = { "Standard Frames", "Personal Resources", "Advanced Frames/Supported addons", "Gamepad/top" },
-		tip = "Fights bring up your portrait, target, target of target, focus and focus's target " ..
-		"of target (these also for an enemy or friend targeted and in dungeons and raids) and the swing timer, but " ..
-		"no buffs or minimap (the minimap is up in dungeons and raids; the personal resource display: as " ..
-		"the layout has it); the cast bar shows all " ..
-		"through CineMode. The player frame stays up in fights, after them while " ..
-		"health or power isn't full, and out of combat under 95% health or 50% power; " ..
-		"raid frames without names, buffs, threat, target markers, ready checks or titles in CineMode.",
+		tip = "Fights bring up your portrait, target, target of target, focus and focus's target of target, " ..
+		"plus the swing timer. Those frames also show with an enemy or friend targeted, and in dungeons " ..
+		"and raids. No buffs or minimap in fights, though the minimap is up in dungeons and raids, and " ..
+		"the personal resource display follows the layout. The cast bar shows all through CineMode. The " ..
+		"player frame stays up in fights, after them until health and power are full, and out of combat " ..
+		"under 95% health or 50% power. Raid frames in CineMode have no names, buffs, threat, target " ..
+		"markers, ready checks or titles.",
 		apply = function(set)
 			-- (The personal resource display in fights: the layout module's.)
 			KeepUpPlayer(set, true) -- (the PRD's: the layout's)
@@ -356,7 +356,7 @@ ns.PROFILE_MODULES = {
 	-- profile's own shoulder-cam-on now.)
 	{ key = "prd-frames", name = "Cinema: frames, personal resources",
 		scope = { "Standard Frames", "Personal Resources", "Advanced Frames/Supported addons", "Gamepad/top" },
-		tip = "Cinema's frames, with what the personal resource display does left to the modules after it.",
+		tip = "Cinema's frames. The personal resource display is left to the modules after this one.",
 		apply = function(set, client)
 			-- (What the Follow HUD's pieces after it set, left to them.)
 			local theirs = {}
@@ -427,10 +427,10 @@ ns.PROFILE_MODULES = {
 			set("instanceShow", EveryRow(true, false))
 		end },
 	{ key = "pure-plates", name = "Cinema: nameplates", scope = { "Nameplates", "Plate Icons", "Nameplate Style" },
-		tip = "Enemies' nameplates (and their minions') in fights, not kept up otherwise; in PvP and " ..
-		"battlegrounds, none; in instances, friendly players' and NPCs' hidden; no group members' or friendly " ..
-		"targets'; your target's name always; an arrow over your target's plate all through CineMode " ..
-		"(the marks themselves: ultra-plates).",
+		tip = "Enemy nameplates (and their minions') show in fights and aren't kept up otherwise. None in PvP " ..
+		"and battlegrounds. In instances, friendly players' and NPCs' plates are hidden. No plates for " ..
+		"group members or friendly targets. Your target's name always shows, with an arrow over its " ..
+		"plate all through CineMode (the marks themselves are in ultra-plates).",
 		apply = function(set)
 			for _, key in ipairs({ "plateAlwaysGroupMembers", "plateAlwaysGroupMinions", "plateGroupFriends",
 				"plateGroupFriendlyMinions", "plateAlwaysYourTarget", "plateCinematicEnemies", "plateInCitiesEnemies", "plateCombatPvPEnemies", "plateCombatPvPEnemyMinions", "plateCombatPvPFriends",
@@ -454,11 +454,11 @@ ns.PROFILE_MODULES = {
 			set("plateInstanceFriendlyNPCs", "hide")
 		end },
 	{ key = "ultra-plates", name = "Ultra responsive nameplates", scope = { "Nameplate Style" },
-		tip = "In fights the plates say what matters at a glance: the further a unit, the fainter its plate " ..
-		"(past 40, 28 and within 11 yards), normal NPCs faint and narrower while an elite's within 40 yards, an enemy after " ..
-		"someone else tinted orange, mobs that aren't your kill gray, and marks on your target and the unit under the mouse, " ..
-		"your target's bar pale and faded while none of your spells reaches it. No aggro mark, and " ..
-		"plates change quicker.",
+		tip = "In fights the plates are easy to read at a glance: the farther away a unit is, the fainter its " ..
+		"plate (past 40, 28 and within 11 yards). Normal NPCs are faint and narrower while an elite is " ..
+		"within 40 yards, an enemy after someone else is tinted orange, and mobs that aren't your kill " ..
+		"are gray. Your target and the unit under the mouse get marks, and your target's bar goes pale " ..
+		"while none of your spells can reach it. No aggro mark, and plates change quicker.",
 		apply = function(set)
 			set("markOrder", "tapped,targetOutOfRange,target,mouseover,focus,allPast40,allPast28,allIn11,npc,aggroother,aggro")
 			set("markNames", { allPast40 = "Fade 40", allPast28 = "Fade 28", allIn11 = "Fade 11",
@@ -521,8 +521,8 @@ ns.PROFILE_MODULES = {
 			set("cineShow", { target = true })
 		end },
 	{ key = "combat-vision", name = "Battle cards", scope = { "Card Vision" },
-		tip = "The Cards page's fights on: a card and sounds as you go into a fight and come out of it, and a " ..
-		"boss's name as its fight starts.",
+		tip = "Turns on the Cards page's fight cards: a card and sounds as you go into a fight and come out " ..
+		"of it, and a boss's name as its fight starts.",
 		apply = function(set)
 			set("combatOnEnter", true)
 			set("combatOnLeave", true)
@@ -555,7 +555,7 @@ ns.PROFILE_MODULES = {
 		"Interface Recolor/top", "Heal Vision/top", "Damage Vision", "Vitals Vision", "Quest Vision/top",
 		"Roll Vision/top", "Teleport Vision", "Death Vision/top", "Duel Vision/top", "Emote Vision",
 		"Card Vision/top", "Fishing/top", "Hunter/top" },
-		tip = "Every page that isn't about your UI off: no cameras, effects, styles, Visions or cards (music: the Sound choice).",
+		tip = "Turns off every page that isn't about your UI: no cameras, effects, styles, Visions or cards. Music goes by the Sound choice.",
 		apply = function(set)
 			for _, key in ipairs({ "cameraModes", "shoulderCam", "skyrideCam", "visualEffects", "letterboxPage",
 				"tintPage", "graphicsPlus", "styleGeneral", "ufStyle", "rfStyle", "abStyle",
@@ -594,13 +594,13 @@ ns.PROFILE_MODULES = {
 	-- (Vitals and Damage Vision are off to start with: their modules turn them on.
 	-- Quest Vision is off in every profile.)
 	{ key = "no-visions", name = "No visions", scope = { "Heal Vision" },
-		tip = "The visions that change your UI and are on to start with, off: Heal Vision. (Not Roll Vision: " ..
-			"every profile has it, and it stays away while another roll addon is in use.)",
+		tip = "Turns off the visions that change your UI and start out on, which is Heal Vision. Roll Vision " ..
+			"stays: every profile has it, and it stays out of the way while another roll addon is in use.",
 		apply = function(set)
 			set("handleHealVision", false)
 		end },
 	{ key = "pure-tooltips", name = "Cinema: tooltips", scope = { "Tooltips" },
-		tip = "The Tooltips page on: shown all through CineMode, fights too; no Mouse still.",
+		tip = "The Tooltips page on: tooltips show all through CineMode, fights too, without Mouse still.",
 		apply = function(set)
 			set("handleTooltips", true)
 			set("tooltipHideCombatElse", false) -- (Always, as it goes over: ns.ConvertOffGrids)
@@ -648,10 +648,11 @@ ns.PROFILE_MODULES = {
 		end },
 	{ key = "pure-cameras", name = "Cinema: cameras", scope = { "Scenes", "Camera Settings/Chat Cam",
 		"General/top", "Card Vision" },
-		tip = "The cameras don't wait for things to calm down after a fight, auto-run carries on in cities and " ..
-		"instances (as RP walk always does), and the death camera runs in instances too. NPCs talking bring the chat camera, " ..
-		"those chatting nearby once you stand still 3 seconds, and it doesn't look round for speakers off screen. YOU DIED " ..
-		"shows as the death camera starts. Skyriding (retail) zooms the camera all the way out in the air.",
+		tip = "The cameras don't wait for things to calm down after a fight, auto-run carries on in cities " ..
+		"and instances (as RP walk always does), and the death camera runs in instances too. NPCs " ..
+		"talking bring the chat camera, those chatting nearby once you stand still 3 seconds, and it " ..
+		"doesn't look around for speakers off screen. YOU DIED shows as the death camera starts. " ..
+		"Skyriding (retail) zooms the camera all the way out in the air.",
 		apply = function(set)
 			-- (Chat Cam: off to start with, on here. Its look-round setting's
 			-- page is dev-only.)
@@ -726,13 +727,13 @@ ns.PROFILE_MODULES = {
 	-- (Keys as they were: the effects only show in CineMode now anyway, and
 	-- these keep them up all through it, fights too.)
 	{ key = "letterbox-in-cinemode", name = "Letterbox all through CineMode", scope = { "Letterbox/Show in" },
-		tip = "The bars all through CineMode, fights too: the row's Always.",
+		tip = "The bars show all through CineMode, fights too (the row set to Always).",
 		settings = { letterboxAlways = true } },
 	{ key = "tint-in-cinemode", name = "Tint all through CineMode", scope = { "Tint/Show in" },
-		tip = "The tint all through CineMode, fights too: the row's Always.",
+		tip = "The tint shows all through CineMode, fights too (the row set to Always).",
 		settings = { tintAlways = true } },
 	{ key = "effects-in-cinemode", name = "Vignette and weather all through CineMode", scope = { "Effects/Show in" },
-		tip = "The vignette and weather all through CineMode, fights too: their rows' Always.",
+		tip = "The vignette and weather show all through CineMode, fights too (their rows set to Always).",
 		settings = { vignetteAlways = true, weatherAlways = true } },
 	{ key = "effects-in-cameras", name = "Effects only in cameras", scope = { "Effects/Show in", "Letterbox/Show in", "Tint/Show in" },
 		tip = "The letterbox, tint, vignette and weather only while a camera mode runs; no soft edges.",
@@ -744,8 +745,8 @@ ns.PROFILE_MODULES = {
 		end },
 	-- (CineMode page's Allow outside CineMode, 2026-11-13: Balanced's and Cinema's.)
 	{ key = "effects-outside-cinemode", name = "Effects outside CineMode", scope = { "CineMode/Allow outside CineMode" },
-		tip = "The letterbox, tint, vignette and weather also show while CineMode is off (walking about, say), " ..
-			"where their rows say.",
+		tip = "The letterbox, tint, vignette and weather also show while CineMode is off (walking around, for " ..
+			"example), where their rows say.",
 		settings = { outsideCineLetterbox = true, outsideCineTint = true, outsideCineVignette = true,
 			outsideCineWeather = true } },
 	{ key = "letterbox-in-fights", name = "Letterbox stays in fights", scope = { "Letterbox/Show in" },
@@ -767,7 +768,7 @@ ns.PROFILE_MODULES = {
 			"weather at 100%).",
 		apply = function(set) set("rainViewScale", 1) end },
 	{ key = "vitals-vision", name = "Vitals Vision on", scope = { "Vitals Vision" },
-		tip = "Your health at the screen's edges and the picture drained toward gray as it drops.",
+		tip = "Your health shows at the screen's edges, and the screen turns grayer as it drops.",
 		-- (Its health bars fading in, Keep up's Fade to since 2026-11-17: Off
 		-- in every profile, user's pick.)
 		apply = function(set) set("lowHealth", true) end },

@@ -31,7 +31,7 @@ function ns.CreateRollStylePanel(kit)
 	end
 
 	local switch = kit.PageSwitch(content, "rollStyle", L["Enable Page"],
-		L["On: the window looks as this page says; off: Roll Vision's usual look."], intro, Changed)
+		L["When on, the window looks the way this page sets it. When off, it uses Roll Vision's usual look."], intro, Changed)
 	local stack = kit.Stack(switch, "check")
 	local rows = ns.StyleRows(kit, content, stack, Changed, "rollStyle")
 
@@ -54,7 +54,7 @@ function ns.CreateRollStylePanel(kit)
 			look.Choices(L["Cards on:"], "rollPanel", {
 				{ "rounded", L["The game's frame"], L["A dark panel in the rounded edge of the game's roll frames, " ..
 					"in the item's quality color."] },
-				{ "flat", L["Flat"], L["A dark panel with a thin line round it, in the item's quality color."] },
+				{ "flat", L["Flat"], L["A dark panel with a thin line around it, in the item's quality color."] },
 				{ "none", L["Nothing"], L["Just the text, over the world."] },
 			})
 		end,

@@ -447,7 +447,7 @@ function ns.CreateRaidStylePanel(kit)
 	end
 
 	local switch = kit.PageSwitch(content, "rfStyle", L["Enable Page"],
-		L["On: the raid frames look as this page says; off: the game's own look."], intro, Changed)
+		L["When on, the raid frames look the way this page sets them. When off, they use the game's own look."], intro, Changed)
 	local stack = kit.Stack(switch, "check")
 	local rows = ns.StyleRows(kit, content, stack, Changed, "rfStyle")
 
@@ -575,7 +575,7 @@ function ns.CreateRaidStylePanel(kit)
 				-- (By health: only where the game has color curves.)
 				if ns.CanColorByHealth then
 					healthChoices[#healthChoices + 1] = { "health", L["By health"],
-						L["Its color below at full health, turning to the At half and Empty colors as health drops."] }
+						L["Uses the color below at full health, shifting to the At half and Empty colors as health drops."] }
 				end
 				look.Choices(L["Health:"], "rfHealthColor", healthChoices, Editable)
 				local function HealthIs(a, b)
@@ -596,7 +596,7 @@ function ns.CreateRaidStylePanel(kit)
 				-- one of your own, and which way.)
 				look.Choices(L["Health gradient:"], "rfGradient", {
 					{ "off", L["Off"] },
-					{ "shade", L["Darker"], L["It fades to a darker one of its own color, whatever that is."] },
+					{ "shade", L["Darker"], L["It fades to a darker shade of its own color."] },
 					{ "on", L["Your color"], L["It fades to the color below."] },
 				}, Editable)
 				look.Chips(L["Fades to"], { "rfGradR", "rfGradG", "rfGradB" }, L["The color it fades to."],
@@ -617,7 +617,7 @@ function ns.CreateRaidStylePanel(kit)
 			backColor = function(look)
 				look.Choices(L["Background:"], "rfGroundColor", {
 					{ "game", L["The game's"] },
-					{ "custom", L["Custom"], L["The game's background tinted a color of your own (below)."] },
+					{ "custom", L["Custom"], L["Tints the game's background a color of your own, picked below."] },
 				}, Editable)
 				look.Chips(L["Its color"], { "rfGroundR", "rfGroundG", "rfGroundB" }, L["The background's color, for Custom."],
 					function(db) return Editable(db) and ns.StyleKeyGet(Field("rfGroundColor")) == "custom" end)
@@ -628,7 +628,7 @@ function ns.CreateRaidStylePanel(kit)
 			end,
 			font = { "rfFont", L["The font for names."], test = Editable },
 			textSize = function(look)
-				look.Slider("rfNameSize", L["Size"], 50, 150, 5, "%d%%", 100, L["The name's size, next to the game's."],
+				look.Slider("rfNameSize", L["Size"], 50, 150, 5, "%d%%", 100, L["The name's size compared to the game's."],
 					Editable)
 			end,
 			textColor = function(look)
@@ -688,7 +688,7 @@ function ns.CreateRaidStylePanel(kit)
 		-- (Default's, with no pick: where the others' are, past a pick's room: 4 + 170 + 8.)
 		button:SetPoint("LEFT", pick or name, "RIGHT", pick and 8 or 182, 0)
 		button.searchLabel = label
-		kit.Tooltip(button, id and L["Sets this group's own look: bars, name, border and background."] or L["Every group's look while its row says Same as the Default row."])
+		kit.Tooltip(button, id and L["Sets this group's own look: bars, name, border and background."] or L["The look every group uses while its row is set to Same as the Default row."])
 		-- (A row on the Default row's look: its button opens Default's, and says so.)
 		local function FollowsDefault()
 			local db = ns.GetDB()

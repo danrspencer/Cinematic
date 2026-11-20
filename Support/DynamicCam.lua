@@ -49,8 +49,9 @@ local SCENES = {
 	{ id = "302", scenes = { "Fishing" }, label = "Fishing scene",
 		about = "What plays as you fish: Cinematic's fishing camera, or DynamicCam's Fishing situation" },
 	{ id = "300", scenes = { "Quest", "QuestGossip" }, label = "Quest giver scenes",
-		about = "What plays as you talk to a quest giver: Cinematic's quest camera, or DynamicCam's " ..
-			"NPC Interaction situation. Ours turns its NPC Interaction off for every NPC (vendors and banks too)" },
+		about = "What plays as you talk to a quest giver: Cinematic's quest camera, or DynamicCam's NPC " ..
+			"Interaction situation. Picking ours turns DynamicCam's NPC Interaction off for every NPC, " ..
+			"vendors and banks too" },
 }
 
 ns.WhenAddonLoads(LABEL, function()

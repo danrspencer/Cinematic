@@ -412,22 +412,24 @@ function ns.CombatSoundRulesSection(kit, content, stack, boss)
 	stack:Header(content, L["Sounds"])
 	stack:Help(content, card
 		and L["Rules that pick which sound plays when the card shows."]
-		or time and L["Rules for the sounds, read top to bottom as the time of day changes: the first for the new time " ..
-		"that fits plays one of its sounds at random. A rule's condition uses the rules' words (Cities, " ..
-		"Mounted...); none: any time. A rule with no sounds: silent. Each sound's slider sets it next to the " ..
-		"others, the cue volume sets them all (the fights' sounds share it)."]
-		or boss and L["Sounds for boss fights, read before the fights' (Entering and Leaving combat's): as a boss is " ..
-		"pulled, killed or your group " ..
-		"wipes, the first rule that fits plays one of its sounds at random. A rule here has Boss fight in " ..
-		"its condition (taken out, it moves to the fights'). Each sound's slider sets it next to the others, the " ..
-		"cue volume sets them all."]
-		or L["Rules for the sounds, read top to bottom as a fight starts or ends: the first that fits plays one " ..
-		"of its sounds at random. A rule's condition uses the rules' words (Boss fight, Raids, Mounted...); " ..
-		"none: any fight. Each sound's slider sets it next to the others, the cue volume sets them all. They " ..
-		"play on the Ambience channel, its volume set for them and put back after."])
+		or time and L["When the time of day changes, the rules are read top to bottom, and the first one that fits " ..
+		"the new time plays one of its sounds at random. A rule's condition uses the rule words " ..
+		"(Cities, Mounted...); with no condition it fits any time. A rule with no sounds stays silent. " ..
+		"Each sound's slider sets its volume against the others, and the cue volume sets them all (the " ..
+		"fight sounds share it)."]
+		or boss and L["Sounds for boss fights, read before the fight rules (Entering and Leaving combat). When a boss " ..
+		"is pulled or killed, or your group wipes, the first rule that fits plays one of its sounds at " ..
+		"random. Rules here have Boss fight in their condition; take it out and the rule moves to the " ..
+		"fight rules. Each sound's slider sets its volume against the others, and the cue volume sets " ..
+		"them all."]
+		or L["When a fight starts or ends, the rules are read top to bottom, and the first one that fits " ..
+		"plays one of its sounds at random. A rule's condition uses the rule words (Boss fight, Raids, " ..
+		"Mounted...); with no condition it fits any fight. Each sound's slider sets its volume against " ..
+		"the others, and the cue volume sets them all. They play on the Ambience channel, whose volume " ..
+		"is set for them and put back after."])
 	local cueVolume = stack:Add(kit.Slider(content, "combatCueVolume", L["Cue volume"], 0, 100, 5, "%d%%", 100),
 		"slider")
-	kit.Tooltip(cueVolume, L["How loud the sounds are, next to your sound effects' volume."])
+	kit.Tooltip(cueVolume, L["How loud the sounds are, compared to your sound effects volume."])
 
 	local box = CreateFrame("Frame", nil, content)
 	box:SetSize(RULE_W, 40)
@@ -510,7 +512,7 @@ function ns.CombatSoundRulesSection(kit, content, stack, boss)
 		row.play:SetPoint("LEFT", row.percent, "RIGHT", 4, 0)
 		row.remove = SmallButton(row, "x")
 		row.remove:SetPoint("LEFT", row.play, "RIGHT", 4, 0)
-		kit.Tooltip(row.slider, L["This sound's volume, next to the others."])
+		kit.Tooltip(row.slider, L["This sound's volume, compared to the others."])
 		kit.Tooltip(row.play, L["Play it, at its volume."])
 		kit.Tooltip(row.remove, L["Take it off this rule."])
 		row.play:SetScript("OnClick", function() if row.sound then ns.PlayCombatSound(row.sound[1], row.sound[2]) end end)
@@ -525,10 +527,10 @@ function ns.CombatSoundRulesSection(kit, content, stack, boss)
 		or time and L["A new rule at the end, for the time of day and places you pick."]
 		or boss and L["A new rule for boss fights, first on this tab."]
 		or L["A new rule above the last one, for the fights you pick."])
-	kit.Tooltip(defaults, card and L["This card's rules as they come."]
+	kit.Tooltip(defaults, card and L["Resets this card's rules to the defaults."]
 		or time and L["Resets this tab to its default rules."]
 		or boss and L["Resets this tab to its default rules."]
-		or L["This tab's rules as they come: a sound as any other fight starts and one as it ends."])
+		or L["Resets this tab to its default rules: one sound as any other fight starts and one as it ends."])
 	addRule:SetScript("OnClick", function()
 		if time or card then
 			rules[#rules + 1] = { edge = moments and moments[1] or card and "show" or "dawn", rule = "", sounds = {} }

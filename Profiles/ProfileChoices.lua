@@ -80,7 +80,7 @@ ns.SLOT_CHOICES = {
 			line = "The game's own layout", modules = { "layout-preset" } },
 	} },
 	frames = { label = "UI Auto Fade", page = "Standard Frames", question = "When does your UI fade?",
-		about = "CineMode fades your UI so you see the world. This is when it fades, and what brings it back.",
+		about = "CineMode fades your UI so you can see the world. Pick when it fades and what brings it back.",
 		default = "standard", choices = {
 		-- (From the most fading to the least.)
 		{ part = "pure", label = "Almost always", line = "As little UI as possible, even in fights",
@@ -117,7 +117,7 @@ ns.SLOT_CHOICES = {
 	} },
 	-- (Each client's own groups to start with: Forever's Classic group, retail's split.)
 	bars = { label = "Hover Groups", page = "Mouseover groups", question = "When do your action bars show?",
-		about = "While your UI is faded, the bars that come back together when you point at one of them.",
+		about = "While your UI is faded, these are the bars that come back together when you point at one of them.",
 		default = { forever = "grouped", retail = "standard" }, choices = {
 		{ part = "always", label = "Always show", line = "Your action bars stay up all through CineMode",
 			modules = { "bars-always" } },
@@ -138,7 +138,7 @@ ns.SLOT_CHOICES = {
 	camera = { label = "Camera", page = "Cameras", question = "When does the camera move on its own?",
 		about = "Cinematic's cameras take over the view at moments like flights, quests and going AFK.",
 		default = "standard", choices = {
-		{ part = "pure", label = "All the time", line = "Every camera, standing still too, and none waits after a fight",
+		{ part = "pure", label = "All the time", line = "Every camera, even while you stand still, and none waits after a fight",
 			modules = { "pure-cameras", "still-afk", "camera-music" } },
 		{ part = "immersive", label = "Often", line = "Flights, campfires, vistas, fishing, quests, going AFK and more",
 			modules = { "walk-run-music" } },
@@ -171,7 +171,7 @@ ns.SLOT_CHOICES = {
 	-- (From the most chatter to the least. Public channels don't bring chat
 	-- up unless a choice turns them on: chatPeekChannels is off.)
 	chat = { label = "Chat", page = "Chat", question = "How much chatter?",
-		about = "Chat hides in CineMode. This is which messages bring it back up.", default = "standard", choices = {
+		about = "Chat hides in CineMode. Pick which messages bring it back up.", default = "standard", choices = {
 		{ part = "lite", label = "General and Trade too", line = "NPC speech, and the General and Trade channels",
 			modules = { "lite-channels" } },
 		{ part = "standard", label = "NPC speech", line = "NPC speech brings chat up; public channels don't",
@@ -253,11 +253,11 @@ ns.BUILTIN_PROFILES = {
 		label = "Cinema", -- (shown in your language)
 		oldNames = { "Pure Cinema", "Full" }, -- (Full: on main for a day, not released)
 		icon = "Interface\\Icons\\Ability_Stealth",
-		tip = L["The full experience, with as little UI as possible, even in fights. Nameplates tell you what " ..
-			"you need to know, the Cooldown Manager takes the place of your action bars, and your health " ..
-			"shows at the screen's edges. Every camera, every Vision and all the atmosphere: the letterbox " ..
-			"stays up through fights, and the camera comes alive on flights, by campfires, at vistas and " ..
-			"more."],
+		tip = L["Everything on, with as little UI as possible, even in fights. Nameplates tell you what you " ..
+			"need to know, the Cooldown Manager takes the place of your action bars, and your health shows " ..
+			"at the screen's edges. You get every camera, every Vision and every screen effect. The " ..
+			"letterbox stays up through fights, and the camera takes over on flights, by campfires, at " ..
+			"vistas and more."],
 		-- (On Forever, the Retail Inspired layout and its Retail group bars.)
 		picks = { layout = { forever = "retail", retail = "pure" }, frames = "pure",
 			bars = { forever = "split", retail = "pure" }, camera = "pure", vfx = "pure", chat = "pure" },
@@ -316,9 +316,9 @@ ns.BUILTIN_PROFILES = {
 		-- everything off anyway, ns.OFF_UNTIL_PICKED)
 		default = true,
 		icon = "Interface\\Icons\\INV_Misc_Note_01",
-		tip = L["Start from scratch: every part of Cinematic is off, your UI and camera stay as the game has " ..
-			"them. Turn on only the pages you want, Roll Vision, Emote Vision or the cards, say, with each " ..
-			"page's Enable switch or a right-click on its icon."],
+		tip = L["Start from scratch. Every part of Cinematic is off, and your UI and camera stay as the game " ..
+			"has them. Turn on only the pages you want, like Roll Vision, Emote Vision or the cards, with " ..
+			"each page's Enable switch or a right-click on its icon."],
 		picks = { frames = "nofade" },
 		modules = { "all-pages-off", "tint-half" },
 	},
@@ -345,7 +345,7 @@ ns.WELCOME_LEVELS = {
 	{ label = "Balanced", profile = "Balanced", line = "Your UI fades away, and comes back when you need it." },
 	-- (flash: something shown for a moment when it's picked, besides the
 	-- profile's preview: "vitals", Vitals Vision's screen edges.)
-	{ label = "Cinema", profile = "Cinema", flash = "vitals", line = "Full immersion: just you and the world." },
+	{ label = "Cinema", profile = "Cinema", flash = "vitals", line = "As little UI as possible, with every camera and effect." },
 	-- (Cinema over your shoulder, since 2026-11-15. shoulderCam: picking it
 	-- answers the Shoulder Cam's one-time question; note, after its tip in
 	-- the description, says why.)

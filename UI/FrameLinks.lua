@@ -24,7 +24,7 @@ local L = ns.L
 ns.LINK_GROUPS = {
 	{ key = "chat", label = "Chat window", page = "Chat Links", parts = {
 		{ key = "chatwindow", label = "Window",
-			tip = "The panel the chat window's lines show on. A message peeking that window brings it up." },
+			tip = "The panel behind the chat window's lines. It comes up when a message peeks that window." },
 		{ key = "chattabs", label = "Tabs",
 			tip = "The chat tabs. A message brings them up where the Chat page ticks Tabs." },
 		{ key = "chatbuttons", label = "Buttons",
@@ -674,7 +674,7 @@ local linkSections = {}
 -- page's other tabs'. Returns host.
 function ns.LinksSwitch(host, groupKey)
 	ns.GRID_KIT.PageSwitch(host, LINK_SWITCH[groupKey], L["Enable Page"],
-		L["Off: the links on this tab are ignored, and the game's own frames are used."], host,
+		L["Turn this off to ignore the links on this tab and use the game's own frames."], host,
 		function() ns.ApplyFrameLinks() end)
 	return host
 end

@@ -184,8 +184,8 @@ local function CameraRow(cam, label)
 		main = reasons[1], settingsPage = "Cameras" }
 end
 
-ns.WhyProvider("cameras", "Cameras", "The camera playing now, and every trigger on now in its order: the first " ..
-	"with a camera wins. Then each camera: playing, ready for its moment, or why it's off.", function()
+ns.WhyProvider("cameras", "Cameras", "The camera playing now, and every trigger that's on, in order: the first one with a camera " ..
+	"wins. Below that, each camera says whether it's playing, ready, or why it's off.", function()
 	local rows = {}
 	for _, each in ipairs(ns.CAMERA_OFF_CAMS) do
 		local ok, row = pcall(CameraRow, each[1], each[2])
@@ -263,7 +263,7 @@ local WHEN = {
 	["Roll Vision"] = "Shows as loot is rolled for", ["Duel Vision"] = "Shows in duels",
 	["Death Vision"] = "Shows while you're dead, with the death camera",
 	["Teleport Vision"] = "Shows as you teleport or use a Hearthstone",
-	["Emote Vision"] = "Shows its cards as emotes and their moments happen",
+	["Emote Vision"] = "Shows a card when someone emotes at you or another of its moments happens",
 	["Card Vision"] = "Each card is on the Cards tab", ["Tint"] = "Tints the world by the time of day and where you are",
 	["Letterbox"] = "Black bars at the top and bottom of the screen in CineMode",
 	["Graphics+"] = "Raises the game's graphics where it can", ["Audio"] = "Music and sounds for CineMode",
@@ -274,7 +274,7 @@ local WHEN = {
 	["Shoulder Cam"] = "An over-the-shoulder camera while you move",
 	-- (Quality of Life's and the Wheels'.)
 	["Fishing"] = "Helps while you fish",
-	["Hunter"] = "Hunter helpers: pets, ammo...", ["Keyboard Map"] = "Your key bindings on a keyboard you can drag to",
+	["Hunter"] = "Hunter helpers: pets, ammo...", ["Keyboard Map"] = "Your key bindings on a keyboard; drag spells onto it to bind them",
 	["Master wheel"] = "Opens every wheel from one key", ["Your wheels"] = "Wheels you made",
 	["Camera wheel"] = "Starts a camera from a wheel", ["Menu wheel"] = "The game's menus on a wheel",
 	["Marker wheel"] = "Raid markers on a wheel", ["Ground marker wheel"] = "Ground markers on a wheel",
@@ -411,8 +411,8 @@ local function CardRow(event, playing)
 		main = reasons[1], settingsPage = "Card Vision", right = last and ns.WhyAgo(last.at) or nil }
 end
 
-ns.WhyProvider("cards", "Cards", "The card on screen and those waiting. Then each card: whether it would show if " ..
-	"its moment came now, and if not, why not.", function()
+ns.WhyProvider("cards", "Cards", "The card on screen and the ones waiting. Below that, whether each card would show if its " ..
+	"moment came now, and why not if it wouldn't.", function()
 	local sections = { { label = "Right now", rows = { CardNow() }, keepOrder = true } }
 	local current = ns.Cards.Queue()
 	local byGroup = {}
@@ -430,8 +430,8 @@ ns.WhyProvider("cards", "Cards", "The card on screen and those waiting. Then eac
 end)
 
 -- (After Cards, so the tabs go Cameras, Cards, Visions.)
-ns.WhyProvider("visions", "Visions", "Each Vision and Atmosphere page, and its tabs under it: on now, ready for its " ..
-	"moment, or off and which switch did it.", function()
+ns.WhyProvider("visions", "Visions", "Each Vision and Atmosphere page with its tabs: whether it's on now, ready for its moment, or " ..
+	"off, and which switch turned it off.", function()
 	return { HubSection("Visions", "Visions"), HubSection("Atmosphere", "Atmosphere") }
 end)
 
@@ -580,7 +580,7 @@ local function OthersRow()
 				title = Bare((title ~= nil and title ~= "") and title or name),
 				status = "idle", label = L["NOT FADED"], settingsPage = "Advanced Frames",
 				reasons = { R("on", L["Cinematic does nothing with it"]),
-					R("off", L["To fade a frame of its: add it on Addons > Loaded, or point at it with Pick a frame on screen"],
+					R("off", L["To fade one of its frames, add it on Addons > Loaded, or point at it with Pick a frame on screen"],
 						"Advanced Frames") } }
 		end
 	end
@@ -591,8 +591,8 @@ local function OthersRow()
 		settingsPage = "Advanced Frames", parts = parts, partsLabel = L["%d addons"] }
 end
 
-ns.WhyProvider("addons", "Addons", "Every loaded addon Cinematic knows: the frames of theirs it fades, the features " ..
-	"you pick between (Conflicts), and what it does for the rest. Then the addons it leaves alone.", function()
+ns.WhyProvider("addons", "Addons", "Every loaded addon Cinematic knows, with the frames it fades, the features you pick between " ..
+	"(Conflicts) and what it does for the rest. Below that, the addons it leaves alone.", function()
 	local faded, conflicts, notes = {}, {}, {}
 	local order, first = ns.why.RowEntries()
 	ns.why.LookAtRows(order, first)

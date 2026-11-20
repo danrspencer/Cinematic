@@ -584,7 +584,7 @@ function ns.CreateTeleportVisionPanel(kit)
 	end
 	rows.Check("teleportVisionHideCast", L["Fade out your cast bar"], L["Fades out your cast bar early in the cast, so the portal shows its progress."], On)
 	rows.Check("teleportVisionFadeTooltip", L["Fade out the tooltip"], L["Fades out the tooltip while you cast."], On)
-	rows.Check("teleportVisionMotes", L["Motes spiraling in"], L["Motes of its color winding in from the rim."],
+	rows.Check("teleportVisionMotes", L["Motes spiraling in"], L["Motes in the portal's color drift in from the rim."],
 		On)
 
 	-- Test: a pretend cast, Stop while it runs (as the camera tests), at the
@@ -606,7 +606,7 @@ function ns.CreateTeleportVisionPanel(kit)
 	end)
 	ns.SetOnUpdate(button, Label)
 	button.Refresh = Label -- (before GreyUnless, which wraps it)
-	kit.Tooltip(button,L["A pretend 8-second cast, on the screen (close the settings to see it)."])
+	kit.Tooltip(button,L["Plays a pretend 8-second cast on screen. Close the settings to see it."])
 	kit.GreyUnless(button, On)
 	kit.AddControl(button)
 	Label()

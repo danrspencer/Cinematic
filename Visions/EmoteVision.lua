@@ -236,7 +236,7 @@ local MOMENTS = {
 			"congratulation) while this list is as it started. Same back: the one they did, or its answer.",
 		sample = { name = "Pip", class = "MAGE", line = "waves at you.", same = "WAVE" } },
 	{ id = "Summon", on = "emoteVisionSummon", name = "You're summoned", emotes = { "THANK", "WAVE" },
-		tip = "A warlock's summon, or a meeting stone's, that you accept: once you're there.",
+		tip = "You accept a warlock's or meeting stone's summon. Shows once you're there.",
 		sample = { name = "Velmora", class = "WARLOCK", line = "summoned you" } },
 	{ id = "Trade", on = "emoteVisionTrade", name = "A trade goes through", emotes = { "THANK", "BOW" },
 		tip = "A trade with someone finishes (both of you clicked Trade).",
@@ -246,11 +246,11 @@ local MOMENTS = {
 		tip = "Your party or raid's members, not you. Only when they're near you.",
 		sample = { name = "Brakka", class = "WARRIOR", line = "reached level %d", level = 42 } },
 	{ id = "Dungeon", on = "emoteVisionDungeon", name = "You clear a dungeon", emotes = { "THANK", "BOW", "CHEER" },
-		journal = true, maxAge = 300, soon = true, tip = "Its last boss down, in a group: the emotes go to everyone, not one person.",
+		journal = true, maxAge = 300, soon = true, tip = "When your group kills the dungeon's last boss. The emotes go to everyone, not one person.",
 		sample = { name = "The Deadmines", line = "cleared with your group", group = true,
 			icon = "Interface\\Icons\\INV_Misc_Key_03" } },
 	{ id = "Duel", on = "emoteVisionDuel", name = "A duel ends", emotes = { "BOW", "SALUTE", "CONGRATULATE" },
-		tip = "Won or lost, against whoever it was.",
+		tip = "Whether you won or lost, and whoever it was against.",
 		sample = { name = "Kargash", class = "ROGUE", line = "lost a duel to you" } },
 	{ id = "Join", on = "emoteVisionJoin", name = "Someone joins your group", emotes = { "WELCOME", "WAVE", "HELLO" },
 		near = true, tip = "Someone new in your party or raid (not a whole raid filling at once), near you.",
@@ -305,7 +305,7 @@ local MOMENTS = {
 	{ id = "Campfire", on = "emoteVisionCampfire", name = "You hover a campfire", emotes = { "SIT", "KNEEL", "LAYDOWN" },
 		campfire = true, -- (its open section: the fire's reach and names, CampfireSettings)
 		anyMode = true, -- (outside CineMode too, whatever Allow outside CineMode says: ns.EmoteVisionOnFor)
-		tip = "Hover a campfire near the middle of the screen, standing still: sit by it in one click (CineMode or not).",
+		tip = "Stand still and hover a campfire near the middle of the screen to sit by it in one click (CineMode or not).",
 		sample = { name = "Campfire", line = "rest a while by the fire", group = true,
 			icon = "Interface\\Icons\\Spell_Fire_Fire" } },
 	{ id = "CampBenefits", on = "emoteVisionCampBenefits", name = "You get Camp Benefits", emotes = { "STAND" },
@@ -708,15 +708,15 @@ local LOOK_ORDER = { "classic", "parchment", "bubble", "subtitle", "banner", "wh
 local LOOK_NAMES = { classic = "Classic", parchment = "Parchment letter", bubble = "Speech bubble",
 	subtitle = "Subtitle", banner = "Banner", wheel = "Wheel" }
 local LOOK_TIPS = {
-	classic = "A dark panel, its border Visions Style's, the emotes as buttons.",
-	parchment = "A letter on the game's own mail paper, a brown edge, a red seal round their face, the emotes on " ..
-		"brown tabs.",
+	classic = "A dark panel with the Visions Style border and the emotes as buttons.",
+	parchment = "A letter on the game's mail paper with a brown edge, their face in a red seal, and the emotes " ..
+		"on brown tabs.",
 	bubble = "The game's own chat bubble, as speech from behind you, pointing at their face.",
-	subtitle = "Outlined words on a dark band that fades out at both ends, as a film's subtitles, the emotes on " ..
-		"dark tabs. Their face isn't shown.",
-	banner = "A dark band between two gold lines, a heading for the moment over the name (A KINDNESS, SAVED...). " ..
+	subtitle = "Outlined words on a dark band that fades out at both ends, like movie subtitles, with the " ..
+		"emotes on dark tabs. Their face isn't shown.",
+	banner = "A dark band between two gold lines, with a heading like A KINDNESS or SAVED above the name. " ..
 		"Their face isn't shown.",
-	wheel = "Their face in a dark disc, the emotes round it, as Cinematic's wheels.",
+	wheel = "Their face in a dark disc with the emotes around it, like Cinematic's wheels.",
 }
 DEFAULTS.emoteVisionLook = "classic"
 -- The banner's heading over the name, by moment.
@@ -3218,8 +3218,8 @@ end
 
 local function Tabs(content, title, picked)
 	local panel = ns.PageTabs(content, {
-		{ L["Works Everywhere"], "Emote Vision", L["Turning it on, the moments a card shows for and each one's emotes."] },
-		{ L["Nameplates Required"], "Emote Vision Nameplates", L["The cards that need the other player's nameplate: CineMode keeps it for them."] },
+		{ L["Works Everywhere"], "Emote Vision", L["Turn it on and pick which moments show a card, and the emotes on each."] },
+		{ L["Nameplates Required"], "Emote Vision Nameplates", L["Cards that need the other player's nameplate. CineMode keeps it for them."] },
 		{ L["Settings"], "Emote Vision Settings", L["Which cards to skip, how long they stay, and the player menu."] },
 		{ L["Look"], "Emote Vision Style", L["Its style, words, frame and face, and where it sits."] },
 	}, picked)
@@ -3661,7 +3661,7 @@ do
 			end)
 		end)
 		local defaults = SmallButton(box, L["Back to the defaults"], 160)
-		kit.Tooltip(defaults, L["The menu's emotes as they come."])
+		kit.Tooltip(defaults, L["Puts the menu's emotes back to the defaults."])
 		defaults:SetPoint("LEFT", add, "RIGHT", 8, 0)
 		defaults:SetScript("OnClick", function()
 			ns.GetDB().emoteVisionMenuEmotes = DEFAULTS.emoteVisionMenuEmotes
@@ -3785,7 +3785,7 @@ local function MomentsGrid(kit, content, stack, plates)
 		local label = kit.Label(box, "GameFontNormalSmall", L["When"])
 		local row = ns.GridRow(grid, box, WHEN_LABEL_W, WHEN_LAYOUT, {
 			always = { isOn = function() return ns.GetDB()[alwaysKey] and true or false end, set = SetAlways,
-				tip = L["Shows wherever you are. (Never in a fight: a card from one waits for it to end.)"] },
+				tip = L["Shows wherever you are, but never in a fight. A card that comes up in a fight waits for it to end."] },
 			menus = parts.menus,
 			rule = { key = Key, label = function() return L[moment.name] end, grid = parts.grid,
 				words = parts.words, apply = parts.apply },
@@ -3909,7 +3909,7 @@ local function MomentsGrid(kit, content, stack, plates)
 	end
 
 	local defaults = SmallButton(box, L["Back to the defaults"], 160)
-	kit.Tooltip(defaults, L["Every moment's emotes as they come."])
+	kit.Tooltip(defaults, L["Puts every moment's emotes back to the defaults."])
 	defaults:SetScript("OnClick", function()
 		local db = ns.GetDB()
 		for _, moment in ipairs(MOMENTS) do
@@ -4131,8 +4131,8 @@ function ns.CreateEmoteVisionSettingsPanel(kit)
 		L["When the cards show and for how long."])
 	-- (Off: every setting here as it starts: Opt.)
 	local switch = kit.PageSwitch(content, "emoteSettings", L["Enable Page"],
-		L["On: the cards show as this page says. Off: as they start, for each setting here; this page keeps " ..
-			"its settings for when you turn it back on."], intro, Changed)
+		L["When on, the cards show as this page says. When off, they act as if every setting here were at " ..
+			"its default, and this page keeps your settings for when you turn it back on."], intro, Changed)
 	local stack = kit.Stack(switch, "check")
 	local b = ns.VisionRows(kit, content, stack, Changed)
 
@@ -4145,8 +4145,7 @@ function ns.CreateEmoteVisionSettingsPanel(kit)
 		{ "emoteVisionRepeats", L["Ignore repeats from the same person"], L["Ignores the same person doing the same thing again for a few minutes."] },
 	}, On)
 	b.Toggles(L["Buffs:"], {
-		{ "emoteVisionGroupBuffs", L["Ignore buffs from your group"], L["Buffs from people in your party or " ..
-			"raid bring up no card: only strangers' do."] },
+		{ "emoteVisionGroupBuffs", L["Ignore buffs from your group"], L["Only buffs from strangers bring up a card, not buffs from your party or raid."] },
 	}, On)
 	b.Number(L["Ignored for:"], "emoteVisionRepeatMins", 1, 60, 1, 1, L["min"], L["How long a repeat is ignored for."],
 		function(db) return db.emoteVision and db.emoteVisionRepeats end)
@@ -4303,8 +4302,8 @@ function ns.CreateEmoteVisionStylePanel(kit)
 		L["Pick its style, look and position."])
 	-- (Off: the card's style, words, frame and spot as they start: Look and Opt.)
 	local switch = kit.PageSwitch(content, "emoteStyle", L["Enable Page"],
-		L["On: the cards look and sit as this page says. Off: their starting look, size and spot; this page " ..
-			"keeps its settings for when you turn it back on."], intro, Changed)
+		L["When on, the cards look and sit as this page says. When off, they use their default look, size " ..
+			"and spot, and this page keeps your settings for when you turn it back on."], intro, Changed)
 	local stack = kit.Stack(switch, "check")
 	local rows = ns.StyleRows(kit, content, stack, Changed, "emoteVision")
 	local b = ns.VisionRows(kit, content, stack, Changed)
@@ -4318,7 +4317,7 @@ function ns.CreateEmoteVisionStylePanel(kit)
 
 	stack:Header(content, L["Words"])
 	rows.Font("emoteFont")
-	b.Number(L["Size:"], "emoteTextSize", 70, 150, 5, 100, "%", L["The words' size, next to their own."], On)
+	b.Number(L["Size:"], "emoteTextSize", 70, 150, 5, 100, "%", L["The words' size compared to their normal size."], On)
 	rows.Outline("emoteOutline", L["Outline"], 2, { [0] = L["None"], L["Thin"], L["Thick"] })
 	b.Choices(L["Shadow:"], "emoteShadow", {
 		{ "general", ns.SharedStyleSource("emoteShadow") }, { "game", L["The game's"] }, { "on", L["Shadow"] },

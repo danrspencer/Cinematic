@@ -25,7 +25,7 @@ function ns.CreateQuestTalkStylePanel(kit)
 	end
 
 	local switch = kit.PageSwitch(content, "questTalkStyled", L["Enable Page"],
-		L["On: the dialogue looks as this page says; off: the game's parchment."], intro, Changed)
+		L["When on, the dialogue looks the way this page sets it. When off, it uses the game's parchment."], intro, Changed)
 	local stack = kit.Stack(switch, "check")
 	local rows = ns.StyleRows(kit, content, stack, Changed, "questTalk")
 
@@ -42,7 +42,7 @@ function ns.CreateQuestTalkStylePanel(kit)
 				{ "parchment", L["Parchment"], L["Like the quest window's page."] },
 				{ "bubble", L["Chat bubble"], L["The game's own chat bubble."] },
 				{ "dark", L["Dark"] },
-				{ "none", L["None"], L["Just the words, over the world: an outline helps them read."] },
+				{ "none", L["None"], L["Just the words, with no bubble. An outline makes them easier to read."] },
 			})
 		end,
 		backAlpha = function(look)
@@ -57,7 +57,7 @@ function ns.CreateQuestTalkStylePanel(kit)
 
 	stack:Header(content, L["Size"])
 	rows.Slider("questTalkScale", L["Scale"], 70, 150, 5, "%d%%", 100,
-		L["The size of the bubble and the list as a whole (their words grow with them)."])
+		L["The size of the bubble and the reply list. Their text grows with them."])
 	rows.Slider("questTalkLines", L["Bubble height"], 3, 15, 1, L["%d lines"], 1,
 		L["How many lines of words the bubble holds."])
 
@@ -104,12 +104,10 @@ function ns.CreateQuestTalkStylePanel(kit)
 			look.Slider("questTalkNumberAlpha", L["Numbers opacity"], 10, 100, 5, "%d%%", 100,
 				L["How faded the page count (2 / 3) and the numbers by the replies and buttons are."])
 		end,
-		outline = { "questTalkOutline", L["A black border around the letters: for light words with no panel behind " ..
-			"them."], names = { [0] = L["None"], L["Thin"], L["Thick"] } },
+		outline = { "questTalkOutline", L["A black border around the letters, for light text with no panel behind it."], names = { [0] = L["None"], L["Thin"], L["Thick"] } },
 		outlineColor = false, -- (a page of words: too many copies)
 		shadow = { "questTalkShadow" },
-		textColor = { "questTalkTextColor", L["The bubble's words in a color of your own (the quest card keeps " ..
-			"its ink)."], keys = { "questTalkTextR", "questTalkTextG", "questTalkTextB" } },
+		textColor = { "questTalkTextColor", L["The bubble's text in a color of your own. The quest card keeps its own color."], keys = { "questTalkTextR", "questTalkTextG", "questTalkTextB" } },
 	})
 
 	-- Using it.

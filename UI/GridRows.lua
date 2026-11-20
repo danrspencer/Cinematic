@@ -537,7 +537,7 @@ local function BuildEditor()
 		target = nil -- (nothing to put back as it closes)
 		editor:Hide()
 	end)
-	Tip(resetGrid, L["Drops the rule: the row's dropdowns decide again, ticked as they were before."])
+	Tip(resetGrid, L["Drops the rule, so the row's dropdowns decide again, ticked as they were before."])
 	-- Follow a row: a menu of the row's table's others (those that follow it
 	-- greyed: no loops). Picking one closes the editor, the rule as it was.
 	local followButton = ns.PanelButton(editor)
@@ -662,7 +662,7 @@ local MENU_GROUPS = {
 	{ heading = "Combat", color = { 1, 0.45, 0.4 }, help = "Shown while you're in a fight." },
 	{ heading = "Target", color = { 1, 0.65, 0.25 }, help = "Shown while you have one of these targeted." },
 	{ heading = "Location", color = { 0.45, 0.75, 1 },
-		help = "Shown the whole time while you're in any of these (Grouped: in a party or raid)." },
+		help = "Shown the whole time while you're in any of these (Grouped means in a party or raid)." },
 }
 ns.GRID_COMBAT, ns.GRID_TARGET, ns.GRID_LOCATION = 1, 2, 3
 -- Which dropdown each list's in (the rest: Location).
@@ -833,7 +833,7 @@ function ns.GridRow(kit, parent, labelWidth, layout, spec)
 		hover:SetSize(16, 16)
 		hover:SetPoint("CENTER", live, "CENTER")
 		hover:EnableMouse(true)
-		Tooltip(hover, L["Green: it would show in CineMode now; gray: hidden; none: rule not finished."])
+		Tooltip(hover, L["Green means it would show in CineMode now, gray means hidden, and no dot means the rule isn't finished."])
 	end
 
 	local always
@@ -986,7 +986,7 @@ function ns.GridRow(kit, parent, labelWidth, layout, spec)
 			GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
 			if Leader() then
 				GameTooltip:SetText(L["Back to its own settings"], 1, 1, 1)
-				GameTooltip:AddLine(L["Stops following: its own ticks or rule, as they were, decide again."],
+				GameTooltip:AddLine(L["Stops following, so its own ticks or rule decide again, as they were."],
 					0.8, 0.8, 0.8, true)
 			elseif not text then
 				GameTooltip:SetText(L["Edit as a rule"], 1, 1, 1)
@@ -1003,7 +1003,7 @@ function ns.GridRow(kit, parent, labelWidth, layout, spec)
 					:format(why) or L["Puts the rule's words back in the dropdowns."], 0.8, 0.8, 0.8, true)
 			else
 				GameTooltip:SetText(L["Back to the ticks"], 1, 1, 1)
-				GameTooltip:AddLine(L["Drops the rule: its ticks, as they were, decide again."], 0.8, 0.8, 0.8, true)
+				GameTooltip:AddLine(L["Drops the rule, so its ticks decide again, as they were."], 0.8, 0.8, 0.8, true)
 			end
 			GameTooltip:Show()
 		end)
@@ -1185,7 +1185,7 @@ function ns.ListRowParts(Key, columns, columnTips, setAlways, opts)
 				if opts.quiet then
 					group[#group + 1] = { L["Out of combat"], function() return ExtraOn("quietShow") end,
 						function() SetExtra("quietShow", not ExtraOn("quietShow")) end, nil,
-						L["On out of fights, once the Calm Timer after one has run out."] }
+						L["On out of combat, once the Calm Timer after a fight has run out."] }
 				end
 				if opts.cam then
 					group[#group + 1] = { L["In a camera mode"], function() return ExtraOn("camShow") end,
@@ -1202,7 +1202,7 @@ function ns.ListRowParts(Key, columns, columnTips, setAlways, opts)
 		if opts.quiet then
 			group[#group + 1] = { L["Out of combat"], function() return ExtraOn("quietShow") end,
 				function() SetExtra("quietShow", not ExtraOn("quietShow")) end, nil,
-				L["On out of fights, once the Calm Timer after one has run out."] }
+				L["On out of combat, once the Calm Timer after a fight has run out."] }
 		end
 		if opts.cam then
 			group[#group + 1] = { L["In a camera mode"], function() return ExtraOn("camShow") end,
@@ -1358,7 +1358,7 @@ function ns.GridTable(content, columnTop, rows, kit)
 				GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
 				GameTooltip:SetText(rowLabel:GetText(), 1, 1, 1)
 				if item.tip then GameTooltip:AddLine(item.tip, 0.8, 0.8, 0.8, true) end
-				GameTooltip:AddLine(L["Your choice in the game's options; Off shows nothing here."], 0.8, 0.8, 0.8, true)
+				GameTooltip:AddLine(L["Uses your choice in the game's options. If that's Off, nothing shows here."], 0.8, 0.8, 0.8, true)
 				GameTooltip:Show()
 			end)
 		end

@@ -242,7 +242,7 @@ function ns.CreateTriggersPanels(kit)
 				GameTooltip:SetText(entry.name, 1, 0.82, 0)
 				GameTooltip:AddLine(entry.src, 1, 1, 1, true)
 				if not entry.pri then
-					GameTooltip:AddLine(L["Its camera takes turns by its own rules for now."], 0.7, 0.7, 0.7, true)
+					GameTooltip:AddLine(L["For now, its camera follows its own rules for when it plays."], 0.7, 0.7, 0.7, true)
 				end
 				GameTooltip:AddLine(L["Click to open its page."], 0.5, 0.8, 1, true)
 				GameTooltip:Show()
@@ -452,7 +452,7 @@ function ns.CreateTriggersPanels(kit)
 				arrow:SetDisabledTexture(tex .. "-Disabled")
 				arrow:SetHighlightTexture("Interface\\Buttons\\UI-Common-MouseHilight", "ADD")
 				arrow:SetScript("OnClick", function() Move(row.index, dir) end)
-				kit.Tooltip(arrow, dir < 0 and L["Higher: wins over the one above."] or L["Lower: the one below wins over it."])
+				kit.Tooltip(arrow, dir < 0 and L["Moves it up, so it wins over the one above."] or L["Moves it down, so the one below wins over it."])
 				return arrow
 			end
 			row.up, row.down = Arrow(-1, 496), Arrow(1, 520)
@@ -622,7 +622,7 @@ function ns.CreateTriggerSettingsPanel(kit)
 		self:SetShown(id ~= nil)
 		self:SetText(id and ns.LibTriggerOn(id) and L["Stop"] or L["Fire now"])
 	end
-	local copy = Add(Button(content, L["Copy"], 70, L["A copy of this trigger, to change apart from it."], function()
+	local copy = Add(Button(content, L["Copy"], 70, L["Makes a copy of this trigger that you can change on its own."], function()
 		local id = Id()
 		local new = id and ns.CopyLibTrigger(id)
 		if new then ns.OpenTriggerPage(new) end
@@ -649,8 +649,7 @@ function ns.CreateTriggerSettingsPanel(kit)
 	end))
 	delete:SetPoint("RIGHT", copy, "LEFT", -6, 0)
 	delete.Refresh = function(self) self:SetShown(Id() ~= nil) end
-	local reset = Add(Button(content, L["Reset"], 80, L["Back as we ship it: its Only if, wait, cooldown, " ..
-		"chance and priority."], function()
+	local reset = Add(Button(content, L["Reset"], 80, L["Puts its Only if, wait, cooldown, chance and priority back to how they came."], function()
 		local built = BuiltIn()
 		if built then ns.ResetOursTrigger(built.key) end
 		kit.Refresh()
@@ -676,7 +675,7 @@ function ns.CreateTriggerSettingsPanel(kit)
 	local sub, subTabs, ShowSub, subBase, subH = ns.FolderTabs(content, {
 		{ L["Starts"], L["Its name, what starts it and its Only if rule."] },
 		{ L["Ends"], L["What ends it: the first of its endings to happen."] },
-		{ L["Timing"], L["A wait before it starts, a least time, a cooldown and a chance."] },
+		{ L["Timing"], L["A wait before it starts, a minimum time, a cooldown and a chance."] },
 		{ L["Scenes"], L["Its priority, and the scenes it starts."] },
 	}, function(i)
 		PAGE.sub = i
@@ -838,7 +837,7 @@ function ns.CreateTriggerSettingsPanel(kit)
 	-- Only if
 	Heading(L["Only if"], Editable)
 	local condLine = Line(L["Rule (CQL)"], Editable)
-	local rule = Add(Button(condLine, "", 300, L["A rule it needs to start; empty means always, click to edit."], function()
+	local rule = Add(Button(condLine, "", 300, L["A rule that must be true for it to start. Leave it empty to always start. Click to edit."], function()
 		local id = EditId()
 		if not id then return end
 		ns.OpenRuleEditor({
@@ -996,7 +995,7 @@ function ns.CreateTriggerSettingsPanel(kit)
 	rearmText:SetText(L["Don't start again until it has stopped being true"])
 	rearm:SetScript("OnClick", function(self) Set("rearm", not self:GetChecked() and "no" or nil) end)
 	rearm.Refresh = function(self) self:SetChecked(ns.TriggerField(Id(), "rearm") ~= "no") end
-	kit.Tooltip(rearm, L["On: it waits until its condition stops before it can start again."])
+	kit.Tooltip(rearm, L["When on, it waits until its condition is no longer true before it can start again."])
 
 	-- Priority
 	building = 4
@@ -1026,7 +1025,7 @@ function ns.CreateTriggerSettingsPanel(kit)
 	order:SetPoint("LEFT", priBox, "RIGHT", 10, 0)
 	local ownRules = Text(priLine, "GameFontDisableSmall", WIDTH - LABEL_X)
 	ownRules:SetPoint("LEFT", LABEL_X, 0)
-	ownRules:SetText(L["Its camera takes turns by its own rules for now."])
+	ownRules:SetText(L["For now, its camera follows its own rules for when it plays."])
 
 	-- Used by
 	Heading(L["Used by"], function() return true end)
@@ -1104,9 +1103,9 @@ function ns.CreateTriggerSettingsPanel(kit)
 			local chance = ns.TriggerNumber(oid, "chance", 100)
 			if chance < 100 then extra[#extra + 1] = (L["%d%% of the time"]):format(chance) end
 			local pri = ns.OursPri(built.key)
-			return (L["|cffffd100Ours:|r %s%s. When it ends is still its camera's code (a later update moves it " ..
-				"here). %s"]):format(built.starts, #extra > 0 and ", " .. table.concat(extra, ", ") or "",
-				pri and (L["Priority %d."]):format(pri) or L["Its camera takes turns by its own rules for now."])
+			return (L["|cffffd100Ours:|r %s%s. For now, its camera's code decides when it ends (a later update moves " ..
+				"that here). %s"]):format(built.starts, #extra > 0 and ", " .. table.concat(extra, ", ") or "",
+				pri and (L["Priority %d."]):format(pri) or L["For now, its camera follows its own rules for when it plays."])
 		end
 		if not id then return L["This trigger isn't there any more: pick one on the Triggers tab."] end
 		local kind, what = Src(id)

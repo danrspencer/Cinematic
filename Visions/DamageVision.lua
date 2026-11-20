@@ -1430,7 +1430,7 @@ function ns.CreateDamageVisionPanel(kit)
 		{ key = ROW_KEY, label = L["Damage Vision"], alwaysKey = "damageVisionAlways",
 			alwaysOn = function() return ns.GetDB().damageVisionAlways end,
 			setAlways = function(value) ns.GetDB().damageVisionAlways = value Changed() end,
-			alwaysTip = L["Shows in every fight, wherever you are. (The other columns then have nothing to add.)"],
+			alwaysTip = L["Shows in every fight, wherever you are, so the other columns don't matter."],
 			apply = Changed },
 	}, L["Damage Vision"])
 	stack:Continue(lastRow, "label")
@@ -1461,8 +1461,8 @@ function ns.CreateDamageVisionPanel(kit)
 
 	stack:Header(content, L["Recaps"])
 	b.Toggles(L["Recap after:"], {
-		{ "damageVisionRecapBoss", L["A boss"], L["Ticked, how you did on that boss as it dies."] },
-		{ "damageVisionRecapRun", L["A dungeon"], L["Ticked, how you did on the whole run as it's done."] },
+		{ "damageVisionRecapBoss", L["A boss"], L["Shows how you did on that boss as it dies."] },
+		{ "damageVisionRecapRun", L["A dungeon"], L["Shows how you did on the whole run once it's done."] },
 	})
 
 	TypeSettings(kit, content, stack, b)
@@ -1588,7 +1588,7 @@ local function TestButtons(stack, content, b)
 		L["Plays a made-up 25-second fight; close the settings to see it."], ns.DamageVisionTesting, ns.TestDamageVision, ns.StopDamageVisionTest)
 	testButton:SetPoint("LEFT")
 	local recapButton = RunButton(110, L["Test recap"],
-		L["The recap card, with the meter's whole run if you've one, else made up (Stop hides it)."],
+		L["Shows the recap card with the meter's whole run if you have one, or a made-up one if not (Stop hides it)."],
 		ns.DamageRecapShowing, ns.TestDamageRecap, ns.StopDamageRecap)
 	recapButton:SetPoint("LEFT", testButton, "RIGHT", 8, 0)
 	local reportButton = b.Button(tests, L["Full report"], 110,
@@ -1612,10 +1612,10 @@ TypeSettings = function(kit, content, stack, b)
 
 	stack:Header(content, L["Over it"])
 	b.Toggles(L["Show:"], {
-		{ "damageVisionPlace", L["Your place"], L["Ticked, your place over it (#2)."] },
+		{ "damageVisionPlace", L["Your place"], L["Shows your place over it (#2)."] },
 		{ "damageVisionPlaceOf", L["Out of how many"], L["Ticked, \"#2 of 5\". Unticked, just \"#2\"."],
 			function(d) return d.damageVisionPlace end },
-		{ "damageVisionCrown", L["Crown"], L["Ticked, a crown pops in as you take #1."] },
+		{ "damageVisionCrown", L["Crown"], L["A crown pops in as you take #1."] },
 	})
 
 	-- Each type's own settings, from the same place.
@@ -1630,9 +1630,8 @@ TypeSettings = function(kit, content, stack, b)
 	end
 	Section("gap", L["Gap bar"], function()
 		return b.Toggles(L["On the bar:"], {
-			{ "damageVisionRivalName", L["Their name"], L["Ticked, the name of the one you race, in their " ..
-				"class's color."] },
-			{ "damageVisionTotal", L["Your total"], L["Ticked, your damage (or healing) so far."] },
+			{ "damageVisionRivalName", L["Their name"], L["Shows the name of the one you race, in their class's color."] },
+			{ "damageVisionTotal", L["Your total"], L["Shows your damage (or healing) so far."] },
 		})
 	end)
 	Section("race", L["Race track"], function()
@@ -1646,7 +1645,7 @@ TypeSettings = function(kit, content, stack, b)
 		return b.Number(L["Rows:"], "damageVisionLadderRows", 2, LADDER_ROWS, 1, 1, nil,
 			L["The most rows to show."]),
 			b.Toggles(L["On the rows:"], {
-				{ "damageVisionLadderNames", L["Names"], L["Ticked, each player's name on their row."] },
+				{ "damageVisionLadderNames", L["Names"], L["Shows each player's name on their row."] },
 			})
 	end)
 	local holder = CreateFrame("Frame", nil, content)
@@ -1681,7 +1680,7 @@ function ns.CreateDamageVisionLookPanel(kit)
 	stack:Header(content, L["Bar"])
 	rows.Texture(L["Texture:"], "damageVisionTexture", L["The bars' fill."], nil, { 0.94, 0.62, 0.15 }, L["Cinematic's"])
 	local _, colorsLast = b.Choices(L["Colors:"], "damageVisionColors", {
-		{ "status", L["Behind and ahead"], L["Amber while you're behind, teal once you lead (or your own two)."] },
+		{ "status", L["Behind and ahead"], L["Amber while you're behind, teal once you lead, or two colors of your own."] },
 		{ "class", L["Your class"], L["Your class's color, whether you lead or chase."] },
 		{ "custom", L["Your own"], L["The two colors after it."] },
 	}, On)
@@ -1699,8 +1698,8 @@ function ns.CreateDamageVisionLookPanel(kit)
 		L["How tall the bar is (the race track's line is half that, the ladder's rows a little more)."], On)
 	b.Number(L["Width:"], "damageVisionWidth", 120, 500, 10, 1, "px", L["How wide it is."], On)
 	b.Toggles(L["Extras:"], {
-		{ "damageVisionSmooth", L["Smooth"], L["Ticked, the bars glide to each new value instead of jumping."] },
-		{ "damageVisionSpark", L["Spark"], L["Ticked, a bright spark at the edge of the filled part."] },
+		{ "damageVisionSmooth", L["Smooth"], L["The bars glide to each new value instead of jumping."] },
+		{ "damageVisionSpark", L["Spark"], L["Adds a bright spark at the edge of the filled part."] },
 	}, On)
 
 	stack:Header(content, L["See-through"])
@@ -1708,11 +1707,11 @@ function ns.CreateDamageVisionLookPanel(kit)
 	b.Number(L["Behind the bar:"], "damageVisionTrack", 0, 100, 5, 100, "%",
 		L["How dark the empty part of the bar is."], On)
 	b.Number(L["Panel:"], "damageVisionPanel", 0, 100, 5, 100, "%",
-		L["How dark the panel behind it is; 0 for none."], On)
+		L["How dark the panel behind it is. Set to 0 for no panel."], On)
 
 	stack:Header(content, L["Words"])
 	rows.Font("damageVisionFont")
-	b.Number(L["Size:"], "damageVisionTextSize", 70, 160, 5, 100, "%", L["The words' size, next to their own."], On)
+	b.Number(L["Size:"], "damageVisionTextSize", 70, 160, 5, 100, "%", L["The words' size compared to their normal size."], On)
 	rows.Outline("damageVisionOutline", L["Outline"], 2, { [0] = L["None"], L["Thin"], L["Thick"] })
 	b.Choices(L["Shadow:"], "damageVisionShadow", {
 		{ "general", L["General"] }, { "game", L["The game's"] }, { "on", L["Shadow"] }, { "none", L["None"] },

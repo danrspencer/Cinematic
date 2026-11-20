@@ -109,7 +109,7 @@ end)
 
 function ns.ToggleUI()
 	if InCombatLockdown() then
-		ns.Print(L["can't hide or show the UI in a fight: the game's own key still can"])
+		ns.Print(L["can't hide or show the UI in a fight, but the game's own key still can"])
 		return
 	end
 	local show = not UIParent:IsShown()

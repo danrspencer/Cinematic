@@ -919,7 +919,7 @@ function ns.CreateCursorHidePage(kit)
 	title:SetPoint("TOPLEFT", mouseTabs, "BOTTOMLEFT", 8, -14)
 	local intro = kit.PageIntro(content, title, L["In CineMode, the cursor shrinks or hides until you move the mouse."])
 	local switch = kit.PageSwitch(content, "cursorHide", L["Enable Page"],
-		L["On: the cursor gets out of the way where its Show in row says."], intro, Apply)
+		L["Turn this on to keep the cursor out of the way where its Show in row says."], intro, Apply)
 	local stack = kit.Stack(switch, "check")
 
 	-- Replace cursor icon: its tick, and beside it a button showing the
@@ -972,7 +972,7 @@ function ns.CreateCursorHidePage(kit)
 		{ key = ROW_KEY, label = L["Cursor Hide"], alwaysKey = "cursorHideAlways",
 			alwaysOn = function() return ns.GetDB().cursorHideAlways end,
 			setAlways = function(value) ns.GetDB().cursorHideAlways = value end,
-			alwaysTip = L["All through CineMode. (The other columns then have nothing to add.)"],
+			alwaysTip = L["The whole time you're in CineMode, so the other columns don't add anything."],
 			apply = function() rowReadAt = -1 end },
 	}, L["Cursor Hide"])
 	stack:Continue(lastRow, "label")

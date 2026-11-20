@@ -21,7 +21,7 @@ local CARD = { now = "combatIn", style = "third" }
 local function CardTabs(content, title, picked)
 	local panel = ns.PageTabs(content, {
 		{ L["Events"], "Card Vision", L["Each event's card on or off, and where it shows."] },
-		{ L["Card Types"], "Card Styles", L["The card types the cards start from: change one for every card using it."] },
+		{ L["Card Types"], "Card Styles", L["The card types cards start from. A change to one applies to every card using it."] },
 		{ L["Settings"], "Card General", L["Settings for every card."] },
 	}, picked)
 	title:ClearAllPoints()
@@ -34,14 +34,14 @@ end
 -- (picked 1 to 3). Gives a frame to put the page under (kit.PageIntro's
 -- under).
 local PAGES = {
-	{ "Settings", "Card Settings", "What's this card's alone: when it shows, its lines, its words." },
+	{ "Settings", "Card Settings", "Settings for this card only: when it shows, its lines and its words." },
 	{ "Style", "Card Style", "How this card looks, with a preview." },
 	{ "Sounds", "Card Sounds", "What this card plays as it shows." },
 }
 local function CardTop(kit, content, title, picked)
 	local panel = ns.PageTabs(content, {
 		{ L["Events"], "Card Vision", L["Back to every card's row."], true },
-		{ L["Card Types"], "Card Styles", L["The card types the cards start from: change one for every card using it."] },
+		{ L["Card Types"], "Card Styles", L["The card types cards start from. A change to one applies to every card using it."] },
 	}, 1)
 	local icon = content:CreateTexture(nil, "ARTWORK")
 	icon:SetSize(24, 24)
@@ -609,11 +609,11 @@ local function LookGrid(kit, content, stack, fieldOf, changed, own, icon)
 	local tileW = (CELL_W - TILE_GAP * 3) / 4
 	-- { value, name, tip, the picture's bar: left and width of the screen, up its height, its height }
 	local tiles = {
-		{ "screen", L["Screen"], L["In the middle of the screen (a subtitle: low on it)."], 0.3, 0.4, 0.42, 0.16 },
+		{ "screen", L["Screen"], L["In the middle of the screen, or low on it for a subtitle."], 0.3, 0.4, 0.42, 0.16 },
 		{ "top", L["Top bar"], L["Top letterbox bar"], 0, 1, 0.76, 0.24 },
 		{ "bottom", L["Bottom bar"], L["Bottom letterbox bar"], 0, 1, 0, 0.24 },
-		{ "third", L["Lower third"], L["Low on the left of the screen, as a film names someone, its line fading " ..
-			"out to the right."], 0.08, 0.42, 0.2, 0.16 },
+		{ "third", L["Lower third"], L["Low on the left of the screen, like a name caption in a movie, its line fading out to the " ..
+			"right."], 0.08, 0.42, 0.2, 0.16 },
 	}
 	local function PlaceOn(db) return On(db) and not Banner() end
 	local SCREEN_H = 28
@@ -634,9 +634,9 @@ local function LookGrid(kit, content, stack, fieldOf, changed, own, icon)
 	at.y = at.y + TILE_H + 6
 	Dot({ "Position" })
 	Number("cardOffsetX", L["Move across"], -50, 50, 0.5, "%.1f%%", 100,
-		L["Moves the card right, or left below 0."])
+		L["Moves the card right. Below 0 moves it left."])
 	Number("cardOffsetY", L["Move up"], -50, 50, 0.5, "%.1f%%", 100,
-		L["Moves the card up, or down below 0."],
+		L["Moves the card up. Below 0 moves it down."],
 		nil, true)
 	Panel(at.x, top, at.y - 4)
 
@@ -646,9 +646,9 @@ local function LookGrid(kit, content, stack, fieldOf, changed, own, icon)
 	Head(L["Timing and extras"])
 	Dot({ "Stays", "Edge pulse", "Pulse color" })
 	Number("cardHold", L["Stays"], 0.5, 12, 0.5, "%.1f s", 1,
-		L["How long the card stays between fading in and out (Typewriter: once typed)."])
+		L["How long the card stays between fading in and out. With Typewriter, this starts once it's done typing."])
 	local pulse = Number("cardPulse", L["Edge pulse"], 0, 100, 1, "%d%%", 100,
-		L["How strongly the screen edges flash as the card shows; 0 for none."], nil, true)
+		L["How strongly the screen edges flash as the card shows. Set to 0 for no flash."], nil, true)
 	-- (At the column's end, where the Text column's swatches are at theirs.)
 	local pulseColor = rows.Swatch(pulse, nil, { "cardPulseR", "cardPulseG", "cardPulseB" },
 		L["Pick the pulse's color."], function(db) return On(db) and (tonumber(Get("cardPulse")) or 0) > 0 end)
@@ -696,7 +696,7 @@ local function LookGrid(kit, content, stack, fieldOf, changed, own, icon)
 	Dot({ "Style" })
 	Buttons(Name(L["Style"]), "cardStyle", {
 		{ "title", L["Title"], L["Big words in the middle of the screen, the rest under them."] },
-		{ "subtitle", L["Subtitle"], L["A small line low on the screen, where a film's subtitles go."] },
+		{ "subtitle", L["Subtitle"], L["A small line low on the screen, where a movie's subtitles go."] },
 		{ "chapter", L["Chapter"], L["The words over a line that draws out, as a new scene starts."] },
 		{ "banner", L["Banner"], L["Big words across the middle of the screen on a dark band."] },
 	})
@@ -705,7 +705,7 @@ local function LookGrid(kit, content, stack, fieldOf, changed, own, icon)
 	Buttons(Name(L["Animation"]), "cardAnim", {
 		{ "fade", L["Fade"], L["The card fades in and out."] },
 		{ "reveal", L["Reveal"], L["The words open out from their middle."] },
-		{ "track", L["Tracking"], L["The letters start spread apart and close up, like a film title."] },
+		{ "track", L["Tracking"], L["The letters start spread apart and close up, like a movie title."] },
 	})
 	Buttons(Name(""), "cardAnim", {
 		{ "type", L["Type"], L["The words appear a letter at a time, as if typed."] },
@@ -728,7 +728,7 @@ local function LookGrid(kit, content, stack, fieldOf, changed, own, icon)
 	at.x, at.y = CELL_RIGHT + CELL_W - 28 - COLOR_NAME, at.y - CELL_ROW
 	Dot({ "Color" })
 	rows.Color(L["Color"], { "cardR", "cardG", "cardB" },
-		L["The words' color; the lines with them in a lighter shade."])
+		L["The words' color. The small lines with them use a lighter shade."])
 	at.last:SetSize(COLOR_NAME, 24)
 	at.last:SetJustifyH("RIGHT")
 	at.last:SetJustifyV("MIDDLE")
@@ -752,8 +752,7 @@ local function LookGrid(kit, content, stack, fieldOf, changed, own, icon)
 		return {
 			{ value = "general", text = ns.SharedStyleSource("cardShadow") },
 			{ value = "game", text = L["The game's"] },
-			{ value = "on", text = L["Shadow"], tip = L["A dark copy of the letters just behind them, down and to " ..
-				"the right."] },
+			{ value = "on", text = L["Shadow"], tip = L["A dark shadow behind the letters, down and to the right."] },
 			{ value = "none", text = L["None"] },
 		}
 	end))
@@ -885,24 +884,25 @@ end
 -- Events: each event's tick and Show in row.
 local TIPS = {
 	combatIn = "As a fight starts: a word (Combat), a pulse around the screen's edges and a sound.",
-	combatOut = "As a fight ends: a word (Respite) and a sound. Not after a fight shorter than its setting on " ..
-		"the Settings tab.",
-	boss = "A boss's name as its fight starts (or before it, as you first target it or come near it), the " ..
-		"dungeon under it and \"Boss 2 of 3\" over it. Once a run for each boss, in place of Entering combat's.",
-	zone = "As you come into a new zone, its name as a card in place of the game's own. The time of day at " ..
-		"login goes on it.",
-	subzone = "As you come into a subzone (a town, a camp, a landing) too, the zone's name small under it. Only " ..
-		"with Zone ticked.",
-	login = "On a real login (not a reload), what you did last time you played: where you spent the most time, " ..
-		"quests done, a level reached and bosses killed. Only what happened, and nothing if nothing did; never " ..
-		"in a fight, nor after more than two weeks away.",
+	combatOut = "As a fight ends: a word (Respite) and a sound. Skipped after fights shorter than the time set " ..
+		"on the Settings tab.",
+	boss = "A boss's name as its fight starts, or earlier as you first target it or get near it, with the " ..
+		"dungeon under it and \"Boss 2 of 3\" over it. Once per boss each run, in place of the Entering " ..
+		"combat card.",
+	zone = "As you come into a new zone, its name as a card in place of the game's own. At login it also " ..
+		"shows the time of day.",
+	subzone = "As you come into a subzone too (a town, a camp, a landing), with the zone's name small under " ..
+		"it. Needs Zone ticked.",
+	login = "On a real login (not a reload), what you did last time you played: where you spent the most " ..
+		"time, quests done, a level reached and bosses killed. It lists only what happened and shows " ..
+		"nothing if nothing did. Never in a fight, or after more than two weeks away.",
 	time = "When the time of day changes during play (not in combat), its name with a fitting sound: a rooster " ..
 		"at dawn, a horse in the morning, your faction's bell at midday, frogs in the evening, an owl at dusk and " ..
 		"a wolf at night.",
 	attack = "When the LocalDefense channel says a place is under attack (\"Dun Algaz is under attack!\"), with " ..
 		"your faction's city bell. The same place at most once every 90 seconds.",
-	duel = "Your own duels: as you challenge someone or they challenge you, as it starts, and who won. Which of " ..
-		"those and their words: the Settings tab.",
+	duel = "Your own duels: as you challenge someone or they challenge you, as it starts, and who won. " ..
+		"Pick which of those show, and their words, on the Settings tab.",
 	cleared = "As a dungeon's or raid's last boss goes down: its name, the time since you came in and how many " ..
 		"times you died.",
 	discover = "A place new to you: a zone the first time you're there, a subzone as the game says you " ..
@@ -911,7 +911,8 @@ local TIPS = {
 		"the screen, in place of Discovered's. Subzones, dungeons and raids stay on Discovered. Only with " ..
 		"Discovered ticked.",
 	departure = "As a flight takes off: where it's taking you, and about how long it takes on a route you've " ..
-		"flown before. With a line along the top or bottom of the screen filling up on the way, if you like.",
+		"flown before. It can also show a line along the top or bottom of the screen that fills up on " ..
+		"the way.",
 	arrival = "As a flight lands: where it took you, and how long the flight took.",
 	rested = "As you come into an inn or a city (not at login, not in a fight): the place's name. The same " ..
 		"place at most once every 10 minutes.",
@@ -922,28 +923,28 @@ local TIPS = {
 	explore = "How much of a zone you've explored (\"The Barrens: 7 of 25 explored\"), as you discover one of its " ..
 		"areas and as you come into it (once a session, until it's all done). At most once every 10 minutes.",
 	almost = "An achievement with one step left after you do one: which step it is (\"1 left: Camp Taurajo\"). At most once every 10 minutes.",
-	step = "A step of an achievement done (a dungeon for Classic Dungeoneer, a quest for a zone's quests): the " ..
-		"achievement, the step and how many are done. Explore achievements' areas: Explore progress. At most " ..
-		"once every 10 minutes.",
-	reputation = "As your standing with a faction changes (\"Honored\", with whom under it), a Renown level " ..
-		"or a friendship's rank: small in the top bar, but Exalted, Hated, the last Renown level and a " ..
-		"friendship's top rank big, as Level up looks.",
-	collect = "A new mount in your collection, big as Level up looks; a new pet, small in the top bar.",
+	step = "A step of an achievement done (a dungeon for Classic Dungeoneer, a quest for a zone's quests): " ..
+		"the achievement, the step and how many are done. Explore achievements' areas go on Explore " ..
+		"progress. At most once every 10 minutes.",
+	reputation = "As your standing with a faction changes (\"Honored\", with the faction under it), a Renown level " ..
+		"or a friendship's rank. Small in the top bar, but big like Level up for Exalted, Hated, the " ..
+		"last Renown level and a friendship's top rank.",
+	collect = "A new mount in your collection shows big, like Level up; a new pet shows small in the top bar.",
 	profession = "A profession learned, or its cap raised (Journeyman, Expert...).",
 	quest = "As you turn in a story quest (campaign, important or legendary) or a dungeon, raid or elite one: " ..
 		"its title.",
 	rare = "A rare's name as you first target it, point at it or (out of fights) its nameplate shows. Once " ..
-		"each a session.",
+		"per rare each session.",
 	battleground = "A battleground's or arena's name as the gates open, then Victory or Defeat.",
 	streak = "Other players you kill without dying, at 2, 3, 5 and every 5 after.",
 	death = "Shortly after the death camera starts: YOU DIED across the middle of the screen, \"wasted\" or " ..
 		"words of your own. Only with the death camera on (the Die row on the Scenes page).",
 	bossDown = "As a dungeon or raid boss goes down, or a world boss you fought: VICTORY ACHIEVED in the top " ..
-		"bar in gold, its name under it. Its words: the Settings tab.",
-	felled = "As a rare you have targeted dies (yours, not someone else's): ENEMY FELLED across the middle of " ..
-		"the screen in gold, its name under it. Its words: the Settings tab.",
-	revived = "As you come back to life, resurrected or back in your body: VITALITY RESTORED across the middle " ..
-		"of the screen in gold, YOU DIED's other side.",
+		"bar in gold, its name under it. Change its words on the Settings tab.",
+	felled = "As a rare you have targeted dies (yours, not someone else's): ENEMY FELLED across the middle " ..
+		"of the screen in gold, its name under it. Change its words on the Settings tab.",
+	revived = "As you come back to life, resurrected or back in your body: VITALITY RESTORED across the " ..
+		"middle of the screen in gold, the flip side of YOU DIED.",
 }
 local FIGHT_OPTS = { anyFight = true, omit = { combatShow = true, enemyShow = true, friendlyShow = true } }
 local STORY_OPTS = { anyFight = true, quiet = true, omit = { enemyShow = true, friendlyShow = true } }
@@ -1101,7 +1102,7 @@ function ns.CreateCardsPanel(kit)
 						At(ns.GridRow(grid, drawer, 0, layout, {
 							band = 1,
 							always = { isOn = function() return ns.GetDB()[alwaysKey] and true or false end, set = SetAlways,
-								tip = L["Shows wherever you are. (The other columns then have nothing to add.)"] },
+								tip = L["Shows everywhere, so the other columns don't change anything."] },
 							menus = parts.menus,
 							rule = { key = Key, label = function() return L[event.name] end, grid = parts.grid,
 								words = parts.words, apply = parts.apply },
@@ -1217,8 +1218,8 @@ function ns.CreateCardsPanel(kit)
 			empty = L["No events use this card type."], collapsible = true, onOpen = Show,
 			count = function(n) return n == 1 and L["1 card"] or L["%d cards"]:format(n) end })
 		stack:Add(rowList, "label")
-		stack:Note(content, L["+2 own: the card has two settings of its own over its card type (the Style tab marks " ..
-			"them with gold dots). The arrow on a row moves it to another card type."], NOTE_W)
+		stack:Note(content, L["+2 own means the card has two settings of its own on top of its card type (gold dots mark them " ..
+			"on the Style tab). The arrow on a row moves it to another card type."], NOTE_W)
 
 		canvas:SetScript("OnShow", kit.PageShown(kit.Refresh, content))
 
@@ -1425,7 +1426,7 @@ function ns.CreateCardStylePanel(kit)
 			return count == 0 and L["None of its own"] or L["%d of its own"]:format(count)
 		end, function()
 			for _, group in ipairs(GROUPS) do Follow(CARD.now, group) end
-		end, L["Puts all of this card's own settings back, to come from its card type again."], Changed, rows.On)
+		end, L["Resets this card's own settings so they come from its card type again."], Changed, rows.On)
 	end
 
 	-- The icon's own picture: a button after the Icon tick opening every icon
@@ -1600,7 +1601,7 @@ function ns.CreateCardStylesPanel(kit)
 		return count == 0 and L["As it comes: nothing changed."] or L["%d changed"]:format(count)
 	end, function()
 		for _, group in ipairs(GROUPS) do PutBack(group) end
-	end, L["Puts all your changes to this card type back, as it comes."], Changed, rows.On)
+	end, L["Puts all your changes to this card type back to the defaults."], Changed, rows.On)
 
 	LookGrid(kit, content, stack, FieldOf, Changed, {
 		Is = function(group)
@@ -1642,7 +1643,7 @@ function ns.CreateCardSettingsPanel(kit)
 	-- Zone's and Subzone's gap: one setting, on both their tabs.
 	local function GapRow()
 		local gap = stack:Add(kit.Slider(content, "storyZoneGap", L["Not again within"], 0, 30, 1, "%d s"), "slider")
-		kit.Tooltip(gap, L["No new Zone or Subzone card for this long after one; 0 for every time."])
+		kit.Tooltip(gap, L["No new Zone or Subzone card for this long after one. Set to 0 to show one every time."])
 	end
 	-- In a fight (or just out of one): shown now, held till after, or not at
 	-- all. (Not for the fight's own cards.)
@@ -1675,7 +1676,7 @@ function ns.CreateCardSettingsPanel(kit)
 		Header(L["When"])
 		local minFight = stack:Add(kit.Slider(content, "combatMinFight", L["Not after fights under"], 0, 10, 1,
 			"%d s"), "slider")
-		kit.Tooltip(minFight, L["No card after fights shorter than this; 0 for every fight."])
+		kit.Tooltip(minFight, L["No card after fights shorter than this. Set to 0 for every fight."])
 	end)
 	parts.Part("boss", function()
 		Header(L["When"])
@@ -1700,8 +1701,8 @@ function ns.CreateCardSettingsPanel(kit)
 		FightRow("zone")
 	end)
 	parts.Part("subzone", function()
-		stack:Note(content, L["Only with Zone ticked: it takes the game's zone text away. Its look follows Zone's " ..
-			"until it's given its own here; its lines are Zone's."], NOTE_W)
+		stack:Note(content, L["Needs Zone ticked, which takes away the game's zone text. It looks like Zone's card until you " ..
+			"give it its own look here, and uses Zone's lines."], NOTE_W)
 		Header(L["When"])
 		GapRow()
 		FightRow("subzone")
@@ -1723,7 +1724,7 @@ function ns.CreateCardSettingsPanel(kit)
 			name:SetSize(150, 30)
 			name:SetJustifyV("MIDDLE")
 			heading:SetPoint("LEFT", name, "RIGHT", 4, 0)
-			kit.Tooltip(heading, L["The words before it all (on a card, over the zone name)."])
+			kit.Tooltip(heading, L["The opening words (on a card, over the zone name)."])
 		end
 		for _, pair in ipairs({
 			{ "storyRecapZone", L["Zone"], L["The zone you spent the most time in (on a card, its big name)."] },
@@ -1760,7 +1761,7 @@ function ns.CreateCardSettingsPanel(kit)
 	local function SoulsRow(id, tip)
 		Header(L["Banner"])
 		PickRow("cardSouls_" .. id, L["Shows as:"], {
-			{ "usual", L["Its card"], L["As it always has, in its own look (the Style tab)."] },
+			{ "usual", L["Its card"], L["Its usual card, in its own look (the Style tab)."] },
 			{ "souls", L["Souls banner"], L["Big words across the middle of the screen, like YOU DIED."] },
 		}, tip)
 	end
@@ -1781,12 +1782,13 @@ function ns.CreateCardSettingsPanel(kit)
 	end
 	-- (The wins that can show as a souls banner, and their Banner's tooltip.)
 	local SOULS_TIPS = {
-		cleared = "How the dungeon's end shows: its card, or a souls banner: VICTORY ACHIEVED across the " ..
-			"middle of the screen, its name, the time and deaths under it (in place of the last boss's own card).",
-		battleground = "How the result shows: its card in the top bar, or a souls banner: VICTORY ACHIEVED or " ..
-			"DEFEATED across the middle of the screen (where the game's scoreboard may cover it).",
-		streak = "How it shows: its card, or a souls banner: PREY SLAUGHTERED across the middle of the screen, " ..
-			"the count and who under it.",
+		cleared = "Shows the dungeon's end as its card or as a souls banner: VICTORY ACHIEVED across the middle " ..
+			"of the screen, with its name, the time and deaths under it (in place of the last boss's own " ..
+			"card).",
+		battleground = "Shows the result as its card in the top bar or as a souls banner: VICTORY ACHIEVED or DEFEATED " ..
+			"across the middle of the screen (the game's scoreboard may cover it).",
+		streak = "Shows it as its card or as a souls banner: PREY SLAUGHTERED across the middle of the screen, " ..
+			"with the count and who you killed under it.",
 	}
 	parts.Part("duel", function()
 		Header(L["When"])
@@ -1818,7 +1820,7 @@ function ns.CreateCardSettingsPanel(kit)
 		Header(L["Words"])
 		local banner = kit.Dropdown(content, "deathBannerStyle", List({
 			{ "youdied", L["YOU DIED"] },
-			{ "wasted", L["wasted"], L["A picture: red with a dark outline, on a flat black band, its own colors."] },
+			{ "wasted", L["wasted"], L["A picture in its own colors: red with a dark outline on a flat black band."] },
 			{ "custom", L["Custom"], L["Your own words."] },
 		}), 200)
 		if banner then
@@ -1851,13 +1853,13 @@ function ns.CreateCardSettingsPanel(kit)
 			name:SetSize(150, 30)
 			name:SetJustifyV("MIDDLE")
 			where:SetPoint("LEFT", name, "RIGHT", 4, 0)
-			kit.Tooltip(where, L["The letterbox bar the line and its time go in (no letterbox up: that edge of " ..
-				"the screen)."])
+			kit.Tooltip(where, L["The letterbox bar the line and its time go in, or that edge of the screen when no letterbox is " ..
+				"up."])
 			kit.GreyUnless(where, function(db) return db.cardDepartureLine end)
 		end
 		local edges = stack:Add(kit.Slider(content, "cardDepartureLineEdges", L["Only at the start and end"], 0, 30, 1,
 			"%d s"), "slider")
-		kit.Tooltip(edges, L["Shows the line only this long at the start and end; 0 for the whole way."])
+		kit.Tooltip(edges, L["Shows the line only this long at the start and end. Set to 0 to show it the whole way."])
 		kit.GreyUnless(edges, function(db) return db.cardDepartureLine end)
 		local clock = kit.Dropdown(content, "cardDepartureClock", List({
 			{ "minutes", L["Minutes only"], L["\"2 min\", rounded up, then \"under a minute\"."] },
@@ -1887,8 +1889,8 @@ function ns.CreateCardSettingsPanel(kit)
 			-- loaded. Support/RareScanner.lua.)
 			if id == "rare" and ns.AddOnWillLoad("RareScanner") then
 				Header(L["RareScanner"])
-				stack:Note(content, L["Whose alert a rare RareScanner finds shows as (this card, or its own " ..
-					"button) is its row on Addons > Conflicts."], NOTE_W)
+				stack:Note(content, L["Whether a rare RareScanner finds shows this card or RareScanner's own button is set on its row " ..
+					"on Addons > Conflicts."], NOTE_W)
 			end
 			if ns.CARD_BY_ID[id] and ns.CARD_BY_ID[id].inFight then
 				FightRow(id)

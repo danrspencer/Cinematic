@@ -387,7 +387,7 @@ local THEME_TABS = {
 	{ "Themes", "Style Themes", "A whole look for the addon in one pick." },
 	{ "Quick Settings", "Style Quick", "Make a theme your own: fonts, bars, shapes, outline and border." },
 	{ "Interface Recolor", "Interface Recolor", "The game's minimap, quest tracker, windows and the rest in your theme's color." },
-	{ "Overrides", "Style Overrides", "Hide or show parts of unit frames, nameplates and action bars, whatever their rows say." },
+	{ "Overrides", "Style Overrides", "Hide or show parts of unit frames, nameplates and action bars, no matter what their rows say." },
 }
 local function StyleTabs(content, title, page)
 	local top, sub = 1, nil

@@ -173,7 +173,7 @@ local THEMES = {
 		swatch = { { 0.10, 0.09, 0.08 }, { 1, 0.82, 0 }, { 0, 0.8, 0 }, { 0, 0.45, 1 } }, settings = {}, plain = true },
 	Theme({
 		key = "reel", name = "Silver Screen", unitBars = "brushed",
-		tip = "Black and silver, like an old film print. Thin lines, narrow lettering, nothing in the way of the picture.",
+		tip = "Black and silver, like an old movie. Thin lines, narrow lettering, nothing in the way of the picture.",
 		swatch = { { 0.05, 0.05, 0.06 }, { 0.86, 0.87, 0.9 }, { 0.55, 0.56, 0.6 }, { 0.94, 0.72, 0.3 } },
 		menu = { accent = { 0.9, 0.9, 0.93 }, edge = { 0.52, 0.53, 0.58 }, field = { 0.07, 0.07, 0.08 },
 			window = { 0.03, 0.03, 0.035 }, well = { 0, 0, 0 }, knob = { 0.95, 0.95, 0.97 }, thumb = { 0.72, 0.72, 0.76 } },
@@ -189,7 +189,7 @@ local THEMES = {
 	}),
 	Theme({
 		key = "codex", name = "Gilded Codex",
-		tip = "An illuminated book: dark vellum, gold leaf and filigree in every corner. The tale of your journey, written as it happens.",
+		tip = "An illuminated book: dark vellum, gold leaf and filigree in every corner.",
 		swatch = { { 0.11, 0.075, 0.05 }, { 0.93, 0.74, 0.34 }, { 0.2, 0.55, 0.32 }, { 0.5, 0.11, 0.1 } },
 		menu = { accent = { 0.95, 0.76, 0.36 }, edge = { 0.58, 0.44, 0.22 }, field = { 0.1, 0.07, 0.05 },
 			window = { 0.06, 0.04, 0.03 }, well = { 0.03, 0.02, 0.015 }, knob = { 0.98, 0.86, 0.58 },
@@ -225,7 +225,7 @@ local THEMES = {
 	}),
 	Theme({
 		key = "glade", name = "Moonlit Glade", unitBars = "linen",
-		tip = "Night in an old forest: deep teal, soft silver and vines climbing the edges. Quiet and alive.",
+		tip = "Night in an old forest: deep teal, silver and vines climbing the edges.",
 		swatch = { { 0.05, 0.11, 0.12 }, { 0.22, 0.6, 0.52 }, { 0.3, 0.72, 0.56 }, { 0.46, 0.42, 0.8 } },
 		menu = { accent = { 0.34, 0.7, 0.62 }, edge = { 0.1, 0.31, 0.29 }, field = { 0.05, 0.1, 0.11 },
 			window = { 0.03, 0.065, 0.075 }, well = { 0.015, 0.035, 0.04 }, knob = { 0.82, 0.96, 0.9 },
@@ -244,7 +244,7 @@ local THEMES = {
 	}),
 	Theme({
 		key = "rime", name = "Frostbound", unitBars = "brushed",
-		tip = "Cut ice over cold slate. Crisp lines and a clear head at the top of the world.",
+		tip = "Cut ice over cold slate, with crisp lines.",
 		swatch = { { 0.07, 0.1, 0.14 }, { 0.72, 0.88, 1 }, { 0.32, 0.66, 0.84 }, { 0.82, 0.9, 0.96 } },
 		menu = { accent = { 0.66, 0.86, 1 }, edge = { 0.36, 0.48, 0.6 }, field = { 0.07, 0.1, 0.14 },
 			window = { 0.04, 0.06, 0.09 }, well = { 0.02, 0.03, 0.05 }, knob = { 0.86, 0.95, 1 },
@@ -296,7 +296,7 @@ local THEMES = {
 	}),
 	Theme({
 		key = "open", name = "Adventurer", unitBars = "soft", layout = "open",
-		tip = "Just the hero: a gold-ringed portrait, the name over two slim bars, and nothing round them.",
+		tip = "Just the hero: a gold-ringed portrait, the name over two slim bars, and nothing around them.",
 		swatch = { { 0.08, 0.07, 0.06 }, { 1, 0.82, 0 }, { 0, 0.8, 0 }, { 0, 0.55, 1 } },
 		menu = { accent = { 1, 0.82, 0.2 }, edge = { 0.5, 0.4, 0.2 }, field = { 0.09, 0.08, 0.07 },
 			window = { 0.05, 0.045, 0.04 }, well = { 0.025, 0.02, 0.02 }, knob = { 1, 0.9, 0.55 },
@@ -1949,7 +1949,7 @@ local MINE_COLOR_NAMES = { accent = "Accent", panel = "Panels", line = "Lines", 
 local MINE_COLOR_TIPS = {
 	accent = "Titles, names and our menus' highlights.",
 	panel = "Tooltips, chat bubbles and our menus' panels.",
-	line = "The thin line round bars, panels and buttons.",
+	line = "The thin line around bars, panels and buttons.",
 	ornament = "Portrait rings and corner art.",
 	health = "Health bars on unit frames, the personal display and tooltips.",
 	mana = "Mana bars.",
@@ -2017,7 +2017,7 @@ function ns.MakeThemePicker(kit, parent, width, changed)
 		StaticPopupDialogs.CINEMATIC_STYLE_THEME_SWITCH = Switch(L["Save as a new theme"])
 		StaticPopupDialogs.CINEMATIC_STYLE_THEME_SWITCH_MINE = Switch(L["Save changes"])
 		StaticPopupDialogs.CINEMATIC_STYLE_THEME_RESET = {
-			text = L["Put %s back as it comes? Your changes will be lost."], button1 = L["Reset"], button2 = CANCEL,
+			text = L["Put %s back to how it came? Your changes will be lost."], button1 = L["Reset"], button2 = CANCEL,
 			OnAccept = Anyway, timeout = 0, whileDead = true, hideOnEscape = true,
 		}
 	end
@@ -2146,7 +2146,7 @@ function ns.MakeThemePicker(kit, parent, width, changed)
 	share:SetSize(70, 20)
 	share:SetPoint("RIGHT", rename, "LEFT", -6, 0)
 	share:SetText(L["Share"])
-	kit.Tooltip(share, L["A line of text to send a friend: they add it with Import under Yours."])
+	kit.Tooltip(share, L["A line of text to send a friend, who adds it with Import under Yours."])
 	local delete = ns.PanelButton(editor)
 	delete:SetSize(70, 20)
 	delete:SetPoint("RIGHT", share, "LEFT", -6, 0)
@@ -2191,7 +2191,7 @@ function ns.MakeThemePicker(kit, parent, width, changed)
 	from:SetPoint("LEFT", fromLabel, "RIGHT", 10, 0)
 	from.searchSkip = true
 	if from.SetScript then
-		kit.Tooltip(from, L["The theme of ours it's made from: its art, shapes and fonts, under your colors and changes."])
+		kit.Tooltip(from, L["The built-in theme it's based on, which gives it its art, shapes and fonts under your colors and changes."])
 	end
 	local colorsLabel = editor:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 	colorsLabel:SetPoint("TOPLEFT", 10, -72)
@@ -2235,7 +2235,7 @@ function ns.MakeThemePicker(kit, parent, width, changed)
 				end)
 			end)
 		end)
-		kit.Tooltip(square, L[MINE_COLOR_TIPS[which]] .. " " .. L["Right-click: back to its starting theme's."])
+		kit.Tooltip(square, L[MINE_COLOR_TIPS[which]] .. " " .. L["Right-click to put it back to its starting theme's."])
 		squares[which] = square
 	end
 	local editHelp = editor:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")

@@ -455,8 +455,8 @@ function ns.ShowExport(name)
 	window.title:SetText(L["Export profile: %s"]:format(ns.ProfileLabel(name)))
 	window.hint:SetText(L["Press Ctrl+C to copy this, then paste it wherever your friends will see it. " ..
 		"They add it with Import on their Cinematic Profiles page (or /cine import)."])
-	window.status:SetText(L["Only Cinematic settings are in it: nothing about you or your character " ..
-		"but its name. Not in it, as with any profile: frames you added and your zone and time tint colors."])
+	window.status:SetText(L["It only has Cinematic settings: nothing about you or your character except its name. Like any " ..
+		"profile, it leaves out frames you added and your zone and time tint colors."])
 	window.nameRow:Hide()
 	window.accept:Hide()
 	window.selectAll:Show()

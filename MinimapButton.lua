@@ -215,7 +215,7 @@ local function ShowMenu(owner)
 		root:CreateCheckbox(L["CineMode"],
 			function() return ns.IsCineModeOn() and not ns.CineOutForFight() end, function()
 				if ns.CineOutForFight() then
-					ns.Print(L["CineMode comes back once the fight is over (Exit CineMode: In combat)."])
+					ns.Print(L["CineMode comes back once the fight is over (Exit CineMode is set to In combat)."])
 					return
 				end
 				Cinematic_ToggleCineMode()

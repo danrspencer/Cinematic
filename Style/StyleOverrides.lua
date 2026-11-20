@@ -106,7 +106,7 @@ function ns.CreateStyleOverridesPanel(kit)
 	local title = kit.Label(content, "GameFontNormalLarge", L["Overrides"])
 	ns.StyleTabs(content, title, "Style Overrides")
 	local intro = kit.PageIntro(content, title,
-		L["Hide or show parts of unit frames and nameplates, whatever their Show rows say."])
+		L["Hide or show parts of unit frames and nameplates, no matter what their Show rows say."])
 	local parts = {} -- (each row, to show its pick again)
 	local function Changed()
 		if ns.ApplyUnitFrameParts then ns.ApplyUnitFrameParts() end
@@ -118,8 +118,8 @@ function ns.CreateStyleOverridesPanel(kit)
 	-- (No stack: Clear overrides and the tabs are placed by hand, below. The
 	-- switch is hidden on a tabbed page: its tab's right-click and the off card.)
 	kit.PageSwitch(content, "styleOverrides", L["Enable Page"],
-		L["On: the parts picked here are hidden or shown. Off: every part goes by its row on the Interface " ..
-			"hub's pages; this tab keeps its picks for when you turn it back on."], intro, Changed)
+		L["When on, the parts picked here are hidden or shown. When off, every part follows its row on " ..
+			"the Interface hub's pages, and this tab keeps its picks for when you turn it back on."], intro, Changed)
 
 	local clear = ns.PanelButton(content)
 	clear:SetSize(130, 22)
