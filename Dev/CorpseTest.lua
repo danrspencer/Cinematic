@@ -1,6 +1,7 @@
--- /cine debug corpse: one run on what addons can learn about a dead mob
--- (2026-11-20). Dead units get no nameplate, and the game draws their names
--- over the body itself (no frame to read), so the only ways in are the unit
+-- /cine debug deadmob: one run on what addons can learn about a dead mob
+-- (2026-11-20; /cine debug corpse is the older one on your own corpse run).
+-- Dead units get no nameplate, and the game draws their names over the body
+-- itself (no frame to read), so the only ways in are the unit
 -- names the game gives out (target, mouseover, soft interact) and the death
 -- itself (the combat log). Steps on screen, each waiting as long as it takes
 -- (type the command again to stop):
@@ -21,7 +22,7 @@ local _, ns = ...
 
 local CVARS = { "SoftTargetInteract", "SoftTargetEnemy", "SoftTargetFriend", "UnitNameNPC", "UnitNameHostleNPC",
 	"nameplateShowEnemies", "nameplateShowAll" }
-local SOFT = ns.CVarSet("Corpse test: soft interact", "/cine debug corpse: soft interact on for the run",
+local SOFT = ns.CVarSet("Corpse test: soft interact", "/cine debug deadmob: soft interact on for the run",
 	{ values = { SoftTargetInteract = "3" } })
 local TOKENS = { "softinteract", "softenemy", "softfriend" }
 local AFTER_WAIT = 3 -- seconds after the loot window or the corpse targeted, if no loot window closes

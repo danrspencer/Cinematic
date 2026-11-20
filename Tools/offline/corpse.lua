@@ -1,6 +1,6 @@
 -- Corpse test check (offline, Lua 5.1 via Tools/offline/run.py):
 --   python -I Tools/offline/run.py Tools/offline/corpse.lua < /dev/null
--- /cine debug corpse (Dev/CorpseTest.lua, dev copy): a stand-in run through
+-- /cine debug deadmob (Dev/CorpseTest.lua, dev copy): a stand-in run through
 -- every step with a stand-in mob: targeted alive, killed, the fight ends,
 -- moused over, picked by soft interact, looted. Checked: the box moves on at
 -- each step, the corpse's reads are logged, a secret name is logged as
@@ -67,6 +67,15 @@ local function Fire(event, ...) wow.Fire(event, ...) end
 
 CinematicDB = CinematicDB or {}
 Check("the command is on ns", type(ns.CorpseTest) == "function")
+-- (/cine debug corpse is the older corpse-run report: the test is deadmob.)
+local realTest, called = ns.CorpseTest, nil
+ns.CorpseTest = function() called = true end
+ns.HandleSlash("debug deadmob")
+Check("/cine debug deadmob starts the test", called == true)
+called = nil
+pcall(ns.HandleSlash, "debug corpse") -- (the report itself needs more of the game than the stand-in has)
+Check("/cine debug corpse stays the corpse-run report", called == nil)
+ns.CorpseTest = realTest
 
 -- (Frames listening for the loot window before the run: other parts of the addon.)
 local function Listening()
