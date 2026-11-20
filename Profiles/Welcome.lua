@@ -399,10 +399,10 @@ local DEMO_ROW = {
 	{ key = "fadeUI", label = "Fading UI", icon = "Interface\\Icons\\Spell_Magic_LesserInvisibilty", group = "ui",
 		tip = "Your UI fades away between fights and comes back when you need it." },
 	{ key = "bars", label = "Letterbox", icon = "Interface\\Icons\\Spell_Shadow_ShadesOfDarkness", group = "atmo",
-		tip = "Black bars at the top and bottom of the screen, as in a film." },
+		tip = "Black bars at the top and bottom of the screen, like in a movie." },
 	{ key = "tint", label = "Tint", icon = "Interface\\Icons\\INV_Misc_Gem_Variety_02", group = "atmo",
-		tip = "A color wash over the world that follows the time of day and the zone, with soft dark edges " ..
-			"and weather to match." },
+		tip = "The world's colors shift with the time of day and the zone, with soft dark edges and " ..
+			"weather to match." },
 	{ key = "camera", label = "Camera", icon = "Interface\\Icons\\INV_Misc_Spyglass_03", group = "cam",
 		tip = "The camera moves on its own at quiet moments: on flights, when you go AFK, by a campfire. " ..
 			"This shows a half turn around you; move the camera yourself to stop it." },
@@ -419,7 +419,7 @@ local DEMO_ROW = {
 	-- (Emote Vision in Teleport's place, the user's pick 2026-11-20: Teleport
 	-- on the shelf.)
 	{ key = "emote", label = "Emote Vision", icon = "Interface\\Icons\\Spell_Holy_PrayerOfFortitude", group = "vis",
-		tip = "Other players' emotes show as film dialogue over their heads." },
+		tip = "A card pops up when someone emotes at you or buffs you, so you can answer in one click." },
 }
 -- The shelf's groups, the settings hubs, each in its hub's band color
 -- (Options.lua's HUBS); a group with nothing to play is left out.
@@ -438,9 +438,9 @@ local SHELF_MORE = {
 	{ key = "audio", label = "Audio", icon = "Interface\\Icons\\INV_Misc_Drum_01", group = "atmo",
 		tip = "Music fades in as a camera starts in CineMode, and out as your UI returns." },
 	{ key = "afk", label = "AFK Cam", icon = "Interface\\Icons\\Spell_Nature_Sleep", group = "cam",
-		tip = "Go AFK and the camera sweeps slowly around you." },
+		tip = "Go AFK and the camera slowly circles you." },
 	{ key = "questCam", label = "Quest Cam", icon = "Interface\\Icons\\INV_Misc_Note_01", group = "cam",
-		tip = "The camera frames you and the quest giver as you talk, as in a cutscene." },
+		tip = "The camera frames you and the quest giver as you talk, like in a cutscene." },
 	{ key = "flight", label = "Flight Cam", icon = "Interface\\Icons\\Ability_Hunter_EagleEye", group = "cam",
 		tip = "Wide, slow shots of the land as you fly a flight path." },
 	{ key = "cozy", label = "Cozy Cam", icon = "Interface\\Icons\\Spell_Fire_Fire", group = "cam",
@@ -469,11 +469,11 @@ local SHELF_MORE = {
 		tip = "As you cast your Hearthstone or a teleport, a portal opens around you and the world fades " ..
 			"out as you leave." },
 	{ key = "cards", label = "Card Vision", icon = "Interface\\Icons\\INV_Misc_Book_09", group = "vis",
-		tip = "Title cards for the moments of your day: a new zone, a level, a fight." },
+		tip = "Title cards when you enter a new zone, level up or start a fight." },
 	{ key = "plates", label = "Nameplates", icon = "Interface\\Icons\\Ability_Hunter_SniperShot", group = "ui",
-		tip = "Nameplates that show only for what matters: your target, a mob on you, a friend in need." },
+		tip = "Nameplates show only when you need them: your target, a mob attacking you, a friend who needs help." },
 	{ key = "bubbles", label = "Chat Bubbles", icon = "Interface\\Icons\\Ability_Warrior_BattleShout", group = "ui",
-		tip = "Chat bubbles restyled, so talk stays readable with your UI gone." },
+		tip = "Chat bubbles get a cleaner look, so you can still read them with your UI hidden." },
 	{ key = "combatText", label = "Combat Text", icon = "Interface\\Icons\\Ability_Warrior_Riposte", group = "style",
 		tip = "Damage and heal numbers in a cleaner style." },
 	-- (the Mouseover page's own icon, a pointing hand)
@@ -489,13 +489,13 @@ local SHELF_MORE = {
 -- sentence).
 local NOTICE_LINES = {
 	fadeUI = "Your UI fades away between fights and comes back when you need it.",
-	bars = "Black bars at the top and bottom, as in a film.",
-	tint = "A color wash that follows the time of day, the zone and the weather.",
-	afk = "Go AFK and the camera sweeps slowly around you.",
+	bars = "Black bars at the top and bottom, like in a movie.",
+	tint = "The world's colors shift with the time of day, the zone and the weather.",
+	afk = "Go AFK and the camera slowly circles you.",
 	shoulder = "The camera sits over your shoulder, with you to one side.",
 	vitals = "The screen's edges close in as your health drops.",
-	emote = "Other players' emotes show as film dialogue over their heads.",
-	cards = "Title cards for the moments of your day: a new zone, a level, a fight.",
+	emote = "A card pops up when someone emotes at you or buffs you, so you can answer in one click.",
+	cards = "Title cards when you enter a new zone, level up or start a fight.",
 	tele = "A portal opens as you hearth or teleport, and the world fades out.",
 }
 -- The tour, in the plan's order: the highlights one after another. Emote
