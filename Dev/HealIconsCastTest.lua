@@ -13,7 +13,9 @@
 --   1 icons     every held stranger plate: its class and role icon frames,
 --               shown or not, their frame and picture alphas. Any icon up
 --               on a plate that should be gone: FAIL. Screenshot.
---   2 cast      one held stranger plate: which frames are its cast bar part
+--   2 everything every picture and text on those plates: any still showing,
+--               by name (the catch-all, after the icons slipped through).
+--   3 cast      one held stranger plate: which frames are its cast bar part
 --               (the container or the bar), then the game's own interrupt
 --               played on its cast bar (CastingBarMixin's), Heal Vision told
 --               as the game would. Every frame for 3 s: the bar's shown,
@@ -167,6 +169,81 @@ STEPS[#STEPS + 1] = { key = "icons", ask = "Stand near other players (not in you
 		Check("no class or role icon up on a plate Heal Vision hides", up == 0,
 			("%d plates with an icon up (the screenshot shows them)"):format(up))
 		Screenshot("icons")
+	end }
+-- The catch-all (2026-11-20, after the class icons slipped through): every
+-- picture and text on a plate Heal Vision hides, any that still shows. Shown
+-- (IsVisible), with a size, a text with words, and no alpha on it or up its
+-- parents to the plate at (near) nothing; a secret alpha on the way counts as
+-- faded (Heal Vision's curve). Each read guarded; at most WALK_MAX things a
+-- plate, so a strange plate can't stall the run. [plate] -> { lines }.
+local WALK_MAX = 600
+local function ShortName(object)
+	local ok, name = pcall(function() return object:GetDebugName() end)
+	name = ok and type(name) == "string" and name or tostring(object)
+	return name:gsub("^NamePlate%d+%.", ""):sub(1, 60)
+end
+local function Showing(region, plate)
+	local okShown, shown = pcall(region.IsVisible, region)
+	if not okShown or Plain(shown) ~= true then return false end
+	local okW, width = pcall(region.GetWidth, region)
+	local okH, height = pcall(region.GetHeight, region)
+	if okW and okH and Plain(width) and Plain(height) and (width <= 0.5 or height <= 0.5) then return false end
+	if region.GetText then
+		local okText, text = pcall(region.GetText, region)
+		if okText and not Secret(text) and (text == nil or text == "") then return false end
+	end
+	-- (Its alpha times its parents', up to the plate.)
+	local alpha, object, steps = 1, region, 0
+	while object and steps < 16 do
+		local okA, a = pcall(object.GetAlpha, object)
+		if not okA or Secret(a) then return false end
+		alpha = alpha * (tonumber(a) or 1)
+		if object == plate then break end
+		local okP, parent = pcall(object.GetParent, object)
+		object, steps = okP and parent or nil, steps + 1
+	end
+	return alpha > 0.05, alpha
+end
+local function StillShowing(plate)
+	local found, queue, seen, count = {}, { plate }, {}, 0 -- (the plate itself down: anything hung on it)
+	while #queue > 0 and count < WALK_MAX do
+		local frame = table.remove(queue, 1)
+		if frame and not seen[frame] then
+			seen[frame] = true
+			count = count + 1
+			local okR, regions = pcall(function() return { frame:GetRegions() } end)
+			for _, region in ipairs(okR and regions or {}) do
+				count = count + 1
+				local up, alpha = Showing(region, plate)
+				if up then
+					local okT, kind = pcall(region.GetObjectType, region)
+					found[#found + 1] = ("%s (%s, alpha %.2f)"):format(ShortName(region), okT and tostring(kind) or "?", alpha)
+				end
+			end
+			local okC, children = pcall(function() return { frame:GetChildren() } end)
+			for _, child in ipairs(okC and children or {}) do queue[#queue + 1] = child end
+		end
+	end
+	return found, count
+end
+
+ns.HealIconsStillShowing = StillShowing -- (Tools' offline smoke run of the catch-all)
+
+STEPS[#STEPS + 1] = { key = "everything", ready = function() return Cine() and #HeldStrangers() > 0 end,
+	checks = function()
+		local total = 0
+		for i, each in ipairs(HeldStrangers()) do
+			if i > MAX_PLATES then break end
+			local found, walked = StillShowing(each.plate)
+			total = total + #found
+			local list = {}
+			for n = 1, math.min(#found, 8) do list[n] = found[n] end
+			Say(("  %s: %d things looked at, %d still showing%s"):format(tostring(Plain(UnitName(each.unit))), walked,
+				#found, #found > 0 and (": " .. table.concat(list, "; ") .. (#found > 8 and "; ..." or "")) or ""))
+		end
+		Check("nothing on a plate Heal Vision hides still shows", total == 0,
+			("%d things showing (named above; the screenshot shows them)"):format(total))
+		Screenshot("everything")
 	end }
 STEPS[#STEPS + 1] = { key = "cast", ready = function() return Cine() and #HeldStrangers() > 0 end,
 	checks = function()
