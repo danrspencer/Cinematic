@@ -48,6 +48,7 @@ OFFLINE_TESTS = [
     ("Mac notch covers, forever", "Tools/offline/notchgap.lua", "forever"),
     ("Mac notch covers, retail", "Tools/offline/notchgap.lua", "retail"),
     ("XP text font per character at login", "Tools/offline/xpfont.lua"),
+    ("music volume never kept near 0", "Tools/offline/musicvolume.lua"),
 ]
 
 

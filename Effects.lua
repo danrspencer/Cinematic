@@ -646,11 +646,59 @@ local function MusicTrace(text)
 end
 ns.MusicTrace = MusicTrace
 
+-- Which music volumes may be kept as yours (2026-11-20). The game's Music
+-- slider moves in 5% steps (other addons' wheels in 1%), so a volume above
+-- 0 but under half a percent is never one you picked: it's a fade's step or
+-- something else's leftover. A player's remembered volume stuck at
+-- 0.0000186 (Forever): written by something outside Cinematic (its own
+-- writes are 3 decimals), then taken as theirs while the music code stood
+-- aside, put back at every login, and faded in to at every camera, so music
+-- was never heard. Nor is the volume Cinematic itself last wrote news of
+-- yours (own: nil once anything else writes it). A real 0 is always kept.
+-- (On ns: this file's main chunk is at Lua's 200 locals.)
+ns.musicKeep = { NEAR_ZERO = 0.005, DEFAULT = 0.4 }
+function ns.musicKeep.NearZero(volume)
+	return volume ~= nil and volume > 0 and volume < ns.musicKeep.NEAR_ZERO
+end
+
+-- Whether volume may be kept as yours (where: for the log; ownCheck: not if
+-- Cinematic itself wrote it last). A refusal is logged once per value.
+function ns.musicKeep.Ok(volume, where, ownCheck)
+	local keep = ns.musicKeep
+	if volume == nil then
+		return false
+	end
+	local why = keep.NearZero(volume) and "near 0, no slider's value"
+		or ownCheck and keep.own and math.abs(volume - keep.own) <= MUSIC_VOLUME_EPSILON and "Cinematic's own write"
+	if not why then
+		return true
+	end
+	if keep.refused ~= volume and why ~= "Cinematic's own write" then
+		keep.refused = volume
+		ns.Log("music", ("volume %s not kept as yours (%s, %s)"):format(tostring(volume), why, where))
+	end
+	return false
+end
+
+-- Your volume to fade in to or put back when the one found can't be yours:
+-- the remembered one, else the game's default.
+function ns.musicKeep.Yours()
+	local volume = ns.db.musicVolume
+	if volume and not ns.musicKeep.NearZero(volume) then
+		return volume
+	end
+	local getDefault = (C_CVar and C_CVar.GetCVarDefault) or GetCVarDefault
+	local ok, default = pcall(getDefault, "Sound_MusicVolume")
+	default = ok and tonumber(default)
+	return default and default > 0 and default or ns.musicKeep.DEFAULT
+end
+
 local function TraceMusicWrite(name, value)
 	if name ~= "Sound_MusicVolume" and name ~= "Sound_EnableMusic" then
 		return
 	end
 	if fadeWriting then
+		if name == "Sound_MusicVolume" then ns.musicKeep.own = tonumber(value) end
 		local zero = tonumber(value) == 0
 		if zero == lastFadeZero then
 			return
@@ -659,7 +707,18 @@ local function TraceMusicWrite(name, value)
 		MusicTrace(("fade %s = %s"):format(name, tostring(value)))
 		return
 	end
-	local stack = (debugstack(3, 4, 0) or ""):gsub("Interface/AddOns/", ""):gsub("\n", " < ")
+	local stack = debugstack(3) or ""
+	if name == "Sound_MusicVolume" then
+		local ours = stack:find("AddOns/" .. ADDON_NAME .. "/", 1, true) ~= nil
+		local volume = tonumber(value)
+		ns.musicKeep.own = ours and volume or nil
+		-- (Always logged, detailed logging or not: who wrote it.)
+		if not ours and ns.musicKeep.NearZero(volume) then
+			ns.Log("music", ("music volume set to %s from outside Cinematic (no slider's value) by %s"):format(
+				tostring(value), stack:gsub("Interface/AddOns/", ""):gsub("\n", " < "):sub(1, 400)))
+		end
+	end
+	stack = stack:gsub("Interface/AddOns/", ""):gsub("\n", " < ")
 	MusicTrace(("SET %s = %s by %s"):format(name, tostring(value), stack:sub(1, 300)))
 end
 
@@ -720,8 +779,20 @@ function ns.RestoreMusicVolume()
 		ns.db.musicVolume = nil
 		return
 	end
-	local volume = ns.db.musicVolume
+	-- Once (2026-11-20): a remembered or game volume stuck near 0 (no slider's
+	-- value, see ns.musicKeep) goes back to a real one. A real 0 stays.
 	local now = tonumber(GetCVar("Sound_MusicVolume"))
+	if not ns.db.musicVolumeNearZeroV1 then
+		ns.db.musicVolumeNearZeroV1 = true
+		local keep = ns.musicKeep
+		if keep.NearZero(ns.db.musicVolume) or (keep.NearZero(now) and ns.db.musicVolume == nil) then
+			ns.db.musicVolume = nil
+			ns.db.musicVolume = keep.Yours()
+			ns.Log("music", ("your music volume was %s (no slider's value): put back to %s"):format(
+				tostring(now), tostring(ns.db.musicVolume)))
+		end
+	end
+	local volume = ns.db.musicVolume
 	if volume and not (now and math.abs(now - volume) <= MUSIC_VOLUME_EPSILON) then
 		MusicTrace(("RESTORE your volume %s -> %.3f"):format(tostring(now), volume))
 		SetCVar("Sound_MusicVolume", ("%.3f"):format(volume))
@@ -738,6 +809,10 @@ local function PlayerMusicVolume()
 		-- (A snap that came a moment after the write.)
 		MusicTrace(("snapped by the slider later %.3f -> %.3f"):format(musicWritten, actual))
 		musicWritten = actual
+	elseif actual and math.abs(actual - musicWritten) > MUSIC_VOLUME_EPSILON
+		and not ns.musicKeep.Ok(actual, "changed while Cinematic had the music") then
+		-- (Near 0: no player's. What Cinematic had there goes back.)
+		SetMusicVolume(musicWritten)
 	elseif actual and math.abs(actual - musicWritten) > MUSIC_VOLUME_EPSILON then
 		MusicTrace(("DETECTED player change %.3f -> %.3f"):format(musicWritten, actual))
 		if ns.musicDebug then
@@ -1048,7 +1123,8 @@ local function UpdateDeathSong()
 		if ns.DeathTestLog then ns.DeathTestLog("death song playing") end
 	elseif deathSong.file then
 		local actual = tonumber(GetCVar("Sound_MusicVolume"))
-		if actual and math.abs(actual - deathSong.written) > MUSIC_VOLUME_EPSILON then
+		if actual and math.abs(actual - deathSong.written) > MUSIC_VOLUME_EPSILON
+			and ns.musicKeep.Ok(actual, "changed during the death song") then
 			if ns.musicDebug then
 				ns.Print(("music: you changed the volume %.2f -> %.2f (death song)"):format(deathSong.written, actual))
 			end
@@ -1146,8 +1222,10 @@ function ns.UpdateMusic(cinematic, elapsed)
 		-- (Nothing touching the volume: whatever it's set to is yours, kept
 		-- for the login restore. Before, it went stale here, and a 0 kept at
 		-- some point came back at every /reload: a player's report 2026-11-17.)
-		if ns.db.savedCVars.Sound_MusicVolume == nil then
-			ns.db.musicVolume = tonumber(GetCVar("Sound_MusicVolume")) or ns.db.musicVolume
+		-- (Not one near 0 or Cinematic's own: see ns.musicKeep.)
+		local volume = ns.db.savedCVars.Sound_MusicVolume == nil and tonumber(GetCVar("Sound_MusicVolume"))
+		if volume and ns.musicKeep.Ok(volume, "music left alone", true) then
+			ns.db.musicVolume = volume
 		end
 		return
 	end
@@ -1186,8 +1264,12 @@ function ns.UpdateMusic(cinematic, elapsed)
 		end
 	end
 	if not playerVolume and ns.db.savedCVars.Sound_MusicVolume == nil then
-		-- The addon isn't touching the volume: whatever it's set to is yours.
-		ns.db.musicVolume = tonumber(GetCVar("Sound_MusicVolume")) or ns.db.musicVolume
+		-- The addon isn't touching the volume: whatever it's set to is yours
+		-- (not one near 0 or Cinematic's own: see ns.musicKeep).
+		local volume = tonumber(GetCVar("Sound_MusicVolume"))
+		if volume and ns.musicKeep.Ok(volume, "music left alone", true) then
+			ns.db.musicVolume = volume
+		end
 	end
 	local switchedOn = (combatMusic.musicOff or combatMusic.managedOff) and GetCVar("Sound_EnableMusic") == "1"
 	UpdateCombatMusic(elapsed, playerVolume ~= nil or switchedOn)
@@ -1201,6 +1283,12 @@ function ns.UpdateMusic(cinematic, elapsed)
 		musicStartedAt = GetTime()
 		ns.SaveCVar("Sound_EnableMusic")
 		ns.SaveCVar("Sound_MusicVolume")
+		-- (A volume near 0 found there is no one's: it fades in to yours, and
+		-- yours is what's put back afterwards. See ns.musicKeep.)
+		local found = tonumber(ns.db.savedCVars.Sound_MusicVolume)
+		if not ns.musicKeep.Ok(found, "found as music started") then
+			ns.db.savedCVars.Sound_MusicVolume = ("%.3f"):format(ns.musicKeep.Yours())
+		end
 		ns.music.managing = true
 		ns.music.level = 0
 		ns.music.volume = tonumber(ns.db.savedCVars.Sound_MusicVolume) or 1
