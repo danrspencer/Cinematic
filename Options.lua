@@ -20131,6 +20131,31 @@ openAfterFight:SetScript("OnEvent", function(self)
 	self:UnregisterEvent("PLAYER_REGEN_ENABLED")
 	ns.OpenOptions(self.page)
 end)
+-- Settings opened by us in a fight with Forever's gamepad UI: the left list's
+-- gamepad cursor calls (SmartNavigation, SetAttribute) are blocked then, a
+-- yellow "Interface action failed" line each, harmless (the cursor just isn't
+-- set on those lines). Players want the settings in fights, so they open
+-- anyway; the dev error box and log skip those blocks (ns.QuietSettingsBlock)
+-- until the fight ends. (Opened in the fight and kept waiting till its end
+-- before, ad4926f9; put back 2026-11-20.)
+local fightOpened = CreateFrame("Frame")
+fightOpened:SetScript("OnEvent", function(self)
+	self:UnregisterEvent("PLAYER_REGEN_ENABLED")
+	ns.settingsOpenedInFight = nil
+end)
+function ns.SettingsOpenedInFight(on)
+	ns.settingsOpenedInFight = on or nil
+	if on then fightOpened:RegisterEvent("PLAYER_REGEN_ENABLED") else fightOpened:UnregisterEvent("PLAYER_REGEN_ENABLED") end
+end
+-- Whether a blocked action (its stack) is the one above: skipped, counted.
+ns.quietSettingsBlocks = 0
+function ns.QuietSettingsBlock(stack)
+	if not (ns.settingsOpenedInFight and type(stack) == "string" and stack:find("SmartNavigation", 1, true)) then
+		return false
+	end
+	ns.quietSettingsBlocks = ns.quietSettingsBlocks + 1
+	return true
+end
 -- (BlockedLineTest.lua: whether an open waits for the fight's end, and
 -- dropping it.)
 function ns.OptionsOpenAfterFight(cancel)
@@ -20196,10 +20221,12 @@ function ns.OpenOptions(page)
 	-- (ns.testFakeFight: BlockedLineTest.lua takes the fight path out of one.)
 	if InCombatLockdown() or ns.testFakeFight then
 		local panel = category and SettingsPanel
-		-- (Not with Forever's gamepad UI: SelectCategory redraws the left list,
+		-- (With Forever's gamepad UI too: SelectCategory redraws the left list,
 		-- whose lines set the gamepad cursor's anchor with SetAttribute, blocked
-		-- in a fight: "Interface action failed" once a line.)
-		if panel and panel.SelectCategory and not panel:IsProtected() and not _G.SmartNavigation then
+		-- in a fight, "Interface action failed" once a line; harmless, and kept
+		-- out of the dev error box: ns.SettingsOpenedInFight.)
+		if panel and panel.SelectCategory and not panel:IsProtected() then
+			if _G.SmartNavigation then ns.SettingsOpenedInFight(true) end
 			panel:Show()
 			ns.PickSettingsCategory(panel, line or subpages[page] or category)
 		elseif not (panel and panel:IsShown()) then

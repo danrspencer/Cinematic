@@ -1887,6 +1887,14 @@ local function HandleSlash(msg)
 		-- (Dev copy: the error box catches the event-less "Interface action failed" line, BlockedLineTest.lua.)
 		if ns.BlockedLineTest then ns.BlockedLineTest()
 		else ns.Print("/cine debug blockedline is in the dev copy only.") end
+	elseif cmd == "debug" and arg == "secreterror" then
+		-- (Dev copy: our error catcher given a secret error text, SecretErrorTest.lua.)
+		if ns.SecretErrorTest then ns.SecretErrorTest()
+		else ns.Print("/cine debug secreterror is in the dev copy only.") end
+	elseif cmd == "debug" and arg == "fightopen" then
+		-- (Dev copy: our settings opened in a real fight, then Escape > Options in the next, BlockedLineTest.lua.)
+		if ns.FightOpenTest then ns.FightOpenTest()
+		else ns.Print("/cine debug fightopen is in the dev copy only.") end
 	elseif cmd == "debug" and (arg == "taintopen" or arg:find("^taintopen ")) then
 		-- (Dev copy: which way of opening the settings taints its lists, one /reload a way, BlockedLineTest.lua.)
 		if ns.TaintOpenTest then ns.TaintOpenTest(arg:match("^taintopen%s*(.*)$"))

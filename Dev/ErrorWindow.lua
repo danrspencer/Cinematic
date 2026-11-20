@@ -189,6 +189,11 @@ end
 
 function ns.DevTap(kind, message, stack)
 	if busy then return end
+	-- (Settings opened by us in a fight with the gamepad UI: its blocked
+	-- gamepad cursor calls are known and harmless, Options.lua.)
+	if type(kind) == "string" and kind:find("^blocked") and ns.QuietSettingsBlock and ns.QuietSettingsBlock(stack) then
+		return
+	end
 	busy = true
 	if kind == "error" then lastHandler.message, lastHandler.at = message, GetTime() end
 	pcall(Add, kind, message, stack)

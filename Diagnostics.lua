@@ -197,9 +197,17 @@ end
 -- Interface/AddOns/ part (BugGrabber strips it).
 local OUR_FILE = "%f[%w]" .. ADDON_NAME .. "[/\\][^:]+%.lua"
 
-local function IsOurs(text)
-	return type(text) == "string" and text:find(OUR_FILE) ~= nil
+-- (An error's text can be a secret on Forever, another addon's or the game's
+-- error relayed by BugGrabber: indexing it errors in turn, a "warning" in the
+-- dev box. Such text is never read.)
+local function Readable(text)
+	return type(text) == "string" and not (issecretvalue and issecretvalue(text))
 end
+
+local function IsOurs(text)
+	return Readable(text) and text:find(OUR_FILE) ~= nil
+end
+ns.ErrorTextIsOurs = IsOurs -- (/cine debug secreterror)
 
 local errors = {}      -- message -> { count, windowStart, inWindow }
 local errorOrder = {}  -- messages, first seen first
@@ -234,7 +242,7 @@ end
 -- dropped: any during the call, and the bars' own later updates (text, health,
 -- heal prediction) after it. Also when our own protected loops catch them.)
 local function Harmless(message)
-	return type(message) == "string" and message:find("secret", 1, true)
+	return Readable(message) and message:find("secret", 1, true)
 		and message:find("tainted by '" .. ADDON_NAME .. "'", 1, true)
 		and (ns.togglingCharacter or message:find("TextStatusBar", 1, true)
 			or message:find("HealthBar", 1, true) or message:find("UnitFrame", 1, true)) and true or false
@@ -247,7 +255,7 @@ function ns.ReportError(message, stack, caught)
 	if caught and Harmless(message) then
 		return
 	end
-	message = tostring(message)
+	message = Readable(message) and message or Readable(tostring(message)) and tostring(message) or "(error text kept secret by the game)"
 	local now = GetTime()
 	local entry = errors[message]
 	if not entry then
@@ -577,11 +585,14 @@ watcher:SetScript("OnEvent", function(_, event, addon, action)
 		ns.Log("blocked", ("%s by %s: %s (%s)"):format(event, tostring(addon), tostring(action),
 			InCombatLockdown() and "in combat" or "out of combat"))
 	elseif addon == ADDON_NAME then
-		ns.Log("BLOCKED", ("%s: %s"):format(event, tostring(action)))
 		-- (The event comes during the blocked call, so the stack says whose it
 		-- was; each different one logged once. Both ends: the top is the
 		-- blocked call, the bottom what started it, a click or code of ours.)
 		local stack = debugstack(2, 8, 8)
+		-- (Settings opened in a fight with the gamepad UI: known, harmless,
+		-- not logged: Options.lua ns.QuietSettingsBlock.)
+		if ns.QuietSettingsBlock and ns.QuietSettingsBlock(debugstack(2, 30, 0)) then return end
+		ns.Log("BLOCKED", ("%s: %s"):format(event, tostring(action)))
 		if type(stack) == "string" and not blockedStacks[stack] then
 			blockedStacks[stack] = true
 			ns.Log("BLOCKED", "by " .. stack:gsub("Interface[/\\]AddOns[/\\]", ""):gsub("\n", " < "))

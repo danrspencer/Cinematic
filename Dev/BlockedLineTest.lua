@@ -16,11 +16,12 @@
 --   6 control    the old way (Settings.OpenToCategory from us): how many it
 --                blocks now, to show the trigger was live (INFO)
 --   7 fight      the settings key in a fight (taken down the fight path with
---                ns.testFakeFight): with Forever's gamepad UI the window isn't
---                opened (its left list's SetAttribute calls are blocked in a
---                fight, once a line), it waits for the fight's end; the wait
---                is dropped after (PASS/FAIL)
---   8 taint scan which game fields an addon wrote (issecurevariable) in the
+--                ns.testFakeFight): the window opens, gamepad UI or not, and
+--                with it the fight is marked so the left list's blocked
+--                gamepad calls stay out of the dev box (PASS/FAIL)
+--   8 quiet      a blocked line from the gamepad UI's file (faked chunk name):
+--                out of the box while marked, in it after (PASS/FAIL)
+--   9 taint scan which game fields an addon wrote (issecurevariable) in the
 --                settings window, game menu, panel list and gamepad UI, also
 --                once before step 1: Escape > Options in a fight blocked every
 --                settings line, so something read there is tainted (INFO)
@@ -246,17 +247,39 @@ local STEPS = {
 		local waits = ns.OptionsOpenAfterFight and ns.OptionsOpenAfterFight(true)
 		local shown = ns.OurSettingsShown and ns.OurSettingsShown()
 		local pad = _G.SmartNavigation ~= nil
-		Say(("  gamepad UI %s, page shown %s, waits for the fight's end %s"):format(pad and "there" or "not there",
-			tostring(shown), tostring(waits)))
-		if pad then
-			Verdict(new == 0 and not shown and waits, ("blocked lines +%d (0 wanted), window %s (closed wanted), %s"):format(
-				new, shown and "open" or "closed", waits and "waits for the fight's end" or "does NOT wait"))
-		else
-			-- (no gamepad UI: opened in the fight where the window allows it)
-			Verdict(new == 0 and (shown or waits), ("blocked lines +%d (0 wanted), %s"):format(new,
-				shown and "opened" or waits and "waits for the fight's end" or "neither opened nor waiting"))
-		end
+		Say(("  gamepad UI %s, page shown %s, waits for the fight's end %s, quiet mark %s"):format(
+			pad and "there" or "not there", tostring(shown), tostring(waits), tostring(ns.settingsOpenedInFight)))
+		-- (opened in the fight, gamepad UI or not: players want them there;
+		-- with the gamepad UI marked so its blocked lines stay out of the box)
+		Verdict(new == 0 and shown and not waits and (not pad or ns.settingsOpenedInFight),
+			("blocked lines in the box +%d (0 wanted), window %s (open wanted), %s, quiet mark %s"):format(new,
+				shown and "open" or "closed", waits and "waits for the fight's end" or "no wait",
+				pad and (ns.settingsOpenedInFight and "set" or "NOT set") or "not needed"))
+		if ns.SettingsOpenedInFight then ns.SettingsOpenedInFight(false) end
 		CloseSettings()
+	end },
+	-- (A blocked call from the gamepad UI's own file, faked with a chunk of
+	-- that name: kept out of the box only while the settings were opened in
+	-- a fight, and in the box again after.)
+	{ "the gamepad UI's blocked line, settings opened in a fight, then not", function()
+		if not (ns.SettingsOpenedInFight and type(_G.DisplayInterfaceActionBlockedMessage) == "function") then return end
+		local chunk = loadstring("local f = ... f()", "@Interface/AddOns/Blizzard_GamepadSmartNavigation/SmartNavigation.lua")
+		run.muted0 = ns.quietSettingsBlocks
+		ns.SettingsOpenedInFight(true)
+		pcall(chunk, _G.DisplayInterfaceActionBlockedMessage)
+		-- (the box adds the hook's entry a frame later: mark off after it)
+		C_Timer.After(0.5, function()
+			ns.SettingsOpenedInFight(false)
+			run.hookMid = (ns.DevErrorCount(HOOK))
+			pcall(chunk, _G.DisplayInterfaceActionBlockedMessage)
+		end)
+		return true
+	end, function(hook0, _, hook1)
+		local quiet = (run.hookMid or -1) - hook0
+		local after = hook1 - (run.hookMid or hook1)
+		local muted = ns.quietSettingsBlocks - (run.muted0 or 0)
+		Verdict(quiet == 0 and after == 1 and muted >= 1,
+			("marked: box +%d (0 wanted), skipped %d (1+ wanted); unmarked: box +%d (1 wanted)"):format(quiet, muted, after))
 	end },
 	{ "taint scan after the steps (settings, game menu, panel list, gamepad UI)", function()
 		CloseSettings()
@@ -614,3 +637,155 @@ taintEvents:SetScript("OnEvent", function(self)
 	if state.pos < 1 then state.pos = 1 end
 	C_Timer.After(4, TaintRunWay)
 end)
+
+-- /cine debug fightopen: our settings opened in a REAL fight with the gamepad
+-- UI (2026-11-20: players want them in fights, so they open there again and
+-- the left list's blocked gamepad calls are kept out of the dev box). One run,
+-- the test says each step on screen and waits for it (no time limit):
+--   1 open     you start a fight; the test opens the Card Vision page (an
+--              AddOns page: the left list moves sets, the case that once
+--              tainted it). Window open, dev box +0 (PASS/FAIL); yellow chat
+--              lines and how many the box skipped (INFO: what players see)
+--   2 after    you close it and end the fight: the quiet mark is off (PASS/FAIL);
+--              left list taint scan (INFO)
+--   3 next     you start a new fight and open Escape > Options yourself: 0
+--              blocked lines, in the box or in chat (PASS/FAIL; 1756 once)
+-- Into CinematicDB.fightOpenTestLog, a screenshot a step. Run again to stop.
+-- Dev copy only.
+local fight, fightWait
+local function FSay(text)
+	local log = CinematicDB and CinematicDB.fightOpenTestLog
+	if log then log[#log + 1] = ("%s %.1f %s"):format(date("%H:%M:%S"), fight and GetTime() - fight.at or 0, text) end
+end
+local function FShot(what)
+	local ok = pcall(function() Screenshot() end)
+	FSay(("  screenshot %s at %s%s"):format(what, date("%m%d%y_%H%M%S"), ok and "" or " (failed)"))
+end
+local function FVerdict(ok, text)
+	if ok then fight.pass = fight.pass + 1 else fight.fail = fight.fail + 1 end
+	FSay(("  verdict %s: %s"):format(ok and "PASS" or "FAIL", text))
+end
+-- (yellow lines that reach chat while the test runs: what a player sees)
+local yellow, yellowHooked = 0, false
+local function CountYellow(_, text)
+	if fight and type(text) == "string" and not (issecretvalue and issecretvalue(text)) and text:find(LINE, 1, true) then
+		yellow = yellow + 1
+	end
+end
+local function FWait(check, after)
+	local token = {}
+	fightWait = token
+	local function Poll()
+		if fightWait ~= token or not fight then return end
+		if check() then return after() end
+		C_Timer.After(0.25, Poll)
+	end
+	Poll()
+end
+local function FDone(text)
+	if not fight then return end
+	local this = fight
+	fight, fightWait = nil, nil
+	local line = ("%s: %d pass, %d fail"):format(text, this.pass, this.fail)
+	FSay(line)
+	ns.TestPrompt(("Fight open test %s. Say \"check log\"."):format(line), 12)
+end
+local function Counts3()
+	return BlockedCount(), yellow, ns.quietSettingsBlocks or 0
+end
+
+local function FightNext()
+	FSay("--- 3 of 3: a new fight, Escape > Options opened by you ---")
+	ns.TestPrompt("Fight open test: start ANOTHER fight. The test waits.", 3600)
+	FWait(InCombatLockdown, function()
+		local box0, yellow0 = Counts3()
+		ns.TestPrompt("Fight open test: in the fight press Escape, then click Options.", 3600)
+		FWait(PanelShown, function()
+			local inFight = InCombatLockdown()
+			ns.TestPrompt("Fight open test: got it, keep fighting a moment.", 3)
+			C_Timer.After(3, function()
+				if not fight then return end
+				FShot("step 3")
+				local box1, yellow1 = Counts3()
+				FSay(("  in a fight %s, quiet mark %s"):format(tostring(inFight), tostring(ns.settingsOpenedInFight)))
+				if box1 > box0 then
+					local _, stack = ns.DevErrorCount(HOOK)
+					if stack then FSay("  newest blocked stack:\n" .. stack) end
+				end
+				FVerdict(inFight and box1 == box0 and yellow1 == yellow0,
+					("Escape > Options in a new fight: dev box +%d, yellow chat lines +%d (0 and 0 wanted)"):format(
+						box1 - box0, yellow1 - yellow0))
+				ns.TestPrompt("Fight open test: close the settings and end the fight. The test waits.", 3600)
+				FWait(function() return not InCombatLockdown() and not PanelShown() end, function() FDone("done") end)
+			end)
+		end)
+	end)
+end
+
+local function FightAfter()
+	FSay("--- 2 of 3: settings closed, fight over ---")
+	ns.TestPrompt("Fight open test: press Escape to close the settings, then end the fight. The test waits.", 3600)
+	FWait(function() return not InCombatLockdown() and not PanelShown() end, function()
+		C_Timer.After(0.5, function()
+			if not fight then return end
+			FVerdict(not ns.settingsOpenedInFight, ("quiet mark after the fight: %s (off wanted)"):format(
+				ns.settingsOpenedInFight and "STILL ON" or "off"))
+			local ok, err = pcall(TaintScan, "verdict INFO: after the fight", 10, FSay)
+			if not ok then FSay("  taint scan error: " .. tostring(err)) end
+			FightNext()
+		end)
+	end)
+end
+
+function ns.FightOpenTest()
+	if fight then return FDone("stopped") end
+	if not (CinematicDB and ns.DevErrorCount and ns.QuietSettingsBlock) then
+		ns.Print("/cine debug fightopen: the dev error box isn't loaded.")
+		return
+	end
+	if InCombatLockdown() then
+		ns.Print("/cine debug fightopen: start it out of a fight.")
+		return
+	end
+	if not yellowHooked then
+		yellowHooked = true
+		for i = 1, (NUM_CHAT_WINDOWS or 10) do
+			local frame = _G["ChatFrame" .. i]
+			if frame and frame.AddMessage then hooksecurefunc(frame, "AddMessage", CountYellow) end
+		end
+	end
+	CinematicDB.fightOpenTestLog = {}
+	fight = { at = GetTime(), pass = 0, fail = 0 }
+	if PanelShown() and HideUIPanel then pcall(HideUIPanel, _G.SettingsPanel) end
+	FSay(("start: %s (game %s), gamepad UI %s, GamePadEnable %s"):format(ns.isRetail and "retail" or "Forever",
+		tostring((select(4, GetBuildInfo()))), _G.SmartNavigation and "there" or "not there",
+		tostring(GetCVar and GetCVar("GamePadEnable"))))
+	pcall(TaintScan, "verdict INFO: before the fight", 5, FSay)
+	FSay("--- 1 of 3: our settings opened in a real fight ---")
+	ns.TestPrompt("Fight open test: start a fight (attack a training dummy or any enemy). The test waits.", 3600)
+	FWait(InCombatLockdown, function()
+		local box0, yellow0, quiet0 = Counts3()
+		ns.TestPrompt("Fight open test: in a fight, opening the settings. Just watch.", 3)
+		local ok, err = pcall(ns.OpenOptions, "Card Vision")
+		if not ok then FSay("  OpenOptions error: " .. tostring(err)) end
+		C_Timer.After(2, function()
+			if not fight then return end
+			FShot("step 1")
+			local box1, yellow1, quiet1 = Counts3()
+			local shown = ns.ShownOptionsPage and ns.ShownOptionsPage()
+			FSay(("  in a fight %s, page shown %q, quiet mark %s, waits for the fight's end %s"):format(
+				tostring(InCombatLockdown()), tostring(shown), tostring(ns.settingsOpenedInFight),
+				tostring(ns.OptionsOpenAfterFight and ns.OptionsOpenAfterFight())))
+			fight.info = true
+			FSay(("  verdict INFO: yellow chat lines +%d (what players see), skipped by the box %d"):format(
+				yellow1 - yellow0, quiet1 - quiet0))
+			if box1 > box0 then
+				local _, stack = ns.DevErrorCount(HOOK)
+				if stack then FSay("  newest blocked stack:\n" .. stack) end
+			end
+			FVerdict(shown == "Card Vision" and box1 == box0, ("page %s (Card Vision wanted), dev box +%d (0 wanted)"):format(
+				tostring(shown), box1 - box0))
+			FightAfter()
+		end)
+	end)
+end
