@@ -2657,9 +2657,16 @@ for _, event in ipairs({ "PLAYER_LOGIN", "PLAYER_TARGET_CHANGED", "PLAYER_FOCUS_
 	pcall(watcher.RegisterEvent, watcher, event)
 end
 pcall(watcher.RegisterEvent, watcher, "PLAYER_ENTERING_WORLD")
+-- (A unit's faction, pet or power changing: only the units these frames show.
+-- Those events come for every unit, nameplates' and raid members' too, and a
+-- refresh dresses every frame.)
+local STYLED_UNITS = { player = true, pet = true, target = true, focus = true, targettarget = true,
+	focustarget = true, party1 = true, party2 = true, party3 = true, party4 = true }
+local UNIT_EVENTS = { UNIT_PET = true, UNIT_DISPLAYPOWER = true, UNIT_FACTION = true }
 watcher:SetScript("OnEvent", function(_, event, name)
 	-- (Of the game's settings, only the classic clients' raid-style party one.)
 	if event == "CVAR_UPDATE" and name ~= "useCompactPartyFrames" then return end
+	if UNIT_EVENTS[event] and not (type(name) == "string" and STYLED_UNITS[name]) then return end
 	ns.RefreshUnitStyle()
 	-- (After a reload the game places the player frame's parts again after our first
 	-- pass: the portrait and name came out off until something (a target) dressed
