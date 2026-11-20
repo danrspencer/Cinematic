@@ -417,7 +417,12 @@ local function ProfessionIcon(lower)
 end
 
 -- The icon for a title, as text for a font string ("|T...|t"), or nil.
+local titleIconsSize -- (the size titleIcons' text was made at: the Icon size slider moved, made again)
 function ServiceIcon(title)
+	if titleIconsSize ~= IconSize() then
+		wipe(titleIcons)
+		titleIconsSize = IconSize()
+	end
 	local icon = titleIcons[title]
 	if icon == nil then
 		icon = false
