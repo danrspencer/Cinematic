@@ -84,7 +84,7 @@ local function FollowPasses(plater)
 		if type(pass) == "function" then
 			plater[name] = function(...)
 				local before = RowValues()
-				local results = { ns.RunOthersCVarPass(pass, ...) }
+				local results = ns.Pack(ns.RunOthersCVarPass(pass, ...))
 				NoteAutoToggles()
 				if ns.db and ns.db.handlePlates then
 					local after = RowValues()
@@ -97,7 +97,7 @@ local function FollowPasses(plater)
 						end
 					end
 				end
-				return unpack(results)
+				return unpack(results, 1, results.n)
 			end
 		end
 	end

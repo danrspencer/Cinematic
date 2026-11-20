@@ -165,14 +165,14 @@ ns.WhenAddonLoads(LABEL, function()
 					off[#off + 1] = situation
 				end
 			end
-			local results = { pcall(evaluate, self, ...) }
+			local results = ns.Pack(pcall(evaluate, self, ...))
 			for _, situation in ipairs(off) do
 				situation.enabled = true
 			end
 			if not results[1] then
 				error(results[2], 0)
 			end
-			return unpack(results, 2)
+			return unpack(results, 2, results.n)
 		end
 	end
 end)

@@ -2372,6 +2372,13 @@ local function Flag(value)
 	return value and true or false
 end
 
+-- A function's results as a table with their count in n, so a nil in the
+-- middle or at the end isn't lost: unpack(t, 1, t.n) gives them all back
+-- (a plain { ... } with unpack(t) stops at Lua 5.1's idea of # instead).
+function ns.Pack(...)
+	return { n = select("#", ...), ... }
+end
+
 -- The frame under the mouse, or nil. Retail's GetMouseFoci gives a list (its
 -- first is the top one); older clients have GetMouseFocus. A secret one
 -- counts as nil, since comparing it would error.
