@@ -172,7 +172,7 @@ for _, child in ipairs({ block:GetChildren() }) do
 end
 Check("two line frames", lines[1] ~= nil and lines[2] ~= nil)
 if lines[1] and lines[2] then
-	Check("line 2 lit (fits here), line 1 not", lines[2].lit:IsShown() and not lines[1].lit:IsShown())
+	Check("line 2 marked In use (fits here), line 1 not", lines[2].inUse:IsShown() and not lines[1].inUse:IsShown())
 	lines[2].up:GetScript("OnClick")(lines[2].up)
 	Check("move up swaps", db.cooldownSpellRules[CORRUPTION][1].place == "any"
 		and db.cooldownSpellRules[CORRUPTION][2].place == "raid")

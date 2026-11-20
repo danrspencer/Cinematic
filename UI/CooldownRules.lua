@@ -221,9 +221,9 @@ local LINE_H = ns.COOLDOWN_LINE_H
 -- every line's reads down one column; its where to the right, where the
 -- Everywhere else line has the row's When ready parts.)
 local SHOW_X, SHOW_W, BAR_X = 180, 135, 318
--- (Each number right beside its dropdown, its lit band from there: under the
+-- (Each number right beside its dropdown, Active left of it: under the
 -- spell's name, 160 px off, they read as loose, 2026-11-20.)
-local NUM_R, LIT_X = SHOW_X - 6, SHOW_X - 26
+local NUM_R, IN_USE_R = SHOW_X - 6, SHOW_X - 24
 -- (Move up and down stacked in one column, and the delete inside the panel:
 -- side by side the arrows were hard to tell apart and pushed the delete past
 -- the panel's edge, cut off, in the first game test, 2026-11-20.)
@@ -278,6 +278,27 @@ for _, place in ipairs(PLACES) do PLACE_LIST[#PLACE_LIST + 1] = { value = place[
 
 -- (Every block made, for the in-game test to read the page: Dev/CdmLinesTest.lua.)
 ns.cooldownLineBlocks = setmetatable({}, { __mode = "k" })
+-- The line deciding now, where you are: a green "Active" left of its number,
+-- the number green too, its tip saying why. (A gold band across the line,
+-- till 2026-11-20, looked like the line was picked, the user said.)
+local function InUseMark(parent, Tip)
+	local mark = CreateFrame("Frame", nil, parent)
+	mark:SetSize(60, 18)
+	local text = mark:CreateFontString(nil, "OVERLAY", "GameFontGreenSmall")
+	text:SetPoint("RIGHT")
+	text:SetText(L["Active"])
+	mark:SetWidth(math.max(type(text:GetStringWidth()) == "number" and text:GetStringWidth() or 0, 30) + 4)
+	mark:EnableMouse(true)
+	Tip(mark, L["This line decides right now, where you are."])
+	mark:Hide()
+	return mark
+end
+local NUMBER_GOLD, NUMBER_GREEN = { 1, 0.82, 0 }, { 0.25, 1, 0.25 }
+local function NumberColor(number, inUse)
+	local color = inUse and NUMBER_GREEN or NUMBER_GOLD
+	number:SetTextColor(color[1], color[2], color[3])
+end
+
 function ns.CooldownRuleLines(parent, opts)
 	local block = CreateFrame("Frame", nil, parent)
 	block:SetSize(DELETE_X + 24, 1)
@@ -300,11 +321,8 @@ function ns.CooldownRuleLines(parent, opts)
 		line:SetSize(DELETE_X + 24, LINE_H)
 		line.n = n
 		local function Rule() return List()[line.n] end
-		-- (The one that fits where you are now: lit gold, as the mockup had it.)
-		line.lit = line:CreateTexture(nil, "BACKGROUND")
-		line.lit:SetPoint("TOPLEFT", LIT_X, -1)
-		line.lit:SetPoint("BOTTOMRIGHT", 0, 1)
-		line.lit:SetColorTexture(1, 0.82, 0, 0.14)
+		line.inUse = InUseMark(line, Tip)
+		line.inUse:SetPoint("RIGHT", line, "LEFT", IN_USE_R, 0)
 		line.number = line:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 		line.number:SetPoint("RIGHT", line, "LEFT", NUM_R, 0)
 		line.number:SetJustifyH("RIGHT")
@@ -449,8 +467,7 @@ function ns.CooldownRuleLines(parent, opts)
 	local elseText = block:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
 	elseText:SetTextColor(0.78, 0.74, 0.64)
 	elseText:SetText(L["Everywhere else"])
-	local elseLit = block:CreateTexture(nil, "BACKGROUND")
-	elseLit:SetColorTexture(1, 0.82, 0, 0.14)
+	local elseInUse = InUseMark(block, Tip)
 
 	function block.Set(newKind, newKey, newLabel, newModes)
 		kind, key, label, modes = newKind, newKey, newLabel, newModes
@@ -486,7 +503,8 @@ function ns.CooldownRuleLines(parent, opts)
 			line:ClearAllPoints()
 			line:SetPoint("TOPLEFT", block, "TOPLEFT", 0, -(i - 1) * LINE_H)
 			line:Show()
-			line.lit:SetShown(i == hit)
+			line.inUse:SetShown(i == hit)
+			NumberColor(line.number, i == hit)
 			line.number:SetText(tostring(i))
 			line.show.Show_()
 			local own = rule.cql ~= nil
@@ -510,7 +528,7 @@ function ns.CooldownRuleLines(parent, opts)
 			elseNumber:Hide()
 			elseBar:Hide()
 			elseText:Hide()
-			elseLit:Hide()
+			elseInUse:Hide()
 			block:SetHeight(1)
 			return 0
 		end
@@ -525,10 +543,10 @@ function ns.CooldownRuleLines(parent, opts)
 		elseBar:Show()
 		elseText:SetPoint("LEFT", block, "TOPLEFT", COMBAT_X + 8, y - LINE_H / 2)
 		elseText:Show()
-		elseLit:ClearAllPoints()
-		elseLit:SetPoint("TOPLEFT", block, "TOPLEFT", LIT_X, y - 1)
-		elseLit:SetPoint("BOTTOMRIGHT", block, "TOPLEFT", DELETE_X + 24, y - LINE_H + 1)
-		elseLit:SetShown(hit == nil)
+		elseInUse:ClearAllPoints()
+		elseInUse:SetPoint("RIGHT", block, "TOPLEFT", IN_USE_R, y - LINE_H / 2)
+		elseInUse:SetShown(hit == nil)
+		NumberColor(elseNumber, hit == nil)
 		block:SetHeight((count + 1) * LINE_H)
 		return (count + 1) * LINE_H
 	end
