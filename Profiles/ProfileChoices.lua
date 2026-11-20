@@ -341,6 +341,9 @@ ns.OLD_PROFILES = {
 -- The welcome window's levels (Welcome.lua), and the profile each picks,
 -- each with its own short line; the longer tip is its profile's (below).
 ns.WELCOME_LEVELS = {
+	-- (Balanced's fading and nothing else, since 2026-11-20; first since then too.)
+	{ label = "Auto-Hide UI", profile = "Auto-Hide UI",
+		line = "Just your UI hiding. No extra features." },
 	{ label = "Subtle", profile = "Subtle", line = "A light touch. Your UI fades only when you're along for the ride." },
 	{ label = "Balanced", profile = "Balanced", line = "Your UI fades away, and comes back when you need it." },
 	-- (flash: something shown for a moment when it's picked, besides the
@@ -353,9 +356,6 @@ ns.WELCOME_LEVELS = {
 		line = "Cinema, with the camera over your shoulder.",
 		note = "It uses one of Blizzard's experimental camera settings: picking it or its test agrees to that. " ..
 			"Turn the Shoulder Cam off and your own camera settings come back." },
-	-- (Balanced's fading and nothing else, since 2026-11-20.)
-	{ label = "Auto-Hide UI", profile = "Auto-Hide UI",
-		line = "Just your UI hiding, as in Balanced. No cameras or effects." },
 	-- (noCustomize: no Next to Customize, whose parts it has all off.)
 	{ label = "Blank Slate", profile = "Blank Slate", noCustomize = true,
 		line = "Everything off. Turn on only the parts you want." },

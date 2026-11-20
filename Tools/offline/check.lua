@@ -441,6 +441,10 @@ if arg[1] and not update then
 			if level.profile == "Auto-Hide UI" then isLevel = true end
 		end
 		if not isLevel then print("problem\tAuto-Hide UI: not in the welcome window") end
+		-- (The welcome window's first card, since 2026-11-20.)
+		if (ns.WELCOME_LEVELS[1] or {}).profile ~= "Auto-Hide UI" then
+			print("problem\tAuto-Hide UI: not the welcome window's first card")
+		end
 		if not byName["Auto-Hide UI"] then
 			print("problem\tAuto-Hide UI: no such profile")
 		else
