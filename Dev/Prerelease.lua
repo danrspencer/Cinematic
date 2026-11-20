@@ -295,6 +295,63 @@ Smoke("camera: vista starts and stops, camera back", function(done)
 	end)
 end)
 
+-- A buff peek brings up the buffs, not the debuffs; a debuff peek the debuffs
+-- (a rested XP debuff came up with every kill's buff, 2026-11-20). Each peek
+-- started from faded, CineMode turned on for it if off; the fade levels of
+-- BuffFrame and DebuffFrame read as each peek holds.
+Smoke("buffs: a buff peek leaves the debuffs faded", function(done)
+	local why = NeedsOn()
+	if why then return done("skip", why) end
+	if InCombatLockdown() then return done("skip", "in a fight") end
+	local function Alpha(name)
+		for _, entry in ipairs(ns.managed or {}) do
+			if entry.name == name then return type(entry.alpha) == "number" and entry.alpha or 0 end
+		end
+	end
+	if not (Alpha("BuffFrame") and Alpha("DebuffFrame")) then return done("skip", "buffs or debuffs not faded by us") end
+	local kept, wasOn = {}, ns.IsCineModeOn()
+	for key, value in pairs({ handleFrames = true, handleBuffs = true, buffPeek = true, debuffPeek = true,
+		buffPeekAfterCombat = false, debuffPeekAfterCombat = false, debuffPeekUntilGone = false }) do
+		kept[key] = ns.db[key]
+		ns.db[key] = value
+	end
+	if not wasOn then Cinematic_ToggleCineMode() end
+	local function Finish(status, detail)
+		for key, value in pairs(kept) do ns.db[key] = value end
+		if not wasOn and ns.IsCineModeOn() then Cinematic_ToggleCineMode() end
+		done(status, detail)
+	end
+	-- Waits (15 sec at most) for both faded, then a peek, its highest levels
+	-- read over 4 sec, then next(buffMax, debuffMax).
+	local function Peek(start, label, next)
+		local waited = 0
+		local function Settle()
+			if Alpha("BuffFrame") < 0.02 and Alpha("DebuffFrame") < 0.02 or waited > 15 then
+				start()
+				local buffMax, debuffMax, read = 0, 0, 0
+				local function Read()
+					buffMax, debuffMax = math.max(buffMax, Alpha("BuffFrame")), math.max(debuffMax, Alpha("DebuffFrame"))
+					read = read + 1
+					if read == 12 then Shot(label) end
+					if read < 20 then return Later(0.2, Read) end
+					next(buffMax, debuffMax)
+				end
+				return Later(0.2, Read)
+			end
+			waited = waited + 0.5
+			Later(0.5, Settle)
+		end
+		Later(1, Settle)
+	end
+	Peek(function() ns.StartBuffPeek(4, {}) end, "buff peek", function(buffUp, debuffWithBuff)
+		Peek(function() ns.StartDebuffPeek(4) end, "debuff peek", function(_, debuffUp)
+			local detail = ("buff peek: buffs %.2f, debuffs %.2f; debuff peek: debuffs %.2f"):format(buffUp,
+				debuffWithBuff, debuffUp)
+			Finish((buffUp > 0.5 and debuffWithBuff < 0.05 and debuffUp > 0.5) and "pass" or "fail", detail)
+		end)
+	end)
+end)
+
 -- Every setting id (/cine debug ids) is one /cine find reaches: a control on a
 -- tab not showing was left out of the search (Heal Vision's Nameplates tab,
 -- /cine find healVisionPlates found nothing, 2026-11-19).
