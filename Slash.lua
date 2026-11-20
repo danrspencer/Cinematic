@@ -548,6 +548,9 @@ local function HandleSlash(msg)
 	elseif cmd == "debug" and (arg == "previewmatch" or arg:match("^previewmatch ")) then
 		-- (Dev copy: the Style previews next to the game's frames, compared, PreviewMatch.lua.)
 		if ns.PreviewMatch then ns.PreviewMatch(arg:match("^previewmatch%s*(.-)$")) else ns.Print("/cine debug previewmatch is in the dev copy only.") end
+	elseif cmd == "debug" and arg == "loose" then
+		-- (Dev copy: the parts under faded frames that ignore their alpha, LoosePartsSurvey.lua.)
+		if ns.LoosePartsSurvey then ns.LoosePartsSurvey() else ns.Print("/cine debug loose is in the dev copy only.") end
 	elseif cmd == "debug" and arg == "petplate" then
 		-- (Dev copy: your pet's plate read with CineMode on and off, PetPlateTest.lua.)
 		if ns.PetPlateTest then ns.PetPlateTest() else ns.Print("/cine debug petplate is in the dev copy only.") end

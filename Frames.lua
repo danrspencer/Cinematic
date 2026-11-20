@@ -811,6 +811,10 @@ do
 		parts[region] = info
 		Set(region, info, belowCount > 0 and GroupHandled(group))
 	end
+	-- (Dev/LoosePartsSurvey.lua: our own detached parts, and frames with a row,
+	-- aren't loose. Tools/loose-parts-plan.md.)
+	function ns.IsOwnDetached(region) return parts[region] ~= nil end
+	function ns.IsManagedFrame(frame) return seen[frame] == true end
 	function ns.Reattach(region)
 		local info = parts[region]
 		if info then

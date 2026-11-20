@@ -52,6 +52,9 @@ looks for `lua5.1`. (Don't put a `lua5.1` stand-in on PATH: Windows asks what to
 - `castlook.lua <forever|retail>`: a cast bar's These bars pick of the other kind's game look (PlateCastStyle.lua's
   GameAs/DressAs) on the style lab's real-layout stand-in: put on (border, name, icon as the game lays the other kind
   out) and taken off again (every anchor, size and justify back).
+- `loosesurvey.lua`: `/cine debug loose` (Dev/LoosePartsSurvey.lua, step A of Tools/loose-parts-plan.md) on the
+  dev copy: finds exactly the parts under faded frames that ignore their alpha (regions, children, deeper ones),
+  not frames with a row of their own or our own detached parts, counts secret answers apart, changes no alpha.
 - `Tools/prerelease.py` (one folder up) runs these checks and the rest side by side before a release, and reads the
   in-game `/cine prerelease` results from the saved settings.
 - `export.lua`: `lua5.1 Tools/offline/export.lua > profiles.json` writes the options pages and their sections, the

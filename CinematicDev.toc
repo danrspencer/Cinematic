@@ -302,3 +302,4 @@ MinimapButton.lua
 QoL\Reload.lua
 Dev\ReloadPathsTest.lua
 Dev\ReloadCoverTest.lua
+Dev\LoosePartsSurvey.lua
