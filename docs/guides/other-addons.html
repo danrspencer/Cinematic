@@ -99,9 +99,9 @@ dl.faq dd { margin: 2px 0 0; color: var(--muted) }
 <div class="col">
 
   <section>
-    <div class="eyebrow">The Addon Frames page</div>
+    <div class="eyebrow">The Addons hub</div>
     <h2>How it works</h2>
-    <p>Supported addons are listed on the <b>Addon Frames</b> page, the ones you have loaded first, then the rest. Like the game's frames on the Game Frames page, their frames are hidden in CineMode unless ticked:</p>
+    <p>Everything about other addons is on the <b>Addons</b> hub in Cinematic's settings. Its icons: <b>Loaded</b> (the supported addons you have running, each frame a row), <b>Find frames</b>, <b>Not running</b> (supported addons you have installed but not loaded, and the rest), <b>Support files</b> (what each addon replaces), <b>Custom Support</b> (only with one of its addons loaded), <b>Links</b> and <b>Conflicts</b>. Like the game's frames on the Game Frames page, an addon's frames are hidden in CineMode unless ticked:</p>
     <div class="cols">
       <div class="colbox"><b>Always</b><span>Leaves the addon alone: shown the whole time.</span></div>
       <div class="colbox"><b>Combat, Target</b><span>Shows it only while you fight or have something targeted.</span></div>
@@ -124,6 +124,7 @@ dl.faq dd { margin: 2px 0 0; color: var(--muted) }
       <div class="addon"><span class="n">EllesmereUI</span><span class="d">A row for each frame: action bars 6 to 10, Cooldown Manager, resource bars, totem bars, damage meters, data bars, each buff reminder, each QoL display (stats, FPS, battle res, Bloodlust, movement alert, Time Spiral, Gateway Shard, crosshair), target distance, self combat text, and Forever Essentials' threat meter, junk list, flight timer and loot feed. <b>Its bars 1 to 5</b>, pet, stance and XP bars, unit frames and quest tracker follow the Game Frames rows. Its cast bar isn't faded, like the game's.</span></div>
       <div class="addon"><span class="n">DaylightUI</span><span class="d">A row each for its two damage meters, threat meter, flight timer, loot feed, buff reminder, pull timer, quest arrow and quest marker. <b>Its unit frames</b>, action bars, buffs, chat, quest tracker, party and raid frames and nameplates follow the Game Frames and Nameplates rows of what they replace; its info panel (XP bar and minimap) follows the Minimap row. Its cast bar isn't faded, like the game's.</span></div>
       <div class="addon"><span class="n">FlareUI</span><span class="d">Its boss frames. <b>Its unit frames</b>, cast bar, resource bars, buffs, quest tracker, party and raid frames, XP bar and totems follow the Game Frames rows.</span></div>
+      <div class="addon"><span class="n">ClassicUI Forever<br><span class="client">WoW Forever</span></span><span class="d">Its action bars follow the Game Frames rows of the bars they replace, and come back when you hover them. Its bar art fades with the Action bar art row, its quest watch with the Quest tracker row.</span></div>
       <div class="addon"><span class="n">Frames Forever<br><span class="client">WoW Forever</span></span><span class="d">Its unit frames (player, pet, target, focus, party, raid and flag carriers) follow the Game Frames rows of the frames they replace, and the game's pet frame stays hidden while Frames Forever hides it.</span></div>
       <div class="addon"><span class="n">Cooldown Manager Centered</span><span class="d">A row each for its utility cooldowns, essential trackers, buff containers, trackers and aura overlays. The game's Cooldown Manager itself is a row on the Game Frames page.</span></div>
       <div class="addon"><span class="n">Forever Enhanced Cooldown Manager<br><span class="client">WoW Forever</span></span><span class="d">Its cooldown and buff bars, and the pulse when a cooldown is ready.</span></div>
@@ -133,26 +134,55 @@ dl.faq dd { margin: 2px 0 0; color: var(--muted) }
       <div class="addon"><span class="n">Titan Panel</span><span class="d">A row each for its top, second top, bottom and second bottom bars, and its ten short bars. Its own transparency setting still counts.</span></div>
       <div class="addon"><span class="n">ShamanPower<br><span class="client">WoW Forever</span></span><span class="d">A row for its cooldown bar. Its totem bar, totem buttons and shield button fade with the Totem bar row. Its own opacity and fade settings still count.</span></div>
       <div class="addon"><span class="n">TomTom</span><span class="d">A row each for its waypoint arrow and coordinates box. Its own arrow transparency still counts.</span></div>
+      <div class="addon"><span class="n">Leatrix Plus</span><span class="d">A row for its flight bar. Its square minimap's header fades with the Minimap header row, and its minimap button bag with the Addon buttons row. Its faction-tinted tooltips are an Addon Conflicts row. With its <i>Set edit mode layout</i> on, profiles leave your Edit Mode layout to it.</span></div>
+      <div class="addon"><span class="n">RareScanner</span><span class="d">A row for its alert button. For a rare NPC, Card Vision's Rare spotted card can show in its place: an Addon Conflicts row (Ours to start with). Treasures and events keep its button either way.</span></div>
       <div class="addon"><span class="n">Spoken<br><span class="client">WoW Forever</span></span><span class="d">A row each for its narrator window, minimal narrator and subtitles; their own fades still count. With Custom dialogue frames on, Spoken's Play button sits in the top right corner of the speech bubble: it reads the quest aloud, or skips the line playing.</span></div>
       <div class="addon"><span class="n">Lore Forever<br><span class="client">WoW Forever</span></span><span class="d">A row each for its subtitles, floating player, new page note and pin card; the subtitles' own fade still counts. Its talk mark fades with the Target frame row. Willo's sky over the minimap is never faded, so the companion app can still read it. With Custom dialogue frames on, its Play button sits in the top right corner of the speech bubble while the quest has a recording: it plays the narration, or stops it.</span></div>
     </div>
     <p>These follow a row or page that's already there, with no row of their own:</p>
     <div class="addons">
       <div class="addon"><span class="n">Plater</span><span class="d">Its nameplates fade in CineMode and follow the Nameplates page's rows. Plater can change the game's nameplate settings itself; Cinematic puts its own back afterwards.</span></div>
-      <div class="addon"><span class="n">Questie</span><span class="d">Its quest tracker and quest item buttons fade with the Quest tracker row. Where it puts its own icon on a nameplate or the target frame, Quest Vision's quest mark stays off it, and the quest item button stays away while its tracker has a button for that item.</span></div>
+      <div class="addon"><span class="n">Questie</span><span class="d">Its quest tracker and quest item buttons fade with the Quest tracker row. Where it puts its own icon on a nameplate or the target frame, Quest Vision's quest mark stays off it, and the quest item button stays away while its tracker has a button for that item. On the Minimap page, <b>Use Questie DB</b> brings the minimap up while one of Questie's quest icons is on it (not on retail).</span></div>
       <div class="addon"><span class="n">Horizon Suite</span><span class="d">Its quest tracker, dungeon banner and floating quest item button fade with the Quest tracker row, without flickering on zone changes.</span></div>
       <div class="addon"><span class="n">RestedXP Guides</span><span class="d">A row each for its guide window, quest item button, target buttons, level splits and waypoint arrow. Until you set them, the guide, buttons and splits follow the Quest tracker row.</span></div>
       <div class="addon"><span class="n">DynamicCam</span><span class="d">Nothing of it fades. Cinematic's cameras zoom past its zoom handling, so they go the distance they ask for. Its situations that move the camera (Taxi, Hearth/Teleport, AFK, Fishing, NPC Interaction) each get a row on the Addon Conflicts page: its camera plays (the default) or Cinematic's scene does.</span></div>
       <div class="addon"><span class="n">Platynator</span><span class="d">Its nameplates fade in CineMode and follow the Nameplates page's rows. Platynator sets the game's nameplate settings itself (at login and after a fight); Cinematic puts its own back afterwards.</span></div>
       <div class="addon"><span class="n">Threat Plates</span><span class="d">Its nameplates fade in CineMode and follow the Nameplates page's rows. Threat Plates can switch friendly nameplates on and off around fights; Cinematic puts its own back afterwards.</span></div>
+      <div class="addon"><span class="n">MinimapButtonButton</span><span class="d">Its button and the bar of addon buttons it gathers fade with the Minimap page's Addon buttons row, and come back when you hover the minimap.</span></div>
+      <div class="addon"><span class="n">Glass Forever<br><span class="client">WoW Forever</span></span><span class="d">Its chat lines fade with the Chat window row and come up when the Chat page lets a message through. It fades the chat tabs and input box itself, so the Chat page leaves those to it.</span></div>
+      <div class="addon"><span class="n">Dialogue UI</span><span class="d">Nothing of it fades. It replaces the game's quest and gossip windows, so Quest talk doesn't come up beside it. While its window is up with its Camera Movement on, Cinematic's quest camera and others wait for it.</span></div>
+      <div class="addon"><span class="n">Immersion</span><span class="d">Nothing of it fades. Its window comes up in place of Quest talk's, and the quest camera plays with it as usual.</span></div>
       <div class="addon"><span class="n">Prat 3.0</span><span class="d">It keeps the game's chat windows, so they fade with the Chat page. With its Chat Tabs module on, it fades the chat tabs itself, so the Chat page leaves those alone.</span></div>
     </div>
+  </section>
+
+  <section id="conflicts">
+    <div class="eyebrow">Two versions of one thing</div>
+    <h2>Addon Conflicts</h2>
+    <p>Some addons have their own version of something Cinematic does: an AFK screen, a zone banner, a tooltip look. The <b>Conflicts</b> page lists each one your loaded addons have, with its <b>Feature</b>, <b>Addon</b>, whether <b>Theirs now</b> is on, and what <b>Plays</b>: <b>Theirs</b>, <b>Ours</b> (theirs is hidden while ours plays, its settings left be) or <b>Both</b>. <b>All theirs</b> and <b>All ours</b> set every row at once. Style rows have no Both: one look wins. A row you haven't picked plays theirs.</p>
+    <p>At login, while a conflict whose addon has its version on has no pick yet, a window (<b>Two versions of the same thing</b>) asks you, a few at a time. <b>Decide later</b> brings it back next login.</p>
+    <div class="addons">
+      <div class="addon"><span class="n">DaylightUI</span><span class="d">The AFK and Campfire scenes, the Zone, Level-up and Reputation cards, the Flight arrival card (its "Welcome to" as you land), object glow and icons, and the tooltip, chat bubble, minimap and damage number looks.</span></div>
+      <div class="addon"><span class="n">DynamicCam</span><span class="d">Its Taxi, Hearth/Teleport, AFK, Fishing and NPC Interaction situations against Cinematic's scenes (its camera plays to start with).</span></div>
+      <div class="addon"><span class="n">ElvUI</span><span class="d">The AFK scene (its AFK mode), the tooltip and chat bubble looks, and the loot roll window.</span></div>
+      <div class="addon"><span class="n">Leatrix Plus</span><span class="d">The tooltip look.</span></div>
+      <div class="addon"><span class="n">Naowh Forever<br><span class="client">WoW Forever</span></span><span class="d">Object glow and icons (its Glimmer), and the damage meter look.</span></div>
+      <div class="addon"><span class="n">RareScanner</span><span class="d">The Rare spotted card.</span></div>
+    </div>
+    <p class="muted">Object glow and icons is Quest Vision's <b>Glow on quest objects</b>: both set the game's soft targeting, so only one can play.</p>
+  </section>
+
+  <section id="find">
+    <div class="eyebrow">The Find frames icon</div>
+    <h2>Find frames</h2>
+    <p>Type part of a frame's name, or of the addon that made it, to find frames to fade. Hover a match to see it marked on screen, then click it to fade it. <b>Hover Find</b> is here too (below).</p>
+    <p><b>Smart Find</b> looks for other addons' frames that nothing fades yet, and lists each with its <b>Addon</b> and a <b>Guess</b> at which row it should follow. <b>Load</b> puts one on the Loaded tab, under its addon, with the Default row's settings; <b>Load all</b> does them all. <b>Look in the background</b> keeps it looking for new addons' frames for a while.</p>
   </section>
 
   <section id="add">
     <div class="eyebrow">Everything else</div>
     <h2>Add it yourself</h2>
-    <p>For any other addon, point at its frame and add it. It joins the <b>Custom frames</b> list at the bottom of the Addon Frames page, with the same columns as the supported addons.</p>
+    <p>For any other addon, point at its frame and add it. It joins the <b>Custom frames</b> list on the Addon Frames page (the Loaded icon), with the same columns as the supported addons.</p>
     <h3>One frame</h3>
     <ol class="steps">
       <li><div>Put the mouse over the frame you want to fade.</div></li>
@@ -160,7 +190,7 @@ dl.faq dd { margin: 2px 0 0; color: var(--muted) }
     </ol>
     <h3>Several at once: Add mode</h3>
     <ol class="steps">
-      <li><div>Press <b>Hover Find</b> at the top of the Addon Frames page, or type <code>/cine add mode</code>. Move the settings window out of the way, or close it.</div></li>
+      <li><div>Press <b>Hover Find</b> on the Addons hub's Find frames icon, or type <code>/cine add mode</code>. Move the settings window out of the way, or close it.</div></li>
       <li><div>Hover over each frame you want to fade.</div></li>
       <li><div>Click <b>Stop</b>, or type <code>/cine add mode</code> again, to fade them all. <code>/cine add cancel</code> drops them instead.</div></li>
     </ol>
@@ -188,6 +218,7 @@ dl.faq dd { margin: 2px 0 0; color: var(--muted) }
     <dl class="faq">
       <div><dt>An addon is on the list but still shows in CineMode.</dt><dd>Check its row on the Addon Frames page (or, for one that follows the Game Frames page, the row of the frame it replaces): with Always ticked, it stays up.</dd></div>
       <div><dt>I use EllesmereUI's or ElvUI's action bars. Where are they?</dt><dd>Most are the same rows as the game's bars on the Game Frames page, so they fade just as the game's would. Only the extra bars the game doesn't have get rows on the Addon Frames page.</dd></div>
+      <div><dt>What's on Custom Support?</dt><dd>Settings for how Cinematic works with addons it has a rule of its own for, shown only with one loaded: <b>Move Questie's nameplate icons</b> (beside the name, where the quest mark goes) and <b>Move EnhanceQoL's nameplate quest marks</b>. Its <b>Enable Page</b> turns Cinematic's support for your other addons on or off.</dd></div>
       <div><dt>/cine add says it's a window.</dt><dd>Move the mouse off the window, onto the frame you want, and try again. Windows aren't faded so you never lose one you opened.</dd></div>
     </dl>
   </section>

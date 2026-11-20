@@ -265,7 +265,7 @@ function ns.ReportError(message, stack, caught)
 			Alert(("error: %s (/cine log for the stack)"):format(Shorten(message:match("^[^\n]*"))))
 		elseif not told and ns.Print then
 			told = true
-			ns.Print("hit a Lua error. Type /cine log to copy the details for a bug report.")
+			ns.Print(ns.L["hit a Lua error. Type /cine log to copy the details for a bug report."])
 		end
 	end
 	entry.count = entry.count + 1
@@ -1834,7 +1834,7 @@ do
 			"CompactUnitFrame_UpdateAuras", "CompactUnitFrame_UpdateBuffs" }) do
 			ns.Log("raidparts", ("%s: %s"):format(fn, type(_G[fn])))
 		end
-		local focus = GetMouseFoci and GetMouseFoci()[1]
+		local focus = ns.MouseFocus()
 		if focus then
 			ns.Log("raidparts", ("under the mouse: %s, debug name %s, parent %s"):format(Describe(focus),
 				Safe(focus.GetDebugName, focus) or "?",
@@ -3349,8 +3349,7 @@ function ns.MinimapPulseTest()
 		end
 		if GetTime() >= nextSnap then
 			nextSnap = GetTime() + 0.5
-			local foci = GetMouseFoci and GetMouseFoci()
-			local focus = type(foci) == "table" and foci[1] or (GetMouseFocus and GetMouseFocus())
+			local focus = ns.MouseFocus()
 			local x, y = GetCursorPosition()
 			local okOver, over = pcall(function() return ns.Flag(Minimap:IsMouseOver()) end)
 			local okSweep, sweep = pcall(ns.MinimapSweepState or function() return "no sweep code" end)

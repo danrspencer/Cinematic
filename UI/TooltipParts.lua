@@ -254,7 +254,7 @@ end
 -- tooltip whose owner isn't that frame.
 local function FocusUnitFrame()
 	local ok, unit = pcall(function()
-		local focus = GetMouseFoci and GetMouseFoci()[1] or (GetMouseFocus and GetMouseFocus())
+		local focus = ns.MouseFocus()
 		local u = focus and focus.unit
 		if type(u) ~= "string" or (issecretvalue and issecretvalue(u)) then
 			return nil
@@ -1133,12 +1133,7 @@ local function Num0(f)
 end
 
 -- The frame under the mouse.
-local function MouseFocus()
-	if GetMouseFoci then
-		return GetMouseFoci()[1]
-	end
-	return GetMouseFocus and GetMouseFocus()
-end
+local MouseFocus = ns.MouseFocus
 
 local function Describe(part)
 	return ("%s (%s) %s at %s, %s"):format(

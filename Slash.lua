@@ -78,7 +78,7 @@ local function PrintHelp()
 	Command("/cine plates", L["why friendly nameplates near you are showing, as text to copy and send us"])
 	Heading(L["Camera"])
 	Command("/cine behind", L["swing the camera back behind your character"])
-	Command("/cine flyby", L["turn the camera slowly round to look back, then back behind you (again to stop)"])
+	Command("/cine flyby", L["turn the camera slowly around to look back, then back behind you (again to stop)"])
 	Command("/cine walk", L["does the addon think you're walking or auto-running?"])
 	Command("/cine walk flip", L["fix it if it has walk and run backwards"])
 	Heading(L["More"])
@@ -664,7 +664,7 @@ local function HandleSlash(msg)
 		local group = arg:match("^hover%s+(%S+)") or "quests"
 		local last
 		ns.hoverWatch = C_Timer.NewTicker(0.1, function()
-			local focus = GetMouseFoci and GetMouseFoci()[1] or (GetMouseFocus and GetMouseFocus())
+			local focus = ns.MouseFocus()
 			local ok, focusName = pcall(function() return focus and focus:GetDebugName() or "nothing" end)
 			local parts = { "on " .. (ok and tostring(focusName) or "?") }
 			for _, entry in ipairs(ns.managed) do

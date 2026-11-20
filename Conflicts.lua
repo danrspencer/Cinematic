@@ -25,7 +25,7 @@ local PICK_TIPS = {
 }
 local PAGE = "Addon Conflicts"
 -- Addons with rows (Support/): the page is listed with one of them loaded.
-local ADDONS = { "DaylightUI", "ElvUI", "Leatrix_Plus", "NaowhForever_QoL", "RareScanner" }
+local ADDONS = { "DaylightUI", "DynamicCam", "ElvUI", "Leatrix_Plus", "NaowhForever_QoL", "RareScanner" }
 
 -- Holding their frames hidden ------------------------------------------------
 

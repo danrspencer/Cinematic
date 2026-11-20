@@ -115,14 +115,18 @@ dl.faq dd { margin: 2px 0 0; color: var(--muted) }
     <div class="eyebrow">General</div>
     <h2>On, off and settings</h2>
     <div class="cmds">
-<div class="cmd"><code id="cmd1">/cine</code><span class="what">Turns all of Cinematic on or off. With no level picked yet, it opens the welcome window</span><button type="button" class="copy" data-for="cmd1">Copy</button></div>
-<div class="cmd"><code id="cmd2">/cine on</code><span class="what">Turns CineMode on</span><button type="button" class="copy" data-for="cmd2">Copy</button></div>
-<div class="cmd"><code id="cmd3">/cine off</code><span class="what">Turns CineMode off</span><button type="button" class="copy" data-for="cmd3">Copy</button></div>
+<div class="cmd"><code id="cmd1">/cine</code><span class="what">Turns CineMode on or off (<code>/cine toggle</code> too). With no level picked yet, it opens the welcome window</span><button type="button" class="copy" data-for="cmd1">Copy</button></div>
+<div class="cmd"><code id="cmd2">/cine on</code><span class="what">Turns Cinematic back on after it was turned off</span><button type="button" class="copy" data-for="cmd2">Copy</button></div>
+<div class="cmd"><code id="cmd3">/cine off</code><span class="what">Turns Cinematic off completely: it asks first, then turns it off in the AddOns list and reloads</span><button type="button" class="copy" data-for="cmd3">Copy</button></div>
 <div class="cmd"><code id="cmd4">/cine config</code><span class="what">Opens Cinematic's settings (<code>/cine options</code> too)</span><button type="button" class="copy" data-for="cmd4">Copy</button></div>
+<div class="cmd"><code id="cmd4b">/cine find minimap</code><span class="what">Opens the settings at the setting or page with those words</span><button type="button" class="copy" data-for="cmd4b">Copy</button></div>
+<div class="cmd"><code id="cmd4c">/cine find ui visibility minimap</code><span class="what">Opens a page by its names, from the left list down</span><button type="button" class="copy" data-for="cmd4c">Copy</button></div>
+<div class="cmd"><code id="cmd4d">/cine find Style|Names fade time</code><span class="what">Looks only on those pages: the page names, a <code>|</code> between them, then the words</span><button type="button" class="copy" data-for="cmd4d">Copy</button></div>
 <div class="cmd"><code id="cmd5">/cine hideui</code><span class="what">Hides the UI but keeps the look: the tint, letterbox and time-of-day title. Again to bring it back</span><button type="button" class="copy" data-for="cmd5">Copy</button></div>
 <div class="cmd"><code id="cmd6">/cine size 3</code><span class="what">Sets the letterbox bar height, as a percent of the screen from 0 to 40. Each bar starts at 3</span><button type="button" class="copy" data-for="cmd6">Copy</button></div>
 <div class="cmd"><code id="cmd7">/cine button</code><span class="what">Shows or hides the minimap button</span><button type="button" class="copy" data-for="cmd7">Copy</button></div>
 <div class="cmd"><code id="cmd8">/cine welcome</code><span class="what">Opens the welcome window, to pick a level or Customize</span><button type="button" class="copy" data-for="cmd8">Copy</button></div>
+<div class="cmd"><code id="cmd8b">/cine conflicts</code><span class="what">Opens the Addon Conflicts window: for features your other addons also have, pick whose version plays</span><button type="button" class="copy" data-for="cmd8b">Copy</button></div>
     </div>
   </section>
 
@@ -152,6 +156,7 @@ dl.faq dd { margin: 2px 0 0; color: var(--muted) }
 <div class="cmd"><code id="cmd18">/cine keep</code><span class="what">Always shows the frame under the mouse (<code>/cine remove</code> too)</span><button type="button" class="copy" data-for="cmd18">Copy</button></div>
 <div class="cmd"><code id="cmd19">/cine list</code><span class="what">Lists the extra frames you've added</span><button type="button" class="copy" data-for="cmd19">Copy</button></div>
 <div class="cmd"><code id="cmdwhy">/cine why</code><span class="what">The Why window: every frame, whether it's showing right now, and which settings say so. <code>/cine why pick</code> goes straight to clicking a frame on screen</span><button type="button" class="copy" data-for="cmdwhy">Copy</button></div>
+<div class="cmd"><code id="cmdplates">/cine plates</code><span class="what">Why friendly nameplates near you are showing, as text to copy and send us</span><button type="button" class="copy" data-for="cmdplates">Copy</button></div>
     </div>
     <p class="muted">The same is on the Addon Frames settings page. See <a href="../guides/other-addons.html">Other addons</a>.</p>
   </section>
@@ -176,6 +181,8 @@ dl.faq dd { margin: 2px 0 0; color: var(--muted) }
 <div class="cmd"><code id="cmd24">/cine talents</code><span class="what">Opens the talent calculator, to plan a build. <span class="chip forever">WoW Forever</span></span><button type="button" class="copy" data-for="cmd24">Copy</button></div>
 <div class="cmd"><code id="cmd25">/cine rolls</code><span class="what">Opens the latest loot rolls, once Roll Vision is turned on. Where the game keeps a loot history</span><button type="button" class="copy" data-for="cmd25">Copy</button></div>
 <div class="cmd"><code id="cmd26">/cine rolls test</code><span class="what">Shows the roll window with made-up rolls, to see how it looks</span><button type="button" class="copy" data-for="cmd26">Copy</button></div>
+<div class="cmd"><code id="cmd26b">/cine keys</code><span class="what">Shows or hides the Keyboard Map: what each of your keys does. <code>/cine keys frostbolt</code> finds those words on it</span><button type="button" class="copy" data-for="cmd26b">Copy</button></div>
+<div class="cmd"><code id="cmd26c">/cine report</code><span class="what">Damage Vision's report for this run: boss by boss, the rest, the whole party. <code>/cine report test</code> shows a made-up one</span><button type="button" class="copy" data-for="cmd26c">Copy</button></div>
     </div>
   </section>
 
@@ -185,6 +192,8 @@ dl.faq dd { margin: 2px 0 0; color: var(--muted) }
     <div class="cmds">
 <div class="cmd"><code id="cmd27">/cine log</code><span class="what">Opens the log and a summary of your setup, ready to copy into a bug report</span><button type="button" class="copy" data-for="cmd27">Copy</button></div>
 <div class="cmd"><code id="cmd28">/cine log clear</code><span class="what">Empties the log</span><button type="button" class="copy" data-for="cmd28">Copy</button></div>
+<div class="cmd"><code id="cmd28b">/cine error</code><span class="what">Has Cinematic hit any errors? Lists them, newest last</span><button type="button" class="copy" data-for="cmd28b">Copy</button></div>
+<div class="cmd"><code id="cmd28c">/cine profiler</code><span class="what">Records what Cinematic costs your computer, with the results on the Profiler page (<code>/cine profiler deep</code>: in detail; <code>/cine profiler stop</code>: end it early)</span><button type="button" class="copy" data-for="cmd28c">Copy</button></div>
 <div class="cmd"><code id="cmd29">/cine panic</code><span class="what">Stops Cinematic for this session and puts your UI and settings back</span><button type="button" class="copy" data-for="cmd29">Copy</button></div>
 <div class="cmd"><code id="cmd30">/cine resume</code><span class="what">Starts Cinematic again after <code>/cine panic</code> or an error stopped it</span><button type="button" class="copy" data-for="cmd30">Copy</button></div>
 <div class="cmd"><code id="cmd31">/cine debug help</code><span class="what">Lists the troubleshooting commands, for when a bug report asks for one. What they print goes in the log too</span><button type="button" class="copy" data-for="cmd31">Copy</button></div>

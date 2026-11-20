@@ -171,7 +171,7 @@ ns.PROFILE_MODULES = {
 		"The game's own layout (Modern or Classic), which the fades and mouseover groups are made for, " ..
 		"not one the player's moved things in."),
 	Layout("layout-retail", "Retail Inspired layout", "Retail Inspired", "forever",
-		"Action bars centred along the bottom, the micro menu and bags in the corner, the XP bars under them, " ..
+		"Action bars centered along the bottom, the micro menu and bags in the corner, the XP bars under them, " ..
 		"as on retail. Fights bring up the player frame, not the personal resource display, which isn't kept " ..
 		"up while you recover either.",
 		function(set, client)
@@ -746,7 +746,7 @@ ns.PROFILE_MODULES = {
 			"weather at 100%).",
 		apply = function(set) set("rainViewScale", 1) end },
 	{ key = "vitals-vision", name = "Vitals Vision on", scope = { "Vitals Vision" },
-		tip = "Your health at the screen's edges and the picture drained toward grey as it drops.",
+		tip = "Your health at the screen's edges and the picture drained toward gray as it drops.",
 		-- (Its health bars fading in, Keep up's Fade to since 2026-11-17: Off
 		-- in every profile, user's pick.)
 		apply = function(set) set("lowHealth", true) end },

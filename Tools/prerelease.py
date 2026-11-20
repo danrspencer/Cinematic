@@ -8,6 +8,7 @@ Runs side by side, each a PASS or FAIL line, then one line for all of it:
 - luacheck (baseline 0 warnings) and the Lua 5.1 compile of every .lua (the
   200-local cap and syntax, which luacheck misses);
 - check-toc.py (dev TOC = release TOC + dev files, packaging);
+- local-room.py: files near Lua's 200-local cap (named, never a FAIL);
 - the full offline check (Tools/offline/check.lua: the profile modules, the
   built-in profiles' settings, setting ids);
 - the settings sweep on the stand-in game, both clients
@@ -94,6 +95,17 @@ def judge_luacheck(ok, output):
 def judge_compile(ok, output):
     bad = [l for l in output.splitlines() if l.strip() and not l.rstrip().endswith(" ok")]
     return ok and not bad, ("%d files ok" % len(output.splitlines())) if not bad else "; ".join(bad[:5])
+
+
+def judge_room(ok, output):
+    # (Never a FAIL by itself: a file at the cap still loads. Each tight one is
+    # named, so a session adding locals there sees it; a file that doesn't
+    # compile fails here and in the compile above.)
+    tight = [l.strip() for l in output.splitlines() if l[:3].strip().isdigit()]
+    detail = last_line(output, "local room:")
+    if tight:
+        detail += "\n      " + "\n      ".join(tight)
+    return ok, detail
 
 
 def judge_check(ok, output):
@@ -187,6 +199,7 @@ def main():
         jobs.append(Job("Lua 5.1 compile", [PY, os.path.join(HOME, "bin", "luacompile.py")] + lua_files(),
                         judge_compile))
         jobs.append(Job("TOCs", [PY, "-I", "Tools/check-toc.py"], lambda ok, out: (ok, last_line(out))))
+        jobs.append(Job("locals to spare (Lua's 200 cap)", [PY, "-I", "Tools/local-room.py"], judge_room))
         jobs.append(Job("offline check (profiles, ids)", lua + ["Tools/offline/check.lua"], judge_check))
         for client in CLIENTS:
             jobs.append(Job("offline sweep, %s" % client, lua + ["Tools/offline/sweep.lua", client], judge_sweep))

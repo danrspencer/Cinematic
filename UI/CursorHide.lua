@@ -228,13 +228,7 @@ local function PickCover()
 	pickCover:Hide()
 	return pickCover
 end
-local function MouseFocus()
-	if GetMouseFoci then
-		local foci = GetMouseFoci()
-		return foci and foci[1]
-	end
-	return GetMouseFocus and GetMouseFocus()
-end
+local MouseFocus = ns.MouseFocus
 -- Whether the game's cursor over this unit is its plain pointer (retail can
 -- say; elsewhere a player you can't attack gets it).
 local unitProbe

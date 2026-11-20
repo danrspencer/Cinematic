@@ -2182,7 +2182,7 @@ function ns.LowHealthGameArt(arg)
 	gameArtTest = arg ~= "off" or nil
 	UseTheme(screen, WantedTheme(), ThemeLook(Look(), WantedTheme()))
 	if gameArtTest then
-		ns.Print("Vitals Vision: the game's low-health edge in the theme's colours. Testing (off: /cine debug gameart off)")
+		ns.Print("Vitals Vision: the game's low-health edge in the theme's colors. Testing (off: /cine debug gameart off)")
 		ns.TestLowHealth()
 	else
 		ns.Print("Vitals Vision: the theme's own art again")

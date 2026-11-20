@@ -1552,15 +1552,7 @@ function cursor.On()
 		and ns.CanCursorSweepMinimap()
 end
 
-local function MouseFocus()
-	if GetMouseFoci then
-		local foci = GetMouseFoci()
-		local focus = type(foci) == "table" and foci[1] or nil
-		if Secret(focus) then return nil end
-		return focus
-	end
-	return GetMouseFocus and GetMouseFocus() or nil
-end
+local MouseFocus = ns.MouseFocus
 
 local function InMinimap(frame)
 	for _ = 1, 20 do

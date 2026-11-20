@@ -1460,10 +1460,7 @@ aim.turnBy = 0.47 -- (the share of the target's x the game's turn takes off, at 
 aim.farthest = 0.85 -- (the click's x it's never taken past: the furthest measured)
 -- (Over the world or a nameplate: forbidden ones can't be asked, so count as a plate.)
 function aim.OverWorld()
-	local ok, focus = pcall(function()
-		if GetMouseFoci then return GetMouseFoci()[1] end
-		return GetMouseFocus and GetMouseFocus()
-	end)
+	local ok, focus = pcall(ns.MouseFocus)
 	if not ok or focus == nil or focus == WorldFrame then return true end
 	if focus.IsForbidden and focus:IsForbidden() then return true end
 	local okName, name = pcall(focus.GetName, focus)
@@ -2032,6 +2029,24 @@ local function ReadPoints(frame)
 	return points
 end
 
+-- Whether a frame's points are still these (as ReadPoints gave them), read
+-- without making a table: the follower asks every frame.
+local function StillAt(frame, points)
+	if not points then return false end
+	local ok, count = pcall(frame.GetNumPoints, frame)
+	if not ok or count ~= #points then return false end
+	for i = 1, count do
+		local okPoint, point, relativeTo, relativePoint, x, y = pcall(frame.GetPoint, frame, i)
+		local want = points[i]
+		if not okPoint or point ~= want[1] or relativeTo ~= want[2] or relativePoint ~= want[3]
+			or type(x) ~= "number" or type(y) ~= "number"
+			or math.abs(x - want[4]) > 0.01 or math.abs(y - want[5]) > 0.01 then
+			return false
+		end
+	end
+	return true
+end
+
 local function SamePoints(a, b)
 	if not (a and b) or #a ~= #b then return false end
 	for i = 1, #a do
@@ -2159,6 +2174,7 @@ local function TargetShift()
 	return math.max(-most, math.min(most, shift))
 end
 
+local CAST_BAR_NAMES = { "PlayerCastingBarFrame", "CastingBarFrame", "GamepadPlayerCastingBarFrame" }
 local follower = CreateFrame("Frame")
 follower:Hide()
 ns.SetOnUpdate(follower, function(self, elapsed)
@@ -2191,7 +2207,7 @@ ns.SetOnUpdate(follower, function(self, elapsed)
 	if math.abs(alignTo - followLift.align) < 0.01 then followLift.align = alignTo end
 	local castX
 	if FOLLOWS.PlayerCastingBarFrame or FOLLOWS.CastingBarFrame then
-		for _, name in ipairs({ "PlayerCastingBarFrame", "CastingBarFrame", "GamepadPlayerCastingBarFrame" }) do
+		for _, name in ipairs(CAST_BAR_NAMES) do
 			local bar = _G[name]
 			local barEntry = type(bar) == "table" and followed[bar]
 			if barEntry and barEntry.homeX and Mover(bar) then
@@ -2203,11 +2219,14 @@ ns.SetOnUpdate(follower, function(self, elapsed)
 	for name, key in pairs(FOLLOWS) do
 		local frame = _G[name]
 		if type(frame) == "table" and frame.GetPoint then
-			local entry, now = followed[frame], ReadPoints(frame)
-			-- (Moved by the game since: its new place.)
-			if now and (not entry or not SamePoints(now, entry.ours)) then
-				entry = { points = now, ours = now, shift = 0, lift = 0, homeX = CenterX(frame) }
-				followed[frame] = entry
+			local entry = followed[frame]
+			-- (Moved by the game since: its new place. Read into a table only then.)
+			if not (entry and StillAt(frame, entry.ours)) then
+				local now = ReadPoints(frame)
+				if now and (not entry or not SamePoints(now, entry.ours)) then
+					entry = { points = now, ours = now, shift = 0, lift = 0, homeX = CenterX(frame) }
+					followed[frame] = entry
+				end
 			end
 			-- (Riding along with another, or on a plate: only its own height;
 			-- none: back on its own place, kept till it can go if protected in a fight.)

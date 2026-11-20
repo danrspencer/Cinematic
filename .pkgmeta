@@ -34,3 +34,17 @@ ignore:
   - Textures/CursorTestRed.tga
   # (Vitals Vision's old sprites: only make_wind_guide.py reads them now)
   - Textures/LowHealth/Effects.tga
+  # (Vitals edges no theme or edge list names: only make_lowhealth.py made them.
+  # Kept here for later; back in the package once the code uses one.)
+  - Textures/LowHealth/Crack.tga
+  - Textures/LowHealth/CrackGlow.tga
+  - Textures/LowHealth/Flame.tga
+  - Textures/LowHealth/FlameGlow.tga
+  - Textures/LowHealth/Runes.tga
+  - Textures/LowHealth/RunesGlow.tga
+  - Textures/LowHealth/Scales.tga
+  - Textures/LowHealth/ScalesGlow.tga
+  - Textures/LowHealth/SunMoon.tga
+  - Textures/LowHealth/SunMoonGlow.tga
+  - Textures/LowHealth/Vines.tga
+  - Textures/LowHealth/VinesGlow.tga

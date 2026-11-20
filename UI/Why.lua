@@ -1262,7 +1262,7 @@ end
 
 function ns.DebugInspect()
 	local x, y = GetCursorPosition()
-	local focus = GetMouseFoci and GetMouseFoci()[1] or GetMouseFocus and GetMouseFocus()
+	local focus = ns.MouseFocus()
 	ns.Print(("inspect %s, cursor %.0f,%.0f, mouse on %s, CineMode %s, %d managed"):format(
 		ns.whyPicking and "on" or "off", x, y, tostring(focus and focus.GetName and focus:GetName() or focus),
 		tostring(ns.lastCinematic), #(ns.managed or NONE)))

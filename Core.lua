@@ -2372,6 +2372,30 @@ local function Flag(value)
 	return value and true or false
 end
 
+-- A function's results as a table with their count in n, so a nil in the
+-- middle or at the end isn't lost: unpack(t, 1, t.n) gives them all back
+-- (a plain { ... } with unpack(t) stops at Lua 5.1's idea of # instead).
+function ns.Pack(...)
+	return { n = select("#", ...), ... }
+end
+
+-- The frame under the mouse, or nil. Retail's GetMouseFoci gives a list (its
+-- first is the top one); older clients have GetMouseFocus. A secret one
+-- counts as nil, since comparing it would error.
+function ns.MouseFocus()
+	local focus
+	if GetMouseFoci then
+		local foci = GetMouseFoci()
+		focus = type(foci) == "table" and foci[1] or nil
+	elseif GetMouseFocus then
+		focus = GetMouseFocus()
+	end
+	if focus ~= nil and issecretvalue and issecretvalue(focus) then
+		return nil
+	end
+	return focus
+end
+
 -- Whether a unit counts as an enemy for the enemy target choices: one you can
 -- attack (neutral mobs too), or the other faction's player even while they
 -- aren't flagged for PvP. nil when the game won't say (secret values).

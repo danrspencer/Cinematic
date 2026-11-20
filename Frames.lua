@@ -2074,13 +2074,7 @@ do
 		local now = GetTime()
 		if focusAt ~= now then
 			focusAt = now
-			if GetMouseFoci then
-				focus = GetMouseFoci()[1]
-			elseif GetMouseFocus then
-				focus = GetMouseFocus()
-			else
-				focus = nil
-			end
+			focus = ns.MouseFocus()
 			if focus == WorldFrame then
 				focus = nil
 			end
@@ -14882,6 +14876,7 @@ do
 	-- that hides it (Hide macro names: the macro's name, TAR...).
 	local TEXTS = { { "HotKey", "HotKey", "hideKeybinds" }, { "Name", "Name", "hideMacroText" } }
 	local setting = {} -- (each text hooked: the setting that hides it)
+	local faded = {} -- (each text we set to 0: given back its alpha once, when unticked)
 	local function Hidden(key)
 		return ns.db ~= nil and ns.db[key] == true
 	end
@@ -14896,15 +14891,24 @@ do
 				local button = _G[bar[1] .. i]
 				for _, kind in ipairs(button and TEXTS or {}) do
 					local text = button[kind[1]] or _G[bar[1] .. i .. kind[2]]
+					-- (Hooked only once its setting is ticked, and only what we faded
+					-- given back: with both off, the buttons are left to the game
+					-- and other addons, as if this weren't here.)
 					if text and text.SetAlpha then
-						if not setting[text] then
-							setting[text] = kind[3]
-							hooksecurefunc(text, "SetVertexColor", Fix)
-							if text.SetTextColor then
-								hooksecurefunc(text, "SetTextColor", Fix)
+						if Hidden(kind[3]) then
+							if not setting[text] then
+								setting[text] = kind[3]
+								hooksecurefunc(text, "SetVertexColor", Fix)
+								if text.SetTextColor then
+									hooksecurefunc(text, "SetTextColor", Fix)
+								end
 							end
+							text:SetAlpha(0)
+							faded[text] = true
+						elseif faded[text] then
+							faded[text] = nil
+							text:SetAlpha(1)
 						end
-						text:SetAlpha(Hidden(kind[3]) and 0 or 1)
 					end
 				end
 			end

@@ -168,11 +168,11 @@ local function Call(fn, ...)
 	if type(fn) ~= "function" then
 		return nil
 	end
-	local results = { pcall(fn, ...) }
+	local results = ns.Pack(pcall(fn, ...))
 	if not results[1] then
 		return nil
 	end
-	return unpack(results, 2)
+	return unpack(results, 2, results.n)
 end
 
 -- Coming and going: ours fade in as a talk opens and out as it ends, not

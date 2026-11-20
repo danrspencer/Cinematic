@@ -1076,33 +1076,6 @@ function ns.TestDamageVision(quiet, meterTest)
 	ns.Print(L["Damage Vision test: a made-up fight for 25 seconds. Close the settings to see it."])
 end
 
--- For DamageVisionMeterTest.lua: the meter window it sits over (or would),
--- how much of the meter shows, its own alpha as seen (0-1, over UIParent's)
--- and both centers.
-function ns.DamageVisionProbe()
-	db = ns.GetDB()
-	local probe = { window = MeterWindow(), meter = MeterShows(), over = frame and frame.over,
-		opacity = Look().damageVisionOpacity or 1 }
-	if frame then
-		local okBase, base = pcall(UIParent.GetEffectiveAlpha, UIParent)
-		local ok, alpha = pcall(frame.GetEffectiveAlpha, frame)
-		probe.alpha = ok and Plain(alpha) and alpha / math.max(okBase and Plain(base) or 1, 0.01) or nil
-		probe.shown = frame:IsShown()
-		local okX, x, y = pcall(frame.GetCenter, frame)
-		local scale = frame:GetEffectiveScale() / UIParent:GetEffectiveScale()
-		if okX and Plain(x) and Plain(y) then probe.x, probe.y = x * scale, y * scale end
-	end
-	local window = probe.window
-	if window then
-		local okX, x, y = pcall(window.GetCenter, window)
-		local scale = window:GetEffectiveScale() / UIParent:GetEffectiveScale()
-		if okX and Plain(x) and Plain(y) then probe.wx, probe.wy = x * scale, y * scale end
-		local okName, name = pcall(window.GetName, window)
-		probe.name = okName and tostring(name) or "?"
-	end
-	return probe
-end
-
 function ns.TestDamageRecap()
 	local rows = HasMeter() and Rows(Enum.DamageMeterSessionType.Overall, MeterType())
 	if not rows or #rows == 0 or InCombatLockdown() then
