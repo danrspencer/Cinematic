@@ -445,6 +445,12 @@ local DEMOS = {
 			end
 		end },
 	speech = { once = true, start = function() ns.TestSpeechBehind() end },
+	-- (Nameplates: the plate code told it's CineMode (Core.lua's
+	-- ns.PlatesCinematic), so the plates that don't matter fade and your
+	-- target's stays, as your level has them; its switch on meanwhile.)
+	plates = { seconds = 7, fade = true, switches = { "handlePlates" },
+		start = function() ns.plateDemo = true end,
+		stop = function() ns.plateDemo = nil end },
 	-- (Heal Vision: its own party, above; the window faded.)
 	heal = { seconds = HEAL_END, fade = true, start = StartHealDemo, stop = StopHealDemo,
 		running = function() return healDemo ~= nil end },
@@ -601,7 +607,7 @@ local IN_PROFILE = { fadeUI = { "handleFrames" }, bars = { "letterboxPage", "let
 	weather = { "tintPage", "weatherTint" }, timeTitle = { "cards", "timeOfDayChange" }, cards = { "cards" },
 	recap = { "damageVision" }, damage = { "damageVision" }, emote = { "emoteVision" }, roll = { "rollWindow" },
 	deathVision = { "deathScreen" }, duel = { "duelPlates" }, audio = { "musicInCinematic" },
-	mouseover = { "handleFrames", "mouseover" }, heal = { "handleHealVision" } }
+	mouseover = { "handleFrames", "mouseover" }, heal = { "handleHealVision" }, plates = { "handlePlates" } }
 -- A camera's Test by its scene (CameraRows.lua's triggers): on with the Cameras
 -- page's switch, the scene ticked and a camera picked (camera: the one to pick
 -- for Turn on).

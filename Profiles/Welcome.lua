@@ -461,6 +461,8 @@ local SHELF_MORE = {
 			"out as you leave." },
 	{ key = "cards", label = "Card Vision", icon = "Interface\\Icons\\INV_Misc_Book_09", group = "vis",
 		tip = "Title cards for the moments of your day: a new zone, a level, a fight." },
+	{ key = "plates", label = "Nameplates", icon = "Interface\\Icons\\Ability_Hunter_SniperShot", group = "ui",
+		tip = "Nameplates that show only for what matters: your target, a mob on you, a friend in need." },
 	-- (the Mouseover page's own icon, a pointing hand)
 	{ key = "mouseover", label = "Mouseover", icon = "Interface\\Cursor\\Point", group = "ui",
 		tip = "Point at where a faded frame lives and it comes back, with its group." },
@@ -492,7 +494,7 @@ local TOUR = { { key = "fadeUI" }, { key = "bars" }, { key = "tint" }, { key = "
 -- The features with nothing to play: a line of links under the grid, "Also
 -- in Cinematic", each opening its settings page (by its English name, as
 -- ns.OpenOptions takes it) over the welcome window, closing back to it. The
--- ones waiting for a demo of their own (Nameplates,
+-- ones waiting for a demo of their own (
 -- Chat Bubbles, Combat Text, Skyriding Cam) are here till they have one.
 local SHELF_LINKS = {
 	{ page = "Graphics+", label = "Graphics Boost", group = "atmo",
@@ -507,8 +509,6 @@ local SHELF_LINKS = {
 		tip = "Quest mobs keep their nameplates, with a quest mark." },
 	{ page = "Duel Vision", label = "Duel Vision", group = "vis",
 		tip = "In CineMode, the nameplates of two players dueling near you show." },
-	{ page = "Nameplates", label = "Nameplates", group = "ui",
-		tip = "Nameplates that show only for what matters: your target, a mob on you, a friend in need." },
 	{ page = "Chat bubbles", label = "Chat Bubbles", group = "ui",
 		tip = "Chat bubbles restyled, so talk stays readable with your UI gone." },
 	{ page = "Tooltips", label = "Tooltips", group = "ui", tip = "Which parts of a tooltip show, and where it sits." },

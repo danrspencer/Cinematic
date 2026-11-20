@@ -3775,8 +3775,9 @@ ns.OUTSIDE_EFFECT = OUTSIDE_EFFECT
 -- parts, names, icons and marks go by them with CineMode off too, as though
 -- it were on. Off to start with: the game's own plates outside CineMode.
 DEFAULTS.outsideCinePlates = false
+-- (ns.plateDemo: the welcome window's Nameplates demo, the plates as in CineMode, ShowMe.lua.)
 function ns.PlatesCinematic(cinematic)
-	return (cinematic or (ns.db and ns.db.outsideCinePlates)) and true or false
+	return (cinematic or ns.plateDemo or (ns.db and ns.db.outsideCinePlates)) and true or false
 end
 local EFFECT_ROWS = {} -- (their Show in rows' keys, made once)
 for _, key in ipairs(GRID_EFFECTS) do EFFECT_ROWS[key] = "effect:" .. key end

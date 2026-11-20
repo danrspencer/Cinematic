@@ -35,7 +35,7 @@ local _, ns = ...
 local PLAY_FOR = 8   -- seconds a tile's watched at most
 local SHOT_AT = 2
 -- (later for a demo whose look comes partway: Mouseover's group, 2.5 s in)
-local SHOT_AT_FOR = { mouseover = 4, heal = 5 }
+local SHOT_AT_FOR = { mouseover = 4, heal = 5, plates = 3 }
 local SKIP = { shoulder = "trying it agrees to its experimental camera setting" }
 -- (ShowMe.lua's once demos: shown and done, no Stop. Any other not running
 -- right after its click didn't start: the quest camera, 2026-11-20.)
@@ -92,6 +92,27 @@ local function TextOnScreen(words)
 	end
 	local holder = _G.CinematicOverlayHolder
 	return Find(UIParent, 0) or (holder and Find(holder, 0)) or false
+end
+-- The nameplates now: how many there are, how many Cinematic is fading (the
+-- alpha it keeps them at, Effects.lua's cinematicAlpha: their own alpha
+-- can't be read, 2026-11-20 counted 0 of 21), and whether your target's is
+-- faded. (A forbidden plate: not ours to fade or read.)
+local function PlatesNow()
+	local total, faded, targetFaded = 0, 0, false
+	for _, plate in ipairs(C_NamePlate and C_NamePlate.GetNamePlates and C_NamePlate.GetNamePlates() or {}) do
+		total = total + 1
+		local ok, alpha = pcall(function()
+			if plate.IsForbidden and plate:IsForbidden() then return nil end
+			return plate.UnitFrame and plate.UnitFrame.cinematicAlpha
+		end)
+		if ok and type(alpha) == "number" and alpha < 0.5 then
+			faded = faded + 1
+			local unit = plate.namePlateUnitToken
+			local isTarget = unit and UnitIsUnit(unit, "target")
+			if isTarget and not (issecretvalue and issecretvalue(isTarget)) then targetFaded = true end
+		end
+	end
+	return total, faded, targetFaded
 end
 local WATCH = { "PlayerFrame", "MainActionBar", "MainMenuBar", "ChatFrame1", "Minimap" }
 local SHOWS = {
@@ -196,6 +217,21 @@ local SHOWS = {
 			if i == hurt then ok = ok and m[1] > 0.8 and m[2] < 0.9 else ok = ok and m[1] < 0.2 end
 		end
 		return ok, table.concat(parts, "; ")
+	end,
+	-- (plates fading now that weren't before, or fewer plates at all; your
+	-- target's not among the faded)
+	plates = function()
+		local total, faded, targetFaded = PlatesNow()
+		local before = run.platesBefore or { 0, 0 }
+		local hasTarget = UnitExists("target")
+		-- (Plates faded and your target's kept: what CineMode does. A level whose
+		-- plates are handled outside CineMode too fades them before as well:
+		-- 21 of 21 on Shoulder Cam, 2026-11-20. Not a fail: it's the same look.)
+		return faded > 0 and not targetFaded,
+			("%d plates, %d faded by Cinematic (before: %d plates, %d faded%s), your target %s%s"):format(total, faded,
+				before[1], before[2], before[2] > 0 and ": handled outside CineMode too on this level" or "",
+				hasTarget and "set" or "none",
+				hasTarget and (targetFaded and ", its plate FADED" or ", its plate kept") or "")
 	end,
 	speech = function()
 		return TextOnScreen(ns.L["Speech from behind you shows here."]), "its line searched for on screen"
@@ -314,6 +350,7 @@ local function TileStep(b)
 		ns.TestPrompt(("Shelf test: %s. Stand still and watch."):format(ns.L[b.demo.label]), 4)
 		local errors = Errors()
 		local before = CameraWhy()
+		if key == "plates" then run.platesBefore = { PlatesNow() } end
 		b:Click()
 		local running = ns.ShowMeRunning(key)
 		Log(("tile %s: clicked, running %s, name now \"%s\", tag \"%s\""):format(key, tostring(running),
