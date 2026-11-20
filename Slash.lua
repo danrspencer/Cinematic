@@ -177,6 +177,7 @@ local function PrintDebugHelp()
 	print("  /cine debug platewatch - log how faded nameplates are drawn each time it changes, to find one flashing up")
 	print("  /cine debug duels - duel nameplates: watching or why not, and which nearby players can attack each other")
 	print("  /cine debug duels test - pretend duels between friendly players around you, to see how they look")
+	print("  /cine debug dueltarget - one run: a duelist you target keeps a whole plate while Your Target hides it (dev copy)")
 	print("  /cine debug questglow - quest object glow: what soft targeting picked and why it glows or not")
 	print("  /cine debug questiepin - show the spot Questie's nameplate icon is pinned to as a quest mark (again to hide it)")
 	print("  /cine debug questmob - the unit under your mouse: the cursor the game gives it, its quest checks and quest items")
@@ -1622,6 +1623,9 @@ local function HandleSlash(msg)
 			.. " (/reload to write the log)")
 	elseif cmd == "debug" and arg == "duels" then
 		ns.PrintDuelsDebug()
+	elseif cmd == "debug" and arg == "dueltarget" then
+		-- (Dev copy: a targeted duelist's plate under Your Target's hide, DuelTargetTest.lua.)
+		if ns.DuelTargetTest then ns.DuelTargetTest() else ns.Print("/cine debug dueltarget is in the dev copy only.") end
 	elseif cmd == "debug" and arg == "duels test" then
 		local on, why = ns.ToggleDuelTest()
 		ns.Print("pretend duels between friendly players around you: " .. OnOff(on)

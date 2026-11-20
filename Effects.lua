@@ -3211,6 +3211,10 @@ local function TargetHeldDown()
 	if not (platesActive and ns.HasTarget()) then
 		return false
 	end
+	-- (Dev/DuelTargetTest.lua: Your Target not keeping it up, whatever the row says.)
+	if ns.testTargetHeldDown then
+		return TargetRow("target") ~= nil
+	end
 	return TargetRow("target") ~= nil and not UnitRowWanted("YourTarget")
 end
 
@@ -3404,9 +3408,10 @@ local function PlateAlpha(unit, plate, besidesHeal)
 		return 1
 	end
 	if plate == targetFade.plate and not (unit and IsTarget(unit) and AlwaysShownTarget(unit)) then
-		return alpha -- a frame before the target fade catches up with a new target
+		-- a frame before the target fade catches up with a new target
+		return math.max(alpha, duels.Level(plate))
 	end
-	alpha = math.max(alpha, TargetPlateLevel(plate), duels.Level(plate))
+	alpha = math.max(alpha, TargetPlateLevel(plate))
 	if plate and plate == targetHidden.plate then
 		alpha = math.min(alpha, targetHidden.level)
 		-- (My pet and the group rows name the unit itself: they still keep
@@ -3416,7 +3421,15 @@ local function PlateAlpha(unit, plate, besidesHeal)
 			alpha = math.max(alpha, UnitRowAlpha(unit, kind))
 		end
 	end
-	return alpha
+	-- (A duelist's plate stays up whole even as your target: Your Target
+	-- hiding it after a fight left it a name alone, every part at 0, user
+	-- 2026-11-20. Dev/DuelTargetTest.lua.)
+	return math.max(alpha, duels.Level(plate))
+end
+-- (For Dev/DuelTargetTest.lua: a plate's duel level, and Your Target's hold
+-- on it: held, and how far down.)
+function ns.DuelTargetState(plate)
+	return duels.Level(plate), plate ~= nil and plate == targetHidden.plate, targetHidden.level
 end
 
 -- Whether the game's name settings, as they are now, show a unit's name over
@@ -4319,6 +4332,11 @@ function ns.PrintDuelsDebug()
 			end
 		end
 	end
+	-- (Your target's plate held down by the Target section's Nameplates row:
+	-- under a duel, it used to empty a duelist's plate.)
+	ns.Print(("your target's plate: kept up=%s, held down=%s (level %.2f, on %s), fade %.2f"):format(
+		tostring(TargetKeptUp()), tostring(TargetHeldDown()), targetHidden.level,
+		targetHidden.plate and (targetHidden.plate.namePlateUnitToken or "a plate") or "none", targetFade.level))
 	local found, fighters = duels.Scan()
 	ns.Print(("%d friendly players in combat with a plate"):format(#fighters))
 	for i, a in ipairs(fighters) do

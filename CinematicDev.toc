@@ -274,6 +274,7 @@ Dev\PreviewWatch.lua
 Dev\TemplateProbe.lua
 Dev\PreviewMatch.lua
 Dev\PetPlateTest.lua
+Dev\DuelTargetTest.lua
 Dev\EuiSwingTest.lua
 Dev\EuiCastTest.lua
 Dev\AddonTest.lua
