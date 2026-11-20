@@ -19,7 +19,8 @@ local PLACES = {
 	{ "world", L["Open world"] }, { "city", L["Cities"] }, { "inn", L["Inns"] }, { "dungeon", L["Dungeons"] },
 	{ "raid", L["Raids"] }, { "bg", L["BGs & arenas"] },
 }
-local PLACE_NAME = { any = L["Anywhere"] }
+-- (none: a new line's, no place picked yet; it fits nowhere till one is.)
+local PLACE_NAME = { any = L["Anywhere"], none = L["Pick a place"] }
 for _, place in ipairs(PLACES) do PLACE_NAME[place[1]] = place[2] end
 local COMBATS = { { "any", L["Any"] }, { "in", L["In combat"] }, { "out", L["Out of combat"] } }
 local COMBAT_NAME = {}
@@ -83,7 +84,7 @@ end
 function ns.CooldownRuleText(rule)
 	if rule.cql then return rule.cql end
 	local words = {}
-	if rule.place ~= "any" then words[#words + 1] = rule.place end
+	if rule.place ~= "any" and rule.place ~= "none" then words[#words + 1] = rule.place end
 	if COMBAT_WORDS[rule.combat] then words[#words + 1] = COMBAT_WORDS[rule.combat] end
 	return table.concat(words, " and ")
 end
@@ -95,7 +96,8 @@ local function Squash(text) return (text:lower():gsub("%s+", " "):gsub("^ ", "")
 function ns.SetCooldownRuleText(rule, text)
 	text = text or ""
 	if not text:find("%S") then
-		rule.cql, rule.combat, rule.place = nil, "any", "any"
+		-- (A new line's empty place stays empty: closing the editor on it blank changes nothing.)
+		rule.cql, rule.combat, rule.place = nil, "any", rule.place == "none" and "none" or "any"
 		return true
 	end
 	local _, err = ns.CompileRule(text)
@@ -141,10 +143,13 @@ function ns.CooldownRuleFactsStale() factsAt = nil end
 -- Whether a line fits now. (A CQL rule that doesn't read never fits.)
 function ns.CooldownRuleFits(rule, facts)
 	facts = facts or ns.CooldownRuleFacts()
+	if rule.show == "" then return false end
 	if rule.cql then
 		local test = ns.CompileRule(rule.cql)
 		return test ~= nil and test(facts) and true or false
 	end
+	-- (A new line, its Icon shows or its place not picked yet: it counts nowhere.)
+	if rule.show == "" or rule.place == "none" then return false end
 	local place, fight = Spot(facts)
 	if rule.place ~= "any" and rule.place ~= place then return false end
 	return rule.combat == "any" or (rule.combat == "in") == fight
@@ -174,6 +179,7 @@ end
 -- A line's where as words for people: "Dungeons, In combat", or its rule.
 function ns.CooldownRuleWhere(rule)
 	if rule.cql then return rule.cql end
+	if rule.place == "none" then return L["Pick a place"] end
 	if rule.place == "any" and rule.combat == "any" then return L["Anywhere"] end
 	if rule.place == "any" then return COMBAT_NAME[rule.combat] end
 	if rule.combat == "any" then return PLACE_NAME[rule.place] end
@@ -233,11 +239,13 @@ local EDIT_X, EDIT_W, UP_X, DOWN_X, DELETE_X = 524, 38, 566, 566, 582
 
 -- A dropdown (or, on clients without the modern one, a button stepping through
 -- the choices): List() its choices ({ value, text }), Get() the one picked.
-local function Pick(parent, width, List, Get, Set)
+local function Pick(parent, width, List, Get, Set, placeholder)
 	local ok, dropdown = ns.MenuDropdown(parent)
 	local control
 	if ok and dropdown and dropdown.SetupMenu then
 		dropdown:SetWidth(width)
+		-- (Nothing picked yet, a new line's: this, greyed by the game, till one is.)
+		if placeholder and dropdown.SetDefaultText then dropdown:SetDefaultText(placeholder) end
 		dropdown:SetupMenu(function(_, root)
 			for _, choice in ipairs(List()) do
 				root:CreateRadio(choice.text, function() return Get() == choice.value end,
@@ -264,10 +272,14 @@ local function Pick(parent, width, List, Get, Set)
 		if control.GenerateMenu then
 			control:GenerateMenu()
 		else
-			local now = Get()
+			local now, shown = Get(), false
 			for _, choice in ipairs(List()) do
-				if choice.value == now then control:SetText(choice.text) end
+				if choice.value == now then
+					control:SetText(choice.text)
+					shown = true
+				end
 			end
+			if not shown and placeholder then control:SetText(placeholder) end
 		end
 	end
 	return control
@@ -333,7 +345,7 @@ function ns.CooldownRuleLines(parent, opts)
 				local rule = Rule()
 				if rule then rule.show = value end
 				Changed()
-			end)
+			end, L["Pick one"])
 		line.show:SetPoint("LEFT", line, "LEFT", SHOW_X, 0)
 		Tip(line.show, L["What the icon shows while this line fits."])
 		line.bar = line:CreateFontString(nil, "OVERLAY", "GameFontDisable")
@@ -354,7 +366,7 @@ function ns.CooldownRuleLines(parent, opts)
 				local rule = Rule()
 				if rule then rule.place = value end
 				Changed()
-			end)
+			end, L["Pick one"]) -- (Pick a place didn't fit: "Pick a pl...", 2026-11-20)
 		line.place:SetPoint("LEFT", line, "LEFT", PLACE_X, 0)
 		Tip(line.place, L["Where this line fits."])
 		-- (A rule of its own: its words, colored as the editor has them, in place of the two.)
@@ -484,10 +496,12 @@ function ns.CooldownRuleLines(parent, opts)
 	end
 	-- Whether the row has lines to show.
 	function block.Has() return ns.CooldownRules(kind, key) ~= nil end
-	-- A new line at the bottom: Always, anywhere (so it's plain it needs a where).
+	-- A new line at the bottom, empty: no Icon shows and no place picked, so
+	-- it counts nowhere till both are. (It started Always, Anywhere, which
+	-- took over every line under it at once, 2026-11-20.)
 	function block.Add()
 		local list = ns.CooldownRules(kind, key, true)
-		list[#list + 1] = { show = modes and modes[1] and modes[1].value or "always", combat = "any", place = "any" }
+		list[#list + 1] = { show = "", combat = "any", place = "none" }
 		Changed()
 	end
 

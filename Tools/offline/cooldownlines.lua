@@ -159,8 +159,19 @@ block.Set("spell", CORRUPTION, "Corruption", MODES)
 Check("no lines: no height", block.Layout() == 0 and not block.Has())
 block.Add()
 block.Add()
-Check("Add makes lines (Always, anywhere)", #db.cooldownSpellRules[CORRUPTION] == 2
-	and db.cooldownSpellRules[CORRUPTION][1].show == "always" and changed == 2)
+Check("Add makes empty lines (no Icon shows, no place)", #db.cooldownSpellRules[CORRUPTION] == 2
+	and db.cooldownSpellRules[CORRUPTION][1].show == "" and db.cooldownSpellRules[CORRUPTION][1].place == "none"
+	and changed == 2)
+-- (Empty, they count nowhere: the spell goes by its own dropdown still.)
+Check("empty lines count nowhere", ns.CooldownRuleMode("spell", CORRUPTION) == nil)
+db.cooldownSpellRules[CORRUPTION][1].show = "never"
+Check("Icon shows picked, place not: still nowhere", ns.CooldownRuleMode("spell", CORRUPTION) == nil)
+local blankEdit = { show = "never", combat = "any", place = "none" }
+ns.SetCooldownRuleText(blankEdit, "")
+Check("closing the editor blank keeps the place empty", blankEdit.place == "none")
+Check("its where reads Pick a place", ns.CooldownRuleWhere(blankEdit) == ns.L["Pick a place"])
+db.cooldownSpellRules[CORRUPTION][2].show = "always"
+db.cooldownSpellRules[CORRUPTION][2].place = "any"
 Check("height: two lines and Everywhere else", block.Layout() == 3 * ns.COOLDOWN_LINE_H)
 db.cooldownSpellRules[CORRUPTION][1].show = "never"
 db.cooldownSpellRules[CORRUPTION][1].place = "raid"

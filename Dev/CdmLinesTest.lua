@@ -13,6 +13,8 @@
 --     Resources, Out of fights and Show early in them (no columns across the page)
 --   7 Open CDM clicked: the game's Cooldown Manager window opens and the button
 --     says Close CDM; clicked again, it shuts and says Open CDM
+--   8 a new, empty line on the page: "Pick one" and "Pick a place" in its
+--     dropdowns, and it counts nowhere (Everywhere else stays Active)
 -- CineMode is off while it runs (back after). Stand still out of a fight; nothing to press. Its settings are put back at
 -- the end, and at the next login if a /reload cuts it short. Into
 -- CinematicDB.cdmLinesLog. Dev copy only (CinematicDev.toc).
@@ -228,6 +230,30 @@ local STEPS = {
 					tostring(button:GetText()), tostring(window and window:IsShown())))
 			end)
 			return ("%s: after the click: %s"):format(openOk and "PASS" or "FAIL", opened)
+		end },
+	{ key = "empty", say = "%d/%d: %s gets a new, empty line: its dropdowns say Pick one and Pick a place, and " ..
+		"Everywhere else stays Active. Just watch.",
+		act = function()
+			Lines({ { show = "", combat = "any", place = "none" } })
+			if InCombatLockdown() then return "in a fight: not opened" end
+			local ok, err = pcall(ns.OpenOptionsAt, "Cooldown Manager")
+			if not ok then return "couldn't open: " .. tostring(err) end
+			C_Timer.After(0.3, function()
+				if run and ns.CdmShowSpells then pcall(ns.CdmShowSpells, run.group) end
+			end)
+			return "one empty line, page opened"
+		end,
+		after = function()
+			local found
+			for block in pairs(ns.cooldownLineBlocks or {}) do
+				local kind, key = block.For()
+				if kind == "spell" and key == run.spell and block:IsVisible() then found = block end
+			end
+			local mode, line = ns.CooldownRuleMode("spell", run.spell)
+			local own = ns.CooldownSpellMode(run.spell, run.group)
+			local ok = found and found.Shown() == 1 and mode == nil and own == "always"
+			return ("%s: empty line drawn %s, it decides %s (line %s), the icon goes by %s"):format(ok and "PASS" or "FAIL",
+				tostring(found and found.Shown() == 1), tostring(mode), tostring(line), tostring(own))
 		end },
 }
 
