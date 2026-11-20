@@ -215,7 +215,8 @@ end
 -- Each line: its number, Icon shows, a bar, Combat and Location (or its CQL
 -- rule), Edit, move up and down, delete.
 
-ns.COOLDOWN_LINE_H = 26
+-- (30: at 26 the dropdowns, about as tall, touched line to line, 2026-11-20.)
+ns.COOLDOWN_LINE_H = 30
 local LINE_H = ns.COOLDOWN_LINE_H
 -- (Icon shows under the row's own dropdown, the page's Icon shows column, so
 -- every line's reads down one column; its where to the right, where the

@@ -262,12 +262,20 @@ do
 		local ruleBlock = row.lines
 		Check("the line drawn under it", ruleBlock and ruleBlock:IsShown() and ruleBlock.Shown() == 1)
 		Check("its dropdown moved down to Everywhere else", modeTop and plainTop
-			and modeTop <= plainTop - ns.COOLDOWN_LINE_H * 2, ("%s -> %s"):format(tostring(plainTop), tostring(modeTop)))
+			and modeTop <= plainTop - ns.COOLDOWN_LINE_H - 20, ("%s -> %s"):format(tostring(plainTop), tostring(modeTop)))
 		db.cooldownSpellRules[IMMOLATE] = nil
 		db.cooldownAlwaysShow[IMMOLATE] = nil
 		open[IMMOLATE] = nil
 	end
 	Check("bar row has its settings", groupRows.essential and groupRows.essential.drawer ~= nil)
+	-- A thin line between spells: over the second, not the first (its bar's gold line is there).
+	ns.CooldownManagerSpells = function()
+		return { { id = IMMOLATE, group = "essential" }, { id = CORRUPTION, group = "essential" } }
+	end
+	ns.CdmShowSpells("essential")
+	Check("no line over the first spell", rows[1] and rows[1].sep and not rows[1].sep:IsShown())
+	Check("a line over the second spell", rows[2] and rows[2].sep and rows[2].sep:IsShown())
+	ns.CooldownManagerSpells = function() return { { id = IMMOLATE, group = "essential" } } end
 	-- Open CDM: says Close CDM while the game's Cooldown Manager window is
 	-- open, however it was opened, and Open CDM once it's shut (2026-11-20).
 	local button = select(4, ns.CdmPageRows())

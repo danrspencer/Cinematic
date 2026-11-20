@@ -16462,8 +16462,10 @@ local function CreateCooldownPanel()
 		row.lines:SetShown(added > 0)
 		row.mode:ClearAllPoints()
 		if added > 0 then
-			row.mode:SetPoint("TOPLEFT", spellHeading, "BOTTOMLEFT", MODE_X, top - added + ns.COOLDOWN_LINE_H - 2)
-			return added
+			-- (Centered in its line as the lines' dropdowns are, and a gap under the
+			-- last line before the next row: they touched, 2026-11-20.)
+			row.mode:SetPoint("TOPLEFT", spellHeading, "BOTTOMLEFT", MODE_X, top - added + ns.COOLDOWN_LINE_H - 3)
+			return added + 6
 		end
 		row.mode:SetPoint("TOPLEFT", spellHeading, "BOTTOMLEFT", MODE_X, y)
 		return 0
@@ -16479,6 +16481,7 @@ local function CreateCooldownPanel()
 		row.anyTime:Hide()
 		if row.flash then row.flash:Hide() end
 		if row.lines then row.lines:Hide() end
+		if row.sep then row.sep:Hide() end
 		if row.line then row.line:Hide() end
 		if row.toggle then
 			row.toggle:Hide()
@@ -16896,6 +16899,16 @@ local function CreateCooldownPanel()
 				local okName, name = pcall(GetName, id)
 				local okIcon, icon = pcall(GetIcon, id)
 				local top = y
+				-- (A thin faint line over each spell but the first, under its bar's
+				-- gold one: each spell and its lines one block, 2026-11-20.)
+				if not spellRow.sep then
+					spellRow.sep = icons:CreateTexture(nil, "ARTWORK")
+					spellRow.sep:SetColorTexture(1, 1, 1, 0.1)
+					spellRow.sep:SetSize(GROUP_WIDTH - 14, 1)
+				end
+				spellRow.sep:ClearAllPoints()
+				spellRow.sep:SetPoint("TOPLEFT", spellHeading, "BOTTOMLEFT", 0, top + 2)
+				spellRow.sep:SetShown(used[pool] > 1)
 				-- (Its icon cropped to its picture, 5..59 of 64: whole, a spell icon
 				-- shows the frame drawn into its texture, 2026-11-20.)
 				local added = PlaceRow(spellRow, id, ("|T%s:16:16:0:0:64:64:5:59:5:59|t %s"):format(
