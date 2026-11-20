@@ -4,6 +4,8 @@ Cinematic is about bringing Azeroth to life. Your screen changes with the moment
 
 Between fights it fades your UI away, adds letterbox bars and a color tint that shifts with the time of day, and controls your cameras for flights, campfires, quest givers, going AFK and more. The music fades in as a camera starts, and the moment you're in a fight or need something, your UI comes right back. Here and there it also swaps a clunky part of the default UI for something simpler, like wheels you hold a key for to pick a camera or open a game window, a button at your cursor to sit by a campfire, and speech from behind you shown as a bubble instead of in chat.
 
+**[The Cinematic Guidebook](https://sapo-wow-dev.github.io/Cinematic/)** walks through every feature and settings page.
+
 ## The UI gets out of the way
 
 * Fades the UI between fights, with letterbox bars sliding in. Combat, targeting an enemy or opening a window brings it straight back.
@@ -17,37 +19,54 @@ Between fights it fades your UI away, adds letterbox bars and a color tint that 
 * **Hide all floating text** (XP, damage, healing) if you'd like a clean screen. It takes a game restart.
 * **Tooltips** (advanced, off by default): hide tooltips in CineMode, in fights or in the camera modes, with a list of the ones that still show, and keybinds to hold for a peek or to switch the hiding off.
 * **Chat bubbles:** hide them by place, show just the text floating over the speaker, and set the text size.
-* **Your call on every frame:** keep any frame always visible, or fade extra ones from other addons. Details!, Bartender4, Plater, Platynator, Threat Plates, EllesmereUI, FlareUI, Frames Forever, BigWigs, HealBot Continued, ShamanPower, Titan Panel, TomTom, Spoken, Lore Forever, Prat 3.0, the Cooldown Manager and Forever Enhanced Cooldown Manager are handled out of the box. For anything else, **Add mode** (or `/cine add`) lets you click a frame to pick it.
-* **Turns itself off where you'd rather have the full UI:** the open world, inns, cities, dungeons, raids, PvP (flagged, or in battlegrounds and arenas), parties or raid groups. Each camera mode can be turned off in those places too (all but the open world), from one grid on the Camera Modes page.
+* **Your call on every frame:** keep any frame always visible, or fade extra ones from other addons. More than 30 addons are handled out of the box, among them Details!, Bartender4, ElvUI, EllesmereUI, Plater, Platynator, Questie, RestedXP Guides, BigWigs, DynamicCam and Leatrix Plus ([the full list](https://sapo-wow-dev.github.io/Cinematic/guides/other-addons.html)). Where one of them does something Cinematic does too, the **Addon Conflicts** page lets you pick whose plays. For anything else, **Add mode** (or `/cine add`) lets you click a frame to pick it.
+* **Turns itself off where you'd rather have the full UI:** the open world, inns, cities, dungeons, raids, PvP (flagged, or in battlegrounds and arenas), parties or raid groups. Each camera can be turned off in those places too (all but the open world).
 
 ## A camera with a mind of its own
 
 Each situation has its own camera, and they hand over seamlessly:
 
-* **Flight Cam:** sways through the journey and turns back to where it started before landing. Each route is timed as you fly it, so the next time it knows when you'll land. It allows for the Frequent Flier legacy talent, and if every flight speeds up for some other reason, one flight on a route it knows is enough to correct them all. Random fly-bys turn the camera slowly round to look back at the view, then return.
+* **Flight Cam:** sways through the journey and turns back to where it started before landing. Each route is timed as you fly it, so the next time it knows when you'll land. It allows for the Frequent Flier legacy talent, and if every flight speeds up for some other reason, one flight on a route it knows is enough to correct them all. Random fly-bys turn the camera slowly around to look back at the view, then return.
 * **AFK Cam:** stand still for a while, or go AFK, and the camera slowly sweeps around your character and drifts in and out.
 * **RP Walk Cam:** auto-walk (auto-run in walk mode) and the camera sways gently from side to side.
 * **Auto-run Cam:** a travel camera that looks ahead down the road and drifts in and out as you go. On retail it keeps going when you auto-run on a skyriding mount.
-* **Cozy Cam:** rest by a campfire, `/sit`, `/sleep`, `/dance`, `/kneel`, sit in a chair, draw your weapon for a hero shot, or log out away from an inn or city (during the 20-second countdown). The camera turns half round (facing you, if it started behind you), comes in close, and sways softly.
-* **Tele Cam:** cast your Hearthstone or a teleport and the camera turns half round, spinning faster and faster as it zooms in until you're gone. Cancel the cast and it turns back and zooms back out.
+* **Cozy Cam:** rest by a campfire, `/sit`, `/sleep`, `/dance`, `/kneel`, sit in a chair, draw your weapon for a hero shot, or log out away from an inn or city (during the 20-second countdown). The camera turns halfway around (facing you, if it started behind you), comes in close, and sways softly.
+* **Tele Cam:** cast your Hearthstone or a teleport and the camera turns halfway around, spinning faster and faster as it zooms in until you're gone. Cancel the cast and it turns back and zooms back out.
 * **Vista Cam:** `/stare` out at the view and the camera lowers and takes it in.
 * **Fish Cam:** cast Fishing and the camera sways gently with the bobber in view. Right-click (or a gamepad button) to cast again.
-* **Quest Cam:** talk to a quest giver and the camera eases in close and comes round to a dialogue shot past your shoulder. It goes back when you close the window.
-* **Death Cam:** when you die, the camera rises and circles slowly round your body over a cold, dimmed screen, with a song of its own. You can also start it from a key or the camera wheel to see it without dying.
-* **Camera wheel:** hold its key and a ring of camera icons comes up round your cursor. Point at one and let go to start that camera, or tap the key and click one.
+* **Quest Cam:** talk to a quest giver and the camera eases in close and comes around to a dialogue shot past your shoulder. It goes back when you close the window.
+* **Death Cam:** when you die, the camera rises and circles slowly around your body over a cold, dimmed screen, with a song of its own. You can also start it from a key or the camera wheel to see it without dying.
+* **Camera wheel:** hold its key and a ring of camera icons comes up around your cursor. Point at one and let go to start that camera, or tap the key and click one.
 * **Menu wheel:** the same, for the game's menu bar buttons (character, spellbook, quest log and the rest your client shows), so their windows are in reach with the UI hidden.
-* **Camera Triggers page:** pick which camera each event starts (or none), and whether it starts music. It starts right away, and moving ends it. With CineMode off, an event can bring CineMode on for as long as its camera runs: tick Stand still and Go AFK for a screensaver that only takes over once you've been idle.
-* **Depth of field:** a soft haze round the screen edges in the camera modes, set separately for each one.
+* **Shoulder Cam:** the camera over your shoulder, you to one side of the screen, like a third-person adventure, with your cast bar and resources sliding along with you.
+* **Skyriding Cam** (retail): pulls back as you take off, tilts as you climb and dive, follows your turns, and answers Surge Forward, Skyward Ascent, Whirling Surge and Aerial Halt.
+* **Scenes and Triggers:** pick which camera each event starts (or none), and whether it starts music. It starts right away, and moving ends it. With CineMode off, an event can bring CineMode on for as long as its camera runs: tick Stand still and Go AFK for a screensaver that only takes over once you've been idle. Make scenes of your own, with triggers of your choosing.
+* **Scripts:** every camera is a short script of moves you can copy and change, with a preview, and share with friends.
+* **Edge haze:** a soft haze around the screen's edges while a camera runs, set for each camera.
 * **Indoor limits** keep the camera out of walls in buildings and caves.
 
-## Colour and mood
+## Color and mood
 
-* **Screen tints:** warm, cool, night, dusk, sepia, dreamy or your own colour, with a vignette. The strength drifts gently over time so it never feels static.
+* **Screen tints:** warm, cool, night, dusk, sepia, dreamy or your own color, with a vignette. The strength drifts gently over time so it never feels static.
 * **Time of day:** the world shifts from moonlit blue to dawn pink to golden hour, following game time or your own clock. Each phase can be tuned.
-* **Zone moods:** pale blue snowfields, sandy deserts, sickly plaguelands, a smoky Ironforge, a golden Westfall and many more. On retail that covers every expansion, from Outland's fel-scorched Hellfire to Midnight's Voidstorm. They fade smoothly at zone borders. Areas such as Theramore can have their own moods, and you can set any zone or area to the colour you want.
+* **Zone moods:** pale blue snowfields, sandy deserts, sickly plaguelands, a smoky Ironforge, a golden Westfall and many more. On retail that covers every expansion, from Outland's fel-scorched Hellfire to Midnight's Voidstorm. They fade smoothly at zone borders. Areas such as Theramore can have their own moods, and you can set any zone or area to the color you want.
 * **Inn glow:** step into an inn and the outdoor tint lifts for a warm, firelit glow.
-* **Weather:** rain, snow and sandstorms grey or colour the scene, on clients that report weather.
+* **Weather:** rain, snow and sandstorms gray or color the scene, on clients that report weather.
 * **A time-of-day title** under the zone name ("Dusk", "Night") on login and as the day turns, with a fitting sound: a rooster, bells, frogs, an owl or a wolf.
+
+## Visions
+
+Small touches that show what matters right now, each with its own page, its own look and a key to toggle it:
+
+* **Heal Vision:** see who needs healing at a glance, on their frames and nameplates.
+* **Quest Vision:** quest mobs and objects marked in the world, and quest dialogue as bubbles and cards.
+* **Card Vision:** a title card for the moments that count: a new zone, a boss, a level up, an achievement, your rest timers and more.
+* **Damage Vision**, **Vitals Vision** (your health at the screen's edges), **Death Vision**, **Teleport Vision** (a portal as you hearth), **Roll Vision**, **Duel Vision** and **Emote Vision** (cards for the players who buff or emote at you).
+
+## Style
+
+* **One look for the whole interface:** pick a theme in a click (fonts, bars, borders and colors for your unit frames, nameplates, names, cast bars, tooltips, bubbles and the Visions' cards), or make and share your own.
+* **Interface Recolor** brings the minimap, quest tracker, damage meter and more into the theme's colors, and **Overrides** change one thing without touching the rest.
 
 ## Music and atmosphere
 
@@ -65,12 +84,18 @@ Each situation has its own camera, and they hand over seamlessly:
 * **Fishing:** cast with right-click or a gamepad button, in CineMode or not.
 * **Hunters** (Classic clients): the smallest ammo stack goes first after Clean Up Bags, and a Fill quiver button at vendors buys enough ammo to fill your quiver.
 
+## Quality of life (every game)
+
+* **Keyboard Map:** your keyboard on screen with what every key does: its spell's icon, cooldown and count, or the command's name. Hold its key to peek, tap it to keep it up, or type `/cine keys`.
+* **Chat history:** your chat windows bring back their last 200 lines after a reload or login, for up to a day.
+* **Why is it showing?** Type `/cine why` and click any frame to see why it's showing or hidden right now, and which settings say so. It works on other addons' frames too.
+
 ## Easy to tweak
 
-* **Profiles** to switch the whole setup at once: Subtle (your UI stays, and fades only on flights, teleports and AFK), Balanced (the UI fades, a few cameras) and Cinema (just the world: Cinematic's own health, target and resource displays in place of the game's UI, every camera). Customize swaps one part at a time (layout, interface, action bars, camera, look, sound and chat), or make and name your own. New players pick one the first time they log in.
+* **Profiles** to switch the whole setup at once: Subtle (your UI stays, and fades only on flights, teleports and AFK), Balanced (the UI fades and comes back when you need it) and Cinema (as little UI as possible, every camera and Vision), plus Shoulder Cam (Cinema with the camera over your shoulder). Customize swaps one part at a time (layout, interface, action bars, camera, look, sound and chat), or make and name your own. New players pick one the first time they log in.
 * **Share profiles:** export your setup as a string and import a friend's.
-* **A minimap button** with quick switches for tint strength, music and combat. It glows while a vision (Heal, Quest, Duel, Roll) is in use, and its menu links to those pages.
-* **Full settings** under Options › AddOns › Cinematic, with a search box to find any setting. The pages are Profiles, CineMode, Game Frames, Gamepad (WoW Forever's gamepad mode), Addon Frames, Mouseover, Minimap, Quest tracker, Swing timer, Cooldown Manager, Tooltips, Buffs/debuffs, Nameplates, Chat, Chat bubbles, Fishing, Quality of life, Visual Effects, Audio, Camera Modes, Camera Triggers, Camera Settings (one section per camera) and Keybinds. Each page, and each camera's section, has its own Reset button for just that part.
+* **A minimap button** with quick switches for tint strength, music and combat. It glows while a Vision is in use, and its menu links to those pages.
+* **Full settings** under Options › AddOns › Cinematic (or `/cine config`), with a search box to find any setting, and `/cine find` to jump straight to one. The pages are grouped in hubs: Interface, Camera, Atmosphere, Style, Visions, Quality of Life, Addons, Help and Community. Each page has its own Reset button for just that part.
 * **Keybinds** to toggle CineMode, peek at the UI, hide the UI, trigger a fly-by, start any camera on demand (or pick one from the camera wheel), open the menu wheel, or show hidden tooltips.
 * **In your language:** English, Deutsch, Español, Français, Italiano, Português, Русский, 한국어, 简体中文 and 繁體中文, picked on the main settings page.
 * **`/cine`** for slash commands, and `/cine debug help` for troubleshooting.
