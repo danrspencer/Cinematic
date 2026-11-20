@@ -215,6 +215,98 @@ local function StartHoverDemo()
 	HoverStep()
 end
 
+-- Heal Vision: it works on the game's party and raid frames, which aren't
+-- there with no group, so a party of five of its own, drawn where the game's
+-- party frames go: all at full health, then Heal Vision fading them away
+-- (full: nothing to heal), one taking hits and coming back as her health
+-- drops, healed, and fading again. A picture of what it does, not the
+-- feature itself (Visions/HealVisionFrames.lua).
+local HEAL_PARTY = { { "Vedeth", "WARRIOR" }, { "Lumen", "PRIEST" }, { "Ashka", "HUNTER" }, { "Sly", "ROGUE" },
+	{ "Maketh", "MAGE" } }
+local HEAL_HURT = 2 -- the one who takes the hits
+-- (seconds: faded from, hits from, hits to, healed from, healed to, end)
+local HEAL_FADE, HEAL_HIT, HEAL_LOW, HEAL_UP, HEAL_FULL, HEAL_END = 1.5, 3.2, 4.4, 6.6, 7.8, 10
+local HEAL_GONE = 0.06 -- a faded frame's alpha (Heal Vision's hidden)
+local healFrame
+local healDemo -- { startAt, tiles }
+local function HealTiles()
+	if healFrame then return healFrame.tiles end
+	healFrame = CreateFrame("Frame", nil, UIParent)
+	healFrame:SetSize(120, #HEAL_PARTY * 44)
+	healFrame:SetPoint("TOPLEFT", UIParent, "TOPLEFT", 24, -220)
+	healFrame:SetFrameStrata("MEDIUM")
+	healFrame.tiles = {}
+	for i, member in ipairs(HEAL_PARTY) do
+		local tile = CreateFrame("Frame", nil, healFrame)
+		tile:SetSize(120, 40)
+		tile:SetPoint("TOPLEFT", 0, -(i - 1) * 44)
+		local ground = tile:CreateTexture(nil, "BACKGROUND")
+		ground:SetAllPoints()
+		ground:SetColorTexture(0, 0, 0, 0.8)
+		tile.health = CreateFrame("StatusBar", nil, tile)
+		tile.health:SetPoint("TOPLEFT", 1, -1)
+		tile.health:SetPoint("BOTTOMRIGHT", -1, 1)
+		tile.health:SetStatusBarTexture("Interface\\RaidFrame\\Raid-Bar-Hp-Fill")
+		tile.health:SetMinMaxValues(0, 1)
+		local color = RAID_CLASS_COLORS and RAID_CLASS_COLORS[member[2]]
+		tile.health:SetStatusBarColor(color and color.r or 0, color and color.g or 0.8, color and color.b or 0)
+		tile.name = tile.health:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+		tile.name:SetPoint("TOPLEFT", 5, -4)
+		tile.name:SetText(L[member[1]])
+		healFrame.tiles[i] = tile
+	end
+	healFrame:Hide()
+	return healFrame.tiles
+end
+local function Ease(from, to, t0, t1, t)
+	local p = math.max(0, math.min(1, (t - t0) / (t1 - t0)))
+	p = p * p * (3 - 2 * p)
+	return from + (to - from) * p
+end
+local healStepFrame = CreateFrame("Frame")
+local function HealStep(_, elapsed)
+	local d = healDemo
+	local t = GetTime() - d.startAt
+	for i, tile in ipairs(d.tiles) do
+		local health = 1
+		if i == HEAL_HURT then
+			-- (three hits down to under half, then healed back up)
+			health = t < HEAL_UP and Ease(1, 0.42, HEAL_HIT, HEAL_LOW, t) or Ease(0.42, 1, HEAL_UP, HEAL_FULL, t)
+			health = math.floor(health * 20 + 0.5) / 20
+		end
+		tile.health:SetValue(health)
+		-- (Heal Vision on from HEAL_FADE: below full shows, full fades)
+		local want = (t < HEAL_FADE or health < 0.99) and 1 or HEAL_GONE
+		local alpha = tile:GetAlpha()
+		local speed = math.min(1, (elapsed or 0) * 3)
+		tile:SetAlpha(alpha + (want - alpha) * speed)
+	end
+end
+local function StopHealDemo()
+	if not healDemo then return end
+	healDemo = nil
+	ns.SetOnUpdate(healStepFrame, nil)
+	if healFrame then healFrame:Hide() end
+end
+local function StartHealDemo()
+	StopHealDemo()
+	local tiles = HealTiles()
+	for _, tile in ipairs(tiles) do
+		tile:SetAlpha(1)
+		tile.health:SetValue(1)
+	end
+	healFrame:Show()
+	healDemo = { startAt = GetTime(), tiles = tiles }
+	ns.SetOnUpdate(healStepFrame, HealStep)
+end
+-- (For the shelf's test: each member's alpha and health now.)
+function ns.HealDemoState()
+	if not healDemo then return nil end
+	local out = {}
+	for i, tile in ipairs(healDemo.tiles) do out[i] = { tile:GetAlpha(), tile.health:GetValue() } end
+	return out, HEAL_HURT
+end
+
 -- Audio: CineMode's music (the Audio page, Effects.lua's ns.UpdateMusic), as
 -- a camera starts it: the game's music switched on at no volume, faded up to
 -- your own, held, faded out, and your settings back (saved as Cinematic saves
@@ -353,6 +445,9 @@ local DEMOS = {
 			end
 		end },
 	speech = { once = true, start = function() ns.TestSpeechBehind() end },
+	-- (Heal Vision: its own party, above; the window faded.)
+	heal = { seconds = HEAL_END, fade = true, start = StartHealDemo, stop = StopHealDemo,
+		running = function() return healDemo ~= nil end },
 	-- (Mouseover: above. Only with your frames looked after.)
 	mouseover = { seconds = HOVER_FADE + HOVER_SHOW + HOVER_AFTER + 1.5, fade = true,
 		start = StartHoverDemo, stop = StopHoverDemo,
@@ -506,7 +601,7 @@ local IN_PROFILE = { fadeUI = { "handleFrames" }, bars = { "letterboxPage", "let
 	weather = { "tintPage", "weatherTint" }, timeTitle = { "cards", "timeOfDayChange" }, cards = { "cards" },
 	recap = { "damageVision" }, damage = { "damageVision" }, emote = { "emoteVision" }, roll = { "rollWindow" },
 	deathVision = { "deathScreen" }, duel = { "duelPlates" }, audio = { "musicInCinematic" },
-	mouseover = { "handleFrames", "mouseover" } }
+	mouseover = { "handleFrames", "mouseover" }, heal = { "handleHealVision" } }
 -- A camera's Test by its scene (CameraRows.lua's triggers): on with the Cameras
 -- page's switch, the scene ticked and a camera picked (camera: the one to pick
 -- for Turn on).

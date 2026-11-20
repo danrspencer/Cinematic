@@ -446,6 +446,8 @@ local SHELF_MORE = {
 		tip = "A walking shot as you auto-walk through a town." },
 	{ key = "run", label = "Auto-run Cam", icon = "Interface\\Icons\\Ability_Rogue_Sprint", group = "cam",
 		tip = "A tracking shot that follows you as you auto-run." },
+	{ key = "heal", label = "Heal Vision", icon = "Interface\\Icons\\Spell_Holy_FlashHeal", group = "vis",
+		tip = "Party and raid frames show only who needs healing, so a healer can keep the UI hidden." },
 	{ key = "damage", label = "Damage Vision", icon = "Interface\\Icons\\Ability_Warrior_Rampage", group = "vis",
 		tip = "Your race with the top of the damage meter, live through a fight." },
 	{ key = "recap", label = "Fight Recap", icon = "Interface\\Icons\\INV_Scroll_03", group = "vis",
@@ -490,7 +492,7 @@ local TOUR = { { key = "fadeUI" }, { key = "bars" }, { key = "tint" }, { key = "
 -- The features with nothing to play: a line of links under the grid, "Also
 -- in Cinematic", each opening its settings page (by its English name, as
 -- ns.OpenOptions takes it) over the welcome window, closing back to it. The
--- ones waiting for a demo of their own (Heal Vision, Nameplates,
+-- ones waiting for a demo of their own (Nameplates,
 -- Chat Bubbles, Combat Text, Skyriding Cam) are here till they have one.
 local SHELF_LINKS = {
 	{ page = "Graphics+", label = "Graphics Boost", group = "atmo",
@@ -501,8 +503,6 @@ local SHELF_LINKS = {
 		tip = "Chains of camera moves you write and play back." },
 	{ page = "My Shots", label = "My Shots", group = "cam",
 		tip = "Your own saved camera shots, played from a key or a wheel." },
-	{ page = "Heal Vision", label = "Heal Vision", group = "vis",
-		tip = "Your group's health shows only for who needs healing, so a healer can keep the UI hidden." },
 	{ page = "Quest Vision", label = "Quest Vision", group = "vis",
 		tip = "Quest mobs keep their nameplates, with a quest mark." },
 	{ page = "Duel Vision", label = "Duel Vision", group = "vis",

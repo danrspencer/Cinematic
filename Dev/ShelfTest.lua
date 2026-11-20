@@ -35,7 +35,7 @@ local _, ns = ...
 local PLAY_FOR = 8   -- seconds a tile's watched at most
 local SHOT_AT = 2
 -- (later for a demo whose look comes partway: Mouseover's group, 2.5 s in)
-local SHOT_AT_FOR = { mouseover = 4 }
+local SHOT_AT_FOR = { mouseover = 4, heal = 5 }
 local SKIP = { shoulder = "trying it agrees to its experimental camera setting" }
 -- (ShowMe.lua's once demos: shown and done, no Stop. Any other not running
 -- right after its click didn't start: the quest camera, 2026-11-20.)
@@ -184,6 +184,18 @@ local SHOWS = {
 			("phase %s, pointer %s (aimed at %s; drawn at %s; texture %s), action bar %s, player frame %s"):format(
 				tostring(phase), tostring(pointer), tostring(spot), tostring(where), tostring(art),
 				bar and ("%.2f"):format(bar) or "?", other and ("%.2f"):format(other) or "?")
+	end,
+	-- (mid-hits: the one hurt shown, the four at full faded away)
+	heal = function()
+		if not ns.HealDemoState then return false, "no demo" end
+		local members, hurt = ns.HealDemoState()
+		if not members then return false, "not running" end
+		local ok, parts = true, {}
+		for i, m in ipairs(members) do
+			parts[#parts + 1] = ("%d: alpha %.2f health %.2f"):format(i, m[1], m[2])
+			if i == hurt then ok = ok and m[1] > 0.8 and m[2] < 0.9 else ok = ok and m[1] < 0.2 end
+		end
+		return ok, table.concat(parts, "; ")
 	end,
 	speech = function()
 		return TextOnScreen(ns.L["Speech from behind you shows here."]), "its line searched for on screen"
