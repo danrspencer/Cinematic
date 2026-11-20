@@ -142,12 +142,6 @@ local SHOWS = {
 			tostring(d.mode), d.strength or 0, d.level or 0, d.r or 1, d.g or 1, d.b or 1, away, tostring(not d.none),
 			ns.db.tintStrength or 1)
 	end,
-	-- (Weather draws only with rain, snow or dust in the zone: its level logged, no verdict.)
-	weather = function()
-		local d = ns.tintDrawn
-		return nil, ("weather level %s, the zone's weather call %s"):format(tostring(d and d.weather),
-			C_Weather and "present" or "absent")
-	end,
 	camera = CameraMoving,
 	vitals = function() return ns.VitalsVisionActive and ns.VitalsVisionActive() end,
 	emote = function() return ns.EmoteCardShown and ns.EmoteCardShown(), "emote card" end,
@@ -529,6 +523,20 @@ function ns.ShelfTest(list)
 			"the window open is on the screen")
 		Verdict(fitScale >= 1, ("the window open fits at UI scale 1 (fits up to %.2f)"):format(fitScale))
 		Verdict(ns.db.welcomeShelf.open == true, "open saved")
+		Next()
+	end
+	-- (Nothing on the shelf that can't play, out of a fight: the user's rule,
+	-- 2026-11-20. Any shown with a reason it can't is a fail.)
+	steps[#steps + 1] = function(Next)
+		if not InCombatLockdown() then
+			local bad = {}
+			for _, b in ipairs(row.ShelfTiles()) do
+				local why = b:IsShown() and ns.ShowMeBlocked(b.demo.key, true)
+				if why then bad[#bad + 1] = b.demo.key .. " (" .. tostring(why) .. ")" end
+			end
+			Log("shown but can't play: " .. (#bad > 0 and table.concat(bad, "; ") or "none"))
+			Verdict(#bad == 0, "every tile shown can play here")
+		end
 		Next()
 	end
 	steps[#steps + 1] = Want("groups") and function(Next)

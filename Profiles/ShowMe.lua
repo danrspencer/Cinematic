@@ -427,9 +427,8 @@ local DEMOS = {
 		stop = function() ns.StopShoulderCamDemo() end,
 		blocked = function() return ns.ShoulderCamDemoBlocked() end },
 	-- The welcome window's See all shelf (Welcome.lua): each feature's own Test.
-	-- (Weather: the Tint demo's weather alone. once: a card, a flash or a
-	-- sound, shown and done.)
-	weather = { seconds = 6, effects = { weather = true } },
+	-- (once: a card, a flash or a sound, shown and done. No Weather: it drew
+	-- nothing without rain or snow in the zone; the user took it off, 2026-11-20.)
 	-- (A card held up for its seconds, not once: its switches stay on till it's gone.)
 	timeTitle = { seconds = 6, switches = { "cards", "timeOfDayChange" },
 		start = function() ns.TestTimeChangeTitle() end },
@@ -598,7 +597,8 @@ function ns.ShowMeBlocked(key, force)
 		local why = def.blocked()
 		if why then return why end
 	end
-	if def.profile and not ns.ProfileChosen() then return L["Pick a profile first."] end
+	-- (Before a level's picked too: their switches go on while they play. A
+	-- tile that can't play isn't on the shelf at all, the user's rule.)
 	-- (Turned off, the welcome window's Turn off: the cameras won't start, and said so in chat each click)
 	if def.profile and not ns.db.enabled then return L["Cinematic is off: turn it on first"] end
 	if def.setting and not force and not ns.Setting(def.setting) then
@@ -611,7 +611,7 @@ end
 -- Enable switch (off on Blank Slate, which leaves the camera as the game has it).
 local IN_PROFILE = { fadeUI = { "handleFrames" }, bars = { "letterboxPage", "letterbox" }, tint = { "tintPage" },
 	camera = { "cameraModes" }, vitals = { "lowHealth" }, tele = { "teleportVision" }, shoulder = { "shoulderCam" },
-	weather = { "tintPage", "weatherTint" }, timeTitle = { "cards", "timeOfDayChange" }, cards = { "cards" },
+	timeTitle = { "cards", "timeOfDayChange" }, cards = { "cards" },
 	recap = { "damageVision" }, damage = { "damageVision" }, emote = { "emoteVision" }, roll = { "rollWindow" },
 	deathVision = { "deathScreen" }, duel = { "duelPlates" }, audio = { "musicInCinematic" },
 	mouseover = { "handleFrames", "mouseover" }, heal = { "handleHealVision" }, plates = { "handlePlates" },

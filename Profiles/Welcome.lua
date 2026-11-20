@@ -291,6 +291,17 @@ local function Active()
 	return ns.ProfileChosen() and ns.db.enabled and ns.ActiveProfile()
 end
 
+-- Back to the level's words as the mouse leaves something, a moment later and
+-- only if nothing else has put its own words up meanwhile: going from one
+-- button to the next, the default text flashed between them (2026-11-20).
+local LEAVE_WAIT = 0.15 -- seconds
+local function DescribeSoon()
+	local was = about and about:GetText()
+	C_Timer.After(LEAVE_WAIT, function()
+		if about and about:GetText() == was then Describe(levelOf[Active()]) end
+	end)
+end
+
 local primary, finish, settings, off, back
 
 -- Gold edge on the level being tried, the lines saying so, and the way out:
@@ -367,7 +378,7 @@ local function Card(parent, profile, level)
 	end)
 	card:SetScript("OnLeave", function(self)
 		if not self.active then self:SetBackdropBorderColor(unpack(EDGE)) end
-		Describe(levelOf[Active()])
+		DescribeSoon()
 	end)
 	card:SetScript("OnClick", function() Pick(profile.name, level) end)
 	return card
@@ -422,8 +433,6 @@ local SHELF_GROUPS = {
 -- The shelf's tiles besides the row's: only what plays (each feature's own
 -- Test, ShowMe.lua). Tips one sentence: they're translated.
 local SHELF_MORE = {
-	{ key = "weather", label = "Weather", icon = "Interface\\Icons\\Spell_Frost_IceStorm", group = "atmo",
-		tip = "Rain, snow and dust drift across the screen to match the zone's weather." },
 	{ key = "timeTitle", label = "Time of day title", icon = "Interface\\Icons\\INV_Misc_PocketWatch_01", group = "vis",
 		tip = "A title card as dusk or dawn comes in." },
 	{ key = "audio", label = "Audio", icon = "Interface\\Icons\\INV_Misc_Drum_01", group = "atmo",
@@ -612,7 +621,7 @@ local function BuildDemoRow(page, width)
 	end)
 	tourButton:SetScript("OnLeave", function(self)
 		Color(self.text, GOLD)
-		Describe(levelOf[Active()])
+		DescribeSoon()
 	end)
 	local list, all = {}, {}
 	for _, demo in ipairs(DEMO_ROW) do
@@ -670,7 +679,7 @@ local function BuildDemoRow(page, width)
 	end)
 	start:SetScript("OnLeave", function(self)
 		self:SetBackdropBorderColor(unpack(EDGE))
-		Describe(levelOf[Active()])
+		DescribeSoon()
 	end)
 	-- On the right, with the Tint demo: the tint's strength (the
 	-- profile's). Dragging it plays the Tint demo, or keeps
@@ -730,7 +739,7 @@ local function BuildDemoRow(page, width)
 		end)
 		slider:SetScript("OnLeave", function()
 			thumb:SetColorTexture(unpack(GOLD))
-			Describe(levelOf[Active()])
+			DescribeSoon()
 		end)
 		row.ShowStrength = Show
 		Show()
@@ -795,7 +804,7 @@ local function BuildDemoRow(page, width)
 		b:SetScript("OnLeave", function(self)
 			self:SetBackdropBorderColor(unpack(ns.ShowMeRunning(demo.key) and GOLD or EDGE))
 			GameTooltip:Hide()
-			Describe(levelOf[Active()])
+			DescribeSoon()
 		end)
 		b.demo = demo
 		b.width = w
@@ -819,14 +828,16 @@ local function BuildDemoRow(page, width)
 		end)
 		on:SetScript("OnLeave", function(self)
 			Color(self.text, DIM)
-			Describe(levelOf[Active()])
+			DescribeSoon()
 		end)
 		on:Hide()
 		b.turnOn = on
 	end
+	local rowButtons = {}
 	for i, demo in ipairs(list) do
 		local b = DemoButton(row, demo, buttonW)
 		b:SetPoint("TOPLEFT", 12 + (i - 1) * (buttonW + gap), -26)
+		rowButtons[i] = b
 	end
 
 	-- See all: the row's last slot, dashed gold (an edge of gold dashes), its
@@ -863,7 +874,7 @@ local function BuildDemoRow(page, width)
 	end)
 	more:SetScript("OnLeave", function(self)
 		self:SetBackdropColor(unpack(BG))
-		Describe(levelOf[Active()])
+		DescribeSoon()
 	end)
 
 	-- The shelf: the groups down the left (All, then each hub with something
@@ -1004,13 +1015,21 @@ local function BuildDemoRow(page, width)
 		end)
 		a:SetScript("OnLeave", function(self)
 			Color(self.text, SOFT)
-			Describe(levelOf[Active()])
+			DescribeSoon()
 		end)
 		a.link = link
 		a:Hide()
 		links[#links + 1] = a
 	end
 	-- (the words searched, in this language, against each tile's name and tip)
+	-- Whether a demo can play here: anything that can't, for a reason that
+	-- lasts (no Cooldown Manager on this level, Mouseover with nothing faded,
+	-- Cinematic off), isn't shown at all: "why would anything be here and not
+	-- working", the user, 2026-11-20 (their rule: what can't be used is
+	-- hidden, not greyed). A fight passes: then they all grey together.
+	local function Playable(demo)
+		return InCombatLockdown() or not ns.ShowMeBlocked(demo.key, true)
+	end
 	local function Matches(demo, words)
 		if words == "" then return saved.group == "all" or demo.group == saved.group end
 		return (L[demo.label] .. " " .. L[demo.tip]):lower():find(words, 1, true) ~= nil
@@ -1022,13 +1041,32 @@ local function BuildDemoRow(page, width)
 			g:SetBackdropColor(unpack(on and RAISED or BG))
 			Color(g.label, on and WHITE or SOFT)
 		end
+		-- (The groups: each with something it can play, in order, its count;
+		-- one picked that has none: All.)
+		local slot = 0
+		for _, g in ipairs(groupButtons) do
+			local n = 0
+			for _, b in ipairs(tiles) do
+				if (g.group.key == "all" or b.demo.group == g.group.key) and Playable(b.demo) then n = n + 1 end
+			end
+			g.n:SetText(tostring(n))
+			local keep = n > 0 or g.group.key == "all"
+			g:SetShown(keep)
+			if keep then
+				g:ClearAllPoints()
+				g:SetPoint("TOPLEFT", 0, -10 - slot * 26)
+				slot = slot + 1
+			elseif saved.group == g.group.key then
+				saved.group = "all"
+			end
+		end
 		for _, label in pairs(labels) do label:Hide() end
 		local y, shown = 0, 0
 		local several = words ~= "" or saved.group == "all"
 		for _, group in ipairs(SHELF_GROUPS) do
 			local n = 0
 			for _, b in ipairs(tiles) do
-				if b.demo.group == group.key and Matches(b.demo, words) then
+				if b.demo.group == group.key and Matches(b.demo, words) and Playable(b.demo) then
 					if n == 0 and several then
 						local label = labels[group.key]
 						label:ClearAllPoints()
@@ -1043,7 +1081,7 @@ local function BuildDemoRow(page, width)
 				end
 			end
 			for _, b in ipairs(tiles) do
-				if b.demo.group == group.key and not Matches(b.demo, words) then b:Hide() end
+				if b.demo.group == group.key and not (Matches(b.demo, words) and Playable(b.demo)) then b:Hide() end
 			end
 			if n > 0 then
 				y = y + math.ceil(n / cols) * (TILE_H + TILE_GAP) + 4
@@ -1107,7 +1145,7 @@ local function BuildDemoRow(page, width)
 	play:SetScript("OnLeave", function(self)
 		self:SetBackdropBorderColor(unpack(EDGE))
 		Color(self.text, SOFT)
-		Describe(levelOf[Active()])
+		DescribeSoon()
 	end)
 
 	local function Paint(b)
@@ -1140,6 +1178,44 @@ local function BuildDemoRow(page, width)
 			b.tag:SetWidth(w)
 		end
 	end
+	-- The row's buttons that can play, side by side, See all after them, and
+	-- its counts; again whenever what can play changes (a level picked, a
+	-- demo's state), the shelf with it.
+	local playableWas
+	local function Recount()
+		local sig, rowN, allN = {}, 0, 0
+		for _, b in ipairs(tiles) do
+			if Playable(b.demo) then
+				allN = allN + 1
+				sig[#sig + 1] = b.demo.key
+			end
+		end
+		for _, b in ipairs(rowButtons) do
+			if Playable(b.demo) then rowN = rowN + 1 end
+		end
+		local text = table.concat(sig, " ")
+		if text == playableWas then return end
+		playableWas = text
+		local i = 0
+		for _, b in ipairs(rowButtons) do
+			local on = Playable(b.demo)
+			b:SetShown(on)
+			if on then
+				b:ClearAllPoints()
+				b:SetPoint("TOPLEFT", 12 + i * (buttonW + gap), -26)
+				i = i + 1
+			end
+		end
+		more:ClearAllPoints()
+		more:SetPoint("TOPLEFT", 12 + i * (buttonW + gap), -26)
+		more.counts = { allN, allN - rowN }
+		if not shelf:IsShown() then
+			more.name:SetText((L["See all %d"]):format(allN))
+			more.tag:SetText((L["%d more"]):format(allN - rowN))
+		elseif Layout then
+			Layout()
+		end
+	end
 	-- keep: the same level as last time (a demo started or ended, a fight).
 	function row:Update(level, keep)
 		if not keep then show = level end
@@ -1159,6 +1235,7 @@ local function BuildDemoRow(page, width)
 		play:SetLabel(touring and L["Stop the tour"] or words ~= "" and L["Play these"]
 			or (not group or group.key == "all") and L["Watch the tour"] or (L["Play all in %s"]):format(L[group.label]))
 		UpdateNotice()
+		Recount()
 		for _, b in ipairs(buttons) do
 			if b:IsShown() then Paint(b) end
 		end
@@ -1173,8 +1250,9 @@ local function BuildDemoRow(page, width)
 		local was = shelf:IsShown()
 		shelf:SetShown(open)
 		saved.open = open or nil
-		more.name:SetText(open and L["Fewer"] or (L["See all %d"]):format(#all))
-		more.tag:SetText(open and "" or (L["%d more"]):format(#all - #list))
+		local counts = more.counts or { #all, #all - #list }
+		more.name:SetText(open and L["Fewer"] or (L["See all %d"]):format(counts[1]))
+		more.tag:SetText(open and "" or (L["%d more"]):format(counts[2]))
 		local h = closedH + (open and SHELF_H + 10 or 0)
 		row:SetHeight(h)
 		if open then
