@@ -54,7 +54,8 @@ local function Gather()
 	local rows = {}
 	for _, set in ipairs(ns.cvarSets) do
 		local flags = {}
-		if set.playerWins then flags[#flags + 1] = "your change wins" end
+		if set.keep then flags[#flags + 1] = "kept (written back)"
+		elseif set.playerWins then flags[#flags + 1] = "your change wins" end
 		if set.secure then flags[#flags + 1] = "not in fights" end
 		for cvar, ours in pairs(set.values) do
 			local now = GetCVar(cvar)

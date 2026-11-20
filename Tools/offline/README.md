@@ -40,6 +40,9 @@ looks for `lua5.1`. (Don't put a `lua5.1` stand-in on PATH: Windows asks what to
   Fitting by Combat and Location or CQL, top to bottom with the row's own dropdown last, a spell's lines before its
   bar's, buffs too; a typed rule back into the dropdowns; the page's block adding, moving, deleting and lighting the
   line in use; the ready pass fading by a line; and the update turning saved situations into lines.
+- `combattextkeep.lua`: Combat Text Style's game-number settings kept as its rows say: a reset of the game's options
+  (an outside write) put back, Game's handing them over, the page off and Keep yours letting go; a plain "your
+  change wins" set still lets go.
 - `notchgap.lua <forever|retail>`: full-screen effects (ns.CoverWorld: letterbox, tint edges, death screen, Focus,
   low health, teleport) reach up over a Mac's camera notch strip above UIParent, at UI scale 1 and 0.8, and come back
   down when it goes.

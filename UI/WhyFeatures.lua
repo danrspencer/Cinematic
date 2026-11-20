@@ -652,7 +652,9 @@ local function CVarSetRow(set, i)
 	elseif set.letGoAt then
 		reasons[#reasons + 1] = R("off", L["Last let go %s"]:format(ns.WhyAgo(set.letGoAt)))
 	end
-	if set.playerWins then
+	if set.keep then
+		reasons[#reasons + 1] = R("off", L["Held by its page: Keep yours on the Game Settings page"], "Game settings")
+	elseif set.playerWins then
 		reasons[#reasons + 1] = R("off", L["Your own change wins: Keep yours on the Game Settings page"], "Game settings")
 	end
 	return { key = "cvarset:" .. i, title = L[set.label or "Game settings"], status = set.active and "on" or "idle",

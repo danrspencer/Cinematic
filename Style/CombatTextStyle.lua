@@ -1204,7 +1204,10 @@ end
 -- own numbers are its CVars: off while a row is ours or none, on while it's
 -- the game's (on even if yours had them off), yours put back as the page goes
 -- off and at logout. (Not its XP: no CVar has it; that's the XP row, the
--- blank font, which hides all the game's numbers with it.)
+-- blank font, which hides all the game's numbers with it.) Kept (keep): the
+-- rows say who draws them, so a change outside the page (a reset of the
+-- game's options lost a player's off, 2026-11-20) is written back; "Game's"
+-- on the row, or Keep yours on the Game Settings page, hands them over.
 local GAME_CVARS = {
 	damage = { "floatingCombatTextCombatDamage", "floatingCombatTextCombatDamage_v2" },
 	heal = { "floatingCombatTextCombatHealing", "floatingCombatTextCombatHealing_v2" },
@@ -1221,9 +1224,9 @@ for kind, cvars in pairs(GAME_CVARS) do
 	end
 	GAME_SETS[kind] = {
 		off = ns.CVarSet("Game's " .. kind .. " numbers off", "Combat Text Style (" .. BY_KEY[kind] .. ")",
-			{ playerWins = true, values = Values("0") }),
+			{ playerWins = true, keep = true, values = Values("0") }),
 		on = ns.CVarSet("Game's " .. kind .. " numbers on", "Combat Text Style (" .. BY_KEY[kind] .. ": the game's)",
-			{ playerWins = true, values = Values("1") }),
+			{ playerWins = true, keep = true, values = Values("1") }),
 	}
 end
 local GAME_NUMBERS = GAME_SETS.damage.off

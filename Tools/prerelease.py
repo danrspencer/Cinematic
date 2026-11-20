@@ -52,6 +52,7 @@ OFFLINE_TESTS = [
     ("Mac notch covers, retail", "Tools/offline/notchgap.lua", "retail"),
     ("XP text font per character at login", "Tools/offline/xpfont.lua"),
     ("music volume never kept near 0", "Tools/offline/musicvolume.lua"),
+    ("combat text keeps the game's numbers as its rows say", "Tools/offline/combattextkeep.lua"),
     ("chat lines-only peeks only with the game's own chat", "Tools/offline/chatdefault.lua"),
     ("reloads through a secure /reload on Forever, forever", "Tools/offline/reload.lua", "forever"),
     ("reloads as before on retail, retail", "Tools/offline/reload.lua", "retail"),

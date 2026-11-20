@@ -3021,8 +3021,11 @@ end
 
 -- Settings held by a set marked playerWins, and the value written: if the
 -- player (or another addon) changes one meanwhile, theirs stands. It's let go
--- rather than put back later, which would undo their change.
-local heldCVars = {} -- [lowercased cvar] = { name = cvar, value = written }
+-- rather than put back later, which would undo their change. A set also
+-- marked keep has a page choice of its own for the game's value (Combat Text
+-- Style's "Game's"): a change outside it (a reset of the game's options too)
+-- is written back instead, unless Keep yours on the Game Settings page.
+local heldCVars = {} -- [lowercased cvar] = { name = cvar, value = written, keep = set.keep }
 local activeCVars = {} -- [cvar] = true while a set (ns.ApplyCVarSet) has it on
 local writingCVar = false
 
@@ -3072,6 +3075,11 @@ local function CheckHeldCVar(name)
 		return
 	end
 	local now = GetCVar(held.name)
+	if now ~= nil and not SameValue(now, held.value) and held.keep then
+		overridden[name:lower()] = "keep"
+		C_Timer.After(0, function() ns.writeBackOverridden() end)
+		return
+	end
 	if now ~= nil and not SameValue(now, held.value) then
 		heldCVars[name:lower()] = nil
 		ns.db.savedCVars[held.name] = nil
@@ -3128,14 +3136,15 @@ end
 -- Held settings changed in another addon's pass written back. Plate and name
 -- settings wait for the end of a fight.
 local function WriteBackOverridden()
-	for key in pairs(overridden) do
+	for key, why in pairs(overridden) do
 		local held = heldCVars[key]
 		if not held then
 			overridden[key] = nil
 		elseif not ((held.name:find("^nameplate") or held.name:find("^UnitName")) and InCombatLockdown()) then
 			overridden[key] = nil
 			if not SameValue(GetCVar(held.name), held.value) then
-				ns.Log("cvar", ("%s changed by another addon: put back to %s"):format(held.name, tostring(held.value)))
+				ns.Log("cvar", ("%s changed %s: put back to %s"):format(held.name,
+					why == "keep" and "outside the addon (its page holds it)" or "by another addon", tostring(held.value)))
 				ns.NoteOwnSpeed(held.name, held.value)
 				WriteCVar(held.name, held.value)
 			end
@@ -3220,7 +3229,7 @@ function ns.ApplyCVarSet(set, want)
 				ns.NoteOwnSpeed(cvar, value)
 				WriteCVar(cvar, value)
 				if set.playerWins then
-					heldCVars[cvar:lower()] = { name = cvar, value = value }
+					heldCVars[cvar:lower()] = { name = cvar, value = value, keep = set.keep }
 				end
 			end
 		elseif other then
@@ -3231,7 +3240,7 @@ function ns.ApplyCVarSet(set, want)
 					tostring(other.label)))
 				WriteCVar(cvar, theirs)
 				if other.playerWins then
-					heldCVars[cvar:lower()] = { name = cvar, value = theirs }
+					heldCVars[cvar:lower()] = { name = cvar, value = theirs, keep = other.keep }
 				end
 			end
 		else
@@ -3295,7 +3304,7 @@ function ns.UseOurCVar(cvar)
 			WriteCVar(cvar, ours)
 		end
 		if set.playerWins then
-			heldCVars[cvar:lower()] = { name = cvar, value = ours }
+			heldCVars[cvar:lower()] = { name = cvar, value = ours, keep = set.keep }
 		end
 	end
 	if ns.ApplyProfileSwitches then ns.ApplyProfileSwitches() end
