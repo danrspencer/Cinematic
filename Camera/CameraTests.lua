@@ -75,8 +75,28 @@ tests["Death Cam"] = {
 		"Moving, or clicking Stop, ends it.",
 }
 
+-- (Played as its script, as our cameras are now, ns.ScriptBuiltInsOn: its own
+-- code counts itself off and its test never started, 2026-11-20. The test
+-- plays the script then, as the other cameras' tests do through their keys.)
+local function QuestScript()
+	return ns.CameraRowsScripted and ns.CameraRowsScripted("quest") and ns.FindCameraScript
+		and ns.FindCameraScript("quest")
+end
+local function QuestScriptPlaying()
+	local playing = ns.PlayingCameraScript and ns.PlayingCameraScript()
+	return playing ~= nil and playing.id == "quest"
+end
+local questByScript = false
 tests["Quest Cam"] = {
 	start = function()
+		local script = QuestScript()
+		if script then
+			local ok, why = ns.PlayCameraScript(script)
+			questByScript = ok and true or false
+			if not ok then ns.Print(why) end
+			return ok and true or false
+		end
+		questByScript = false
 		if ns.QuestCamTest(true) then
 			return true
 		end
@@ -84,8 +104,18 @@ tests["Quest Cam"] = {
 			"moving or in a fight, or it's turned off where you are."])
 		return false
 	end,
-	running = function() return ns.QuestCamTesting() end,
-	stop = function() ns.QuestCamTest(false) end,
+	running = function()
+		if questByScript then return QuestScriptPlaying() end
+		return ns.QuestCamTesting()
+	end,
+	stop = function()
+		if questByScript then
+			questByScript = false
+			if QuestScriptPlaying() then ns.StopCameraScript() end
+			return
+		end
+		ns.QuestCamTest(false)
+	end,
 	tip = "Runs the quest camera for 30 seconds as if you were talking to a quest giver in " ..
 		"front of you. Moving, or clicking Stop, ends it.",
 }

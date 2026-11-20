@@ -226,6 +226,8 @@ Dev\ThresholdTest.lua
 Dev\FlickerTest.lua
 Dev\PartyFlickerTest.lua
 Dev\ZoneCardTest.lua
+Dev\FadeDemoTest.lua
+Dev\ShelfTest.lua
 Dev\NamesTest.lua
 Dev\StyleRevampTest.lua
 Dev\StyleSixTest.lua

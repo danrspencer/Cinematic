@@ -12485,9 +12485,12 @@ function ns.UpdateFrames(cinematic, elapsed)
 	-- The raid-style party frames set apart from the raid frames (Standard
 	-- Frames page): their own rows (rspGroup) decide for them, not the raid frames'.
 	local ownPartyRows = ns.db.raidStylePartySame == false
-	-- (Not while Inspect is picking frames, Why.lua: pointing at one would bring it up.)
+	-- (Not while Inspect is picking frames, Why.lua: pointing at one would bring it up.
+	-- Nor in the welcome window's Fading UI demo, ShowMe.lua: the mouse is on the
+	-- window, which lets it through, and its buttons sit over the bars, which
+	-- stayed up under it the whole demo, tested 2026-11-20.)
 	local tick1 = clock and clock()
-	if cinematic and ns.db.mouseover and not ns.whyPicking then
+	if cinematic and ns.db.mouseover and not ns.whyPicking and not ns.fadeDemo then
 		local mouseRows = wipe(tickTables.mouseRows)
 		-- (Asked of every faded frame, many times a second: with the mouse
 		-- still, on the same thing, each frame's answer stands, asked again a

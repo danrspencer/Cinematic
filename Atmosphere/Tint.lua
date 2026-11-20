@@ -277,10 +277,11 @@ local DAY_SWEEP_GLIDE = 3 -- seconds the tint takes to move on to the next stop
 -- The sweep's stop now, and its clock time in minutes (gliding in from the last).
 local function DaySweepNow()
 	local elapsed = GetTime() - daySweep.started
-	local index = math.min(#DAY_SWEEP_STOPS, math.floor(elapsed / daySweep.each) + 1)
-	local from = DAY_SWEEP_STOPS[index == 1 and #DAY_SWEEP_STOPS or index - 1][2]
-	local to = DAY_SWEEP_STOPS[index][2]
-	local t = math.min(1, (elapsed - (index - 1) * daySweep.each) / DAY_SWEEP_GLIDE)
+	local stops = daySweep.stops
+	local index = math.min(#stops, math.floor(elapsed / daySweep.each) + 1)
+	local from = stops[index == 1 and #stops or index - 1][2]
+	local to = stops[index][2]
+	local t = math.min(1, (elapsed - (index - 1) * daySweep.each) / (daySweep.glide or DAY_SWEEP_GLIDE))
 	t = t * t * (3 - 2 * t) -- ease in and out
 	return index, (from + ((to - from) % 1440) * t) % 1440, elapsed
 end
@@ -733,11 +734,21 @@ local function ApplyTint(level, vignetteLevel, weatherLevel)
 		local low, high = grade(bottom), grade(top)
 		SetGradient(tintTexture, "VERTICAL", low, high)
 		tintTexture:Show()
+		-- (What it drew, for the welcome window's demos' test: Dev/ShelfTest.lua.
+		-- On ns, not a local: kept off this file's count. One table, reused.)
+		local drawn = ns.tintDrawn or {}
+		ns.tintDrawn = drawn
+		drawn.preset, drawn.mode, drawn.strength, drawn.level = preset.key, preset.mode, strength, level
+		drawn.r, drawn.g, drawn.b, drawn.weather, drawn.none = high[1], high[2], high[3], weatherLevel, false
 		-- (The world map's dim: a darkening tint's middle colour. A glow, none.)
 		for c = 1, 3 do
 			ns.mapDim.color[c] = preset.mode == "MOD" and (low[c] + high[c]) / 2 or 1
 		end
 	else
+		local drawn = ns.tintDrawn or {}
+		ns.tintDrawn = drawn
+		drawn.preset, drawn.mode, drawn.strength, drawn.level = preset.key, preset.mode, strength, level
+		drawn.r, drawn.g, drawn.b, drawn.weather, drawn.none = nil, nil, nil, weatherLevel, true
 		tintTexture:Hide()
 		ns.mapDim.color[1], ns.mapDim.color[2], ns.mapDim.color[3] = 1, 1, 1
 	end
@@ -1407,11 +1418,11 @@ local function UpdateTint(cinematic, elapsed, vignetteOn, weatherOn)
 	end
 	if daySweep then
 		local index, _, elapsed = DaySweepNow()
-		if elapsed >= #DAY_SWEEP_STOPS * daySweep.each then
+		if elapsed >= #daySweep.stops * daySweep.each then
 			ns.DaySweep() -- done: stop
 		elseif index ~= daySweep.shown then
 			daySweep.shown = index
-			ns.TestTimeChangeTitle(DAY_SWEEP_STOPS[index][1])
+			if not daySweep.quiet then ns.TestTimeChangeTitle(daySweep.stops[index][1]) end
 		end
 		tintDirty = true
 	end
@@ -1533,8 +1544,11 @@ end
 -- /cine tinttest: each time of day in turn (Dawn to Night), this many seconds
 -- each: the tint glides to it, whatever your preset, and its title shows (with
 -- its sound). Called while running (or with no seconds), it stops. True if it
--- started. onStop runs when it stops, either way.
-ns.DaySweep = function(seconds, onStop)
+-- started. onStop runs when it stops, either way. quiet: no titles, and each
+-- glide done within its stop, and only the times with a color (the day itself
+-- is untinted: three white stops showed nothing, 2026-11-20). The welcome
+-- window's Tint demo: the colors, not seven title cards.
+ns.DaySweep = function(seconds, onStop, quiet)
 	if daySweep or not seconds then
 		if daySweep then
 			local stopped = daySweep.onStop
@@ -1544,7 +1558,10 @@ ns.DaySweep = function(seconds, onStop)
 		end
 		return false
 	end
-	daySweep = { started = GetTime(), each = seconds, onStop = onStop }
+	daySweep = { started = GetTime(), each = seconds, onStop = onStop, quiet = quiet,
+		glide = quiet and math.min(DAY_SWEEP_GLIDE, seconds * 0.7) or nil,
+		stops = quiet and { { "Dawn", 390 }, { "Golden hour", 1110 }, { "Dusk", 1200 }, { "Night", 60 } }
+			or DAY_SWEEP_STOPS }
 	tintDirty = true
 	return true
 end
@@ -1997,6 +2014,9 @@ function ns.TestDeathVision()
 	ns.deathVisionTest = { endsAt = GetTime() + (db.deathVignetteTime or 10) + 5 }
 end
 function ns.DeathVisionTesting() return ns.deathVisionTest ~= nil end
+-- Its overlay (made with the tint at login): the welcome window's demo keeps it
+-- out of the whole UI's fade (ShowMe.lua).
+function ns.DeathScreenFrame() return deathFrame end
 
 function ns.CreateDeathVisionPanel(kit)
 	local canvas, content = kit.CreateScrollPage()

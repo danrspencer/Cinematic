@@ -1206,7 +1206,10 @@ local function Place()
 	if ownDrag then
 		return
 	end
-	local x, top = OwnSpot()
+	-- (The welcome window's demo: beside it, not behind it, ShowMe.lua.)
+	local x, top
+	if ns.rollDemoSpot then x, top = ns.rollDemoSpot(window) end
+	if not x then x, top = OwnSpot() end
 	if not x then
 		x, top = RollsTop()
 	end

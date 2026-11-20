@@ -1808,6 +1808,13 @@ local function HandleSlash(msg)
 	elseif cmd == "debug" and arg == "zonecard" then
 		-- (Dev copy: one run checking a zone change shows one zone title, not two, ZoneCardTest.lua.)
 		if ns.ZoneCardTest then ns.ZoneCardTest() else ns.Print("/cine debug zonecard is in the dev copy only.") end
+	elseif cmd == "debug" and arg == "fadedemo" then
+		-- (Dev copy: one run checking the welcome window's Fading UI demo, FadeDemoTest.lua.)
+		if ns.FadeDemoTest then ns.FadeDemoTest() else ns.Print("/cine debug fadedemo is in the dev copy only.") end
+	elseif cmd == "debug" and (arg == "shelf" or arg:find("^shelf%s")) then
+		-- (Dev copy: one run checking the welcome window's See all shelf, ShelfTest.lua;
+		-- words after it: just those tiles and parts.)
+		if ns.ShelfTest then ns.ShelfTest(arg:match("^shelf%s+(.+)$")) else ns.Print("/cine debug shelf is in the dev copy only.") end
 	elseif cmd == "debug" and arg == "whysecret" then
 		-- (Dev copy: one run checking Why on a frame the game shows by your health, WhyTest.lua.)
 		if ns.WhySecretTest then ns.WhySecretTest() else ns.Print("/cine debug whysecret is in the dev copy only.") end

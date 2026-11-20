@@ -329,6 +329,8 @@ local function Pick(name, level)
 	if level and level.shoulderCam and ns.ShoulderCamAgree then ns.ShoulderCamAgree() end
 	ns.SetProfile(name)
 	if level and level.shoulderCam and ns.ShoulderCamAgree then ns.ShoulderCamAgree() end
+	-- (the shelf's Turn on marks were the last level's)
+	if demoRow and demoRow.LevelPicked then demoRow:LevelPicked() end
 	-- (the profile's tint strength on the slider)
 	if demoRow and demoRow.ShowStrength then demoRow.ShowStrength() end
 	if ns.RestartTimers then ns.RestartTimers() end
@@ -375,46 +377,120 @@ end
 -- of one look (ShowMe.lua), Stop while it runs. Under each, when the
 -- level hovered (else the one picked) shows it (In CineMode, 4 scenes, Off:
 -- ns.ShowMeWhen), and hovered, that in words in the description box. A Vision's test plays with
--- its switch off too: trying it is the point.
+-- its switch off too: trying it is the point. Its last slot, See all, opens
+-- the shelf in place (docs/design/welcome-shelf.md): every feature with
+-- something to play, by the settings hub it's in.
 local DEMO_ROW = {
 	-- (each its settings page's icon, or its Vision's; tip: the description
-	-- box's words while it's hovered)
-	{ key = "bars", label = "Letterbox", icon = "Interface\\Icons\\Spell_Shadow_ShadesOfDarkness",
+	-- box's words while it's hovered; group: its hub on the shelf)
+	-- (Fading UI: CineMode itself, the first thing a player expects. The HUD's
+	-- icon is your faction's banner: Lesser Invisibility here, the UI going.)
+	{ key = "fadeUI", label = "Fading UI", icon = "Interface\\Icons\\Spell_Magic_LesserInvisibilty", group = "ui",
+		tip = "Your UI fades away between fights and comes back when you need it." },
+	{ key = "bars", label = "Letterbox", icon = "Interface\\Icons\\Spell_Shadow_ShadesOfDarkness", group = "atmo",
 		tip = "Black bars at the top and bottom of the screen, as in a film." },
-	{ key = "tint", label = "Tint", icon = "Interface\\Icons\\INV_Misc_Gem_Variety_02",
+	{ key = "tint", label = "Tint", icon = "Interface\\Icons\\INV_Misc_Gem_Variety_02", group = "atmo",
 		tip = "A color wash over the world that follows the time of day and the zone, with soft dark edges " ..
 			"and weather to match." },
-	{ key = "camera", label = "Camera", icon = "Interface\\Icons\\INV_Misc_Spyglass_03",
+	{ key = "camera", label = "Camera", icon = "Interface\\Icons\\INV_Misc_Spyglass_03", group = "cam",
 		tip = "The camera moves on its own at quiet moments: on flights, when you go AFK, by a campfire. " ..
 			"This shows a half turn around you; move the camera yourself to stop it." },
-	{ key = "vitals", label = "Vitals", icon = "Interface\\Icons\\Spell_Shadow_LifeDrain02",
+	{ key = "vitals", label = "Vitals", icon = "Interface\\Icons\\Spell_Shadow_LifeDrain02", group = "vis",
 		tip = "As your health drops, the screen's edges close in, so you feel a fight without watching " ..
 			"your health bar." },
 	-- (Its test turns it on for a few seconds, whatever the level: ShowMe.lua's
 	-- "shoulder". Running it is the Shoulder Cam's one-time question's yes,
 	-- its tip says why.)
-	{ key = "shoulder", label = "Shoulder Cam", icon = "Interface\\Icons\\INV_Shoulder_02",
+	{ key = "shoulder", label = "Shoulder Cam", icon = "Interface\\Icons\\INV_Shoulder_02", group = "cam",
 		tip = "The camera moves over your shoulder, with you to one side of the screen. This glides in, swaps " ..
 			"shoulders once and glides back. It uses one of Blizzard's experimental camera settings: trying it " ..
 			"agrees to that, and your own camera settings come back after." },
-	{ key = "tele", label = "Teleport", icon = "Interface\\Icons\\Spell_Arcane_TeleportStormWind",
+	-- (Emote Vision in Teleport's place, the user's pick 2026-11-20: Teleport
+	-- on the shelf.)
+	{ key = "emote", label = "Emote Vision", icon = "Interface\\Icons\\Spell_Holy_PrayerOfFortitude", group = "vis",
+		tip = "Other players' emotes show as film dialogue over their heads." },
+}
+-- The shelf's groups, the settings hubs, each in its hub's band color
+-- (Options.lua's HUBS); a group with nothing to play is left out.
+local SHELF_GROUPS = {
+	{ key = "atmo", label = "Atmosphere", color = { 0.65, 0.45, 0.9 } },
+	{ key = "cam", label = "Cameras", color = { 0.35, 0.6, 0.9 } },
+	{ key = "vis", label = "Visions", color = { 0.85, 0.3, 0.25 } },
+	{ key = "ui", label = "Interface", color = { 0.35, 0.7, 0.45 } },
+	{ key = "style", label = "Style", color = { 0.85, 0.55, 0.25 } },
+}
+-- The shelf's tiles besides the row's: only what plays (each feature's own
+-- Test, ShowMe.lua). Tips one sentence: they're translated.
+local SHELF_MORE = {
+	{ key = "weather", label = "Weather", icon = "Interface\\Icons\\Spell_Frost_IceStorm", group = "atmo",
+		tip = "Rain, snow and dust drift across the screen to match the zone's weather." },
+	{ key = "timeTitle", label = "Time of day title", icon = "Interface\\Icons\\INV_Misc_PocketWatch_01", group = "vis",
+		tip = "A title card as dusk or dawn comes in." },
+	{ key = "audio", label = "Audio", icon = "Interface\\Icons\\INV_Misc_Drum_01", group = "atmo",
+		tip = "Music fades in as a camera starts in CineMode, and out as your UI returns." },
+	{ key = "afk", label = "AFK Cam", icon = "Interface\\Icons\\Spell_Nature_Sleep", group = "cam",
+		tip = "Go AFK and the camera sweeps slowly around you." },
+	{ key = "questCam", label = "Quest Cam", icon = "Interface\\Icons\\INV_Misc_Note_01", group = "cam",
+		tip = "The camera frames you and the quest giver as you talk, as in a cutscene." },
+	{ key = "flight", label = "Flight Cam", icon = "Interface\\Icons\\Ability_Hunter_EagleEye", group = "cam",
+		tip = "Wide, slow shots of the land as you fly a flight path." },
+	{ key = "cozy", label = "Cozy Cam", icon = "Interface\\Icons\\Spell_Fire_Fire", group = "cam",
+		tip = "Sit by a campfire and the camera settles in close." },
+	{ key = "vista", label = "Vista Cam", icon = "Interface\\Icons\\INV_Misc_Spyglass_02", group = "cam",
+		tip = "Stare at a view and the camera pulls back to take it in." },
+	{ key = "fish", label = "Fish Cam", icon = "Interface\\Icons\\Trade_Fishing", group = "cam",
+		tip = "The camera moves in on your bobber while you fish." },
+	{ key = "deathCam", label = "Death Cam", icon = "Interface\\Icons\\Ability_Rogue_FeignDeath", group = "cam",
+		tip = "The camera pulls up and away from you when you die." },
+	{ key = "walk", label = "RP Walk Cam", icon = "Interface\\Icons\\INV_Boots_01", group = "cam",
+		tip = "A walking shot as you auto-walk through a town." },
+	{ key = "run", label = "Auto-run Cam", icon = "Interface\\Icons\\Ability_Rogue_Sprint", group = "cam",
+		tip = "A tracking shot that follows you as you auto-run." },
+	{ key = "damage", label = "Damage Vision", icon = "Interface\\Icons\\Ability_Warrior_Rampage", group = "vis",
+		tip = "Your race with the top of the damage meter, live through a fight." },
+	{ key = "recap", label = "Fight Recap", icon = "Interface\\Icons\\INV_Scroll_03", group = "vis",
+		tip = "After a boss or a dungeon, a short card of who did what." },
+	{ key = "deathVision", label = "Death Vision", icon = "Interface\\Icons\\INV_Misc_Bone_HumanSkull_01", group = "vis",
+		tip = "The world dims and goes cold while you're dead." },
+	{ key = "roll", label = "Roll Vision", icon = "Interface\\Icons\\INV_Misc_Dice_01", group = "vis",
+		tip = "Group loot rolls in a window: who picked what." },
+	{ key = "tele", label = "Teleport", icon = "Interface\\Icons\\Spell_Arcane_TeleportStormWind", group = "vis",
 		tip = "As you cast your Hearthstone or a teleport, a portal opens around you and the world fades " ..
 			"out as you leave." },
+	{ key = "cards", label = "Card Vision", icon = "Interface\\Icons\\INV_Misc_Book_09", group = "vis",
+		tip = "Title cards for the moments of your day: a new zone, a level, a fight." },
+	{ key = "cdflash", label = "Cooldown Flash", icon = "Interface\\Icons\\Spell_Nature_TimeStop", group = "ui",
+		tip = "A spell's icon flashes in the middle of the screen as it comes off cooldown." },
+	{ key = "speech", label = "Speech", icon = "Interface\\Icons\\Ability_Warrior_RallyingCry", group = "ui",
+		tip = "What's said behind you shows as a bubble, so you don't miss it." },
 }
 local DEMO_ROW_H = 74
+local SHELF_H = 222   -- the shelf open: the grid scrolls inside it
+local TILE_H, TILE_GAP = 38, 6
 local function BuildDemoRow(page, width)
 	local row = CreateFrame("Frame", nil, page, BackdropTemplateMixin and "BackdropTemplate")
 	row:SetSize(width, DEMO_ROW_H)
 	Flat(row, BG)
-	local head = Text(row, "GameFontNormalSmall", L["See it first"], GOLD)
+	local head = Text(row, "GameFontNormalSmall", L["Feature List: Click to preview"], GOLD)
 	head:SetPoint("TOPLEFT", 12, -9)
-	local hint = Text(row, "GameFontHighlightSmall", L["Click one to see it for a few seconds."], DIM)
+	-- (On the right, only in a fight: why they're all grey. The header says
+	-- to click, 2026-11-20: "Click one to see it for a few seconds" dropped.)
+	local hint = Text(row, "GameFontHighlightSmall", "", DIM)
 	hint:SetJustifyH("RIGHT")
 	hint:SetPoint("TOPRIGHT", -12, -9)
-	local list = {}
+	local list, all = {}, {}
 	for _, demo in ipairs(DEMO_ROW) do
-		if ns.ShowMeAvailable and ns.ShowMeAvailable(demo.key) then list[#list + 1] = demo end
+		if ns.ShowMeAvailable and ns.ShowMeAvailable(demo.key) then
+			list[#list + 1] = demo
+			all[#all + 1] = demo
+		end
 	end
+	for _, demo in ipairs(SHELF_MORE) do
+		if ns.ShowMeAvailable and ns.ShowMeAvailable(demo.key) then all[#all + 1] = demo end
+	end
+	-- (Saved for the account: open or closed, the last group. Not a setting.)
+	local saved = type(ns.db.welcomeShelf) == "table" and ns.db.welcomeShelf or {}
+	ns.db.welcomeShelf = saved
 	-- Under the buttons, a line of settings. On the left, Start in CineMode:
 	-- the level's the tags are for (hovered, else picked), a tick to change
 	-- for the one picked (a hovered card has the mouse: its own is only
@@ -447,7 +523,8 @@ local function BuildDemoRow(page, width)
 		if startFor ~= Active() then return end
 		ns.db.fadeUI = not StartOn()
 		if ns.RestartTimers then ns.RestartTimers() end
-		ShowStart()
+		-- (and the Fading UI button's tag, which goes by it)
+		row:Update(nil, true)
 	end)
 	start:SetScript("OnEnter", function(self)
 		if startFor then self:SetBackdropBorderColor(unpack(LIT)) end
@@ -522,28 +599,41 @@ local function BuildDemoRow(page, width)
 		row.ShowStrength = Show
 		Show()
 	end
-	row:SetHeight(DEMO_ROW_H + strengthH)
+	local closedH = DEMO_ROW_H + strengthH
+	row:SetHeight(closedH)
 	local gap = 6
-	local buttonW = math.floor((width - 24 - gap * math.max(0, #list - 1)) / math.max(1, #list))
+	-- (the See all button narrower: two short words, no icon)
+	local moreW = 74
+	local buttonW = math.floor((width - 24 - moreW - gap * #list) / math.max(1, #list))
 	local buttons = {}
 	local show -- (the level the tags are for: Describe's, nil for none)
-	for i, demo in ipairs(list) do
-		local b = CreateFrame("Button", nil, row, BackdropTemplateMixin and "BackdropTemplate")
-		b:SetSize(buttonW, 38)
-		b:SetPoint("BOTTOMLEFT", 12 + (i - 1) * (buttonW + gap), 10 + strengthH)
+	local turned = {} -- (features Turned on in the level picked: key -> true, till another's picked)
+	-- The level the Turn on buttons are for: the one picked, none hovered (a
+	-- hovered card's tags are only shown), not Blank Slate (everything off on
+	-- purpose: no Customize either).
+	local function TurnOnLevel()
+		local active = Active()
+		local level = active and levelOf[active]
+		if not level or show ~= level or level.noCustomize then return nil end
+		return active
+	end
+	-- One demo's button: the row's, or a tile on the shelf (the same, with
+	-- Turn on). Its icon, rounded as the level cards' are; its name and when
+	-- it shows beside it.
+	local function DemoButton(parent, demo, w)
+		local b = CreateFrame("Button", nil, parent, BackdropTemplateMixin and "BackdropTemplate")
+		b:SetSize(w, TILE_H)
 		Flat(b, RAISED, EDGE)
-		-- (its icon on the left, rounded as the level cards' are; the name
-		-- and its In or Not in beside it)
 		b.icon = b:CreateTexture(nil, "ARTWORK")
-		b.icon:SetSize(26, 26)
+		b.icon:SetSize(24, 24)
 		b.icon:SetPoint("LEFT", 6, 0)
 		b.icon:SetTexture(demo.icon)
 		b.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
 		Rounded(b, b.icon)
-		b.name = Text(b, "GameFontHighlightSmall", L[demo.label], SOFT, buttonW - 40)
+		b.name = Text(b, "GameFontHighlightSmall", L[demo.label], SOFT, w - 38)
 		b.name:SetPoint("TOPLEFT", b.icon, "TOPRIGHT", 6, 0)
 		b.name:SetWordWrap(false)
-		b.tag = Text(b, "GameFontDisableSmall", "", DIM, buttonW - 40)
+		b.tag = Text(b, "GameFontDisableSmall", "", DIM, w - 38)
 		b.tag:SetPoint("TOPLEFT", b.name, "BOTTOMLEFT", 0, -3)
 		b.tag:SetWordWrap(false)
 		b:SetScript("OnClick", function() ns.ShowMe(demo.key, window, true) end)
@@ -553,10 +643,13 @@ local function BuildDemoRow(page, width)
 			local when
 			if show then
 				local _, _, sentence = ns.ShowMeWhen(demo.key, show.profile)
+				if turned[demo.key] and TurnOnLevel() then sentence = L["You turned it on."] end
 				when = sentence and "\n|cffffd100" .. (L["In %s"]):format(show.label) .. ":|r " .. sentence
 			end
 			about:SetText("|cffffd100" .. L[demo.label] .. "|r   " .. L[demo.tip] .. (when or ""))
-			local why = ns.ShowMeBlocked(demo.key, true)
+			-- (Why it can't play, on its own: not in a fight, which the shelf
+			-- and the row's hint say for all of them at once.)
+			local why = not InCombatLockdown() and ns.ShowMeBlocked(demo.key, true)
 			if why then
 				GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
 				GameTooltip:SetText(why, 1, 1, 1, 1, true)
@@ -569,35 +662,312 @@ local function BuildDemoRow(page, width)
 			Describe(levelOf[Active()])
 		end)
 		b.demo = demo
-		buttons[i] = b
+		b.width = w
+		buttons[#buttons + 1] = b
+		return b
+	end
+	-- (A tile's Turn on: small, on its right, the name narrower beside it.)
+	local function TurnOnButton(b)
+		local on = FlatButton(b, L["Turn on"], nil, function()
+			if ns.ShowMeTurnOn(b.demo.key) then
+				turned[b.demo.key] = true
+				row:Update(nil, true)
+			end
+		end)
+		on:SetPoint("RIGHT", -4, 0)
+		on:SetScript("OnEnter", function(self)
+			Color(self.text, GOLD)
+			local level = levelOf[Active()]
+			about:SetText("|cffffd100" .. (L["Turn on %s"]):format(L[b.demo.label]) .. "|r   " ..
+				(L["Adds it to %s, the profile you're trying."]):format(level and level.label or ""))
+		end)
+		on:SetScript("OnLeave", function(self)
+			Color(self.text, DIM)
+			Describe(levelOf[Active()])
+		end)
+		on:Hide()
+		b.turnOn = on
+	end
+	for i, demo in ipairs(list) do
+		local b = DemoButton(row, demo, buttonW)
+		b:SetPoint("TOPLEFT", 12 + (i - 1) * (buttonW + gap), -26)
+	end
+
+	-- See all: the row's last slot, dashed gold (an edge of gold dashes), its
+	-- count and "n more" under it; open, Fewer.
+	local more = CreateFrame("Button", nil, row, BackdropTemplateMixin and "BackdropTemplate")
+	more:SetSize(moreW, TILE_H)
+	more:SetPoint("TOPLEFT", 12 + #list * (buttonW + gap), -26)
+	Flat(more, BG, BG)
+	for _, side in ipairs({ "TOP", "BOTTOM", "LEFT", "RIGHT" }) do
+		local across = side == "TOP" or side == "BOTTOM"
+		local steps = math.floor((across and moreW or TILE_H) / 8)
+		for n = 0, steps - 1 do
+			local dash = more:CreateTexture(nil, "BORDER")
+			dash:SetColorTexture(GOLD[1], GOLD[2], GOLD[3], 0.7)
+			if across then
+				dash:SetSize(4, 1)
+				dash:SetPoint(side .. "LEFT", n * 8 + 2, 0)
+			else
+				dash:SetSize(1, 4)
+				dash:SetPoint("TOP" .. side, 0, -(n * 8 + 2))
+			end
+		end
+	end
+	more.name = Text(more, "GameFontHighlightSmall", "", GOLD, moreW - 8)
+	more.name:SetJustifyH("CENTER")
+	more.name:SetPoint("TOP", 0, -7)
+	more.tag = Text(more, "GameFontDisableSmall", "", DIM, moreW - 8)
+	more.tag:SetJustifyH("CENTER")
+	more.tag:SetPoint("TOP", more.name, "BOTTOM", 0, -3)
+	more:SetScript("OnEnter", function(self)
+		self:SetBackdropColor(unpack(RAISED))
+		about:SetText("|cffffd100" .. L["See all"] .. "|r   " ..
+			L["Everything Cinematic can show you, by where you'll find it in the settings. Click any to see it."])
+	end)
+	more:SetScript("OnLeave", function(self)
+		self:SetBackdropColor(unpack(BG))
+		Describe(levelOf[Active()])
+	end)
+
+	-- The shelf: the groups down the left (All, then each hub with something
+	-- to play, in its color), a search box over the grid, the grid of tiles
+	-- (a fixed height, scrolling). In a fight, one line in the search's place.
+	local shelf = CreateFrame("Frame", nil, row)
+	shelf:SetPoint("TOPLEFT", 12, -26 - TILE_H - 10)
+	shelf:SetSize(width - 24, SHELF_H)
+	shelf:Hide()
+	local rule = shelf:CreateTexture(nil, "ARTWORK")
+	rule:SetColorTexture(unpack(EDGE))
+	rule:SetHeight(1)
+	rule:SetPoint("TOPLEFT")
+	rule:SetPoint("TOPRIGHT")
+	local NAV_W = 132
+	local groups, groupButtons = {}, {}
+	local count = {}
+	for _, demo in ipairs(all) do count[demo.group] = (count[demo.group] or 0) + 1 end
+	groups[1] = { key = "all", label = "All", color = GOLD }
+	for _, group in ipairs(SHELF_GROUPS) do
+		if count[group.key] then groups[#groups + 1] = group end
+	end
+	count.all = #all
+	local groupOf = {}
+	for _, group in ipairs(groups) do groupOf[group.key] = group end
+	if not groupOf[saved.group or ""] then saved.group = "all" end
+	local Layout -- (below: the grid for the group picked or the words searched)
+	for i, group in ipairs(groups) do
+		local g = CreateFrame("Button", nil, shelf, BackdropTemplateMixin and "BackdropTemplate")
+		g:SetSize(NAV_W, 24)
+		g:SetPoint("TOPLEFT", 0, -10 - (i - 1) * 26)
+		Flat(g, BG, BG)
+		local swatch = g:CreateTexture(nil, "ARTWORK")
+		swatch:SetColorTexture(unpack(group.color))
+		swatch:SetSize(3, 16)
+		swatch:SetPoint("LEFT", 6, 0)
+		g.label = Text(g, "GameFontHighlightSmall", L[group.label], SOFT)
+		g.label:SetPoint("LEFT", swatch, "RIGHT", 8, 0)
+		g.n = Text(g, "GameFontDisableSmall", tostring(count[group.key]), DIM)
+		g.n:SetJustifyH("RIGHT")
+		g.n:SetPoint("RIGHT", -8, 0)
+		g:SetScript("OnClick", function()
+			saved.group = group.key
+			Layout()
+		end)
+		g:SetScript("OnEnter", function(self) if saved.group ~= group.key then self:SetBackdropColor(unpack(RAISED)) end end)
+		g:SetScript("OnLeave", function(self) if saved.group ~= group.key then self:SetBackdropColor(unpack(BG)) end end)
+		g.group = group
+		groupButtons[i] = g
+	end
+	local gridX = NAV_W + 12
+	local gridW = width - 24 - gridX
+	-- (The search box: flat, a grey hint inside while empty.)
+	local search = CreateFrame("EditBox", nil, shelf, BackdropTemplateMixin and "BackdropTemplate")
+	search:SetSize(gridW, 22)
+	search:SetPoint("TOPLEFT", gridX, -10)
+	Flat(search, RAISED, EDGE)
+	search:SetFontObject("GameFontHighlightSmall")
+	search:SetTextInsets(8, 8, 0, 0)
+	search:SetAutoFocus(false)
+	search:SetMaxLetters(40)
+	local searchHint = Text(search, "GameFontDisableSmall", L["Find a feature: fishing, duel, camera..."], DIM)
+	searchHint:SetPoint("LEFT", 8, 0)
+	search:SetScript("OnEscapePressed", function(self) self:SetText("") self:ClearFocus() end)
+	search:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
+	search:SetScript("OnTextChanged", function(self)
+		searchHint:SetShown(self:GetText() == "")
+		if Layout then Layout() end
+	end)
+	local fightLine = Text(shelf, "GameFontHighlightSmall", L["You're in a fight. The demos come back when it ends."], GOLD)
+	fightLine:SetPoint("LEFT", search, "LEFT", 8, 0)
+	fightLine:Hide()
+	-- The grid: tiles 3 across (2 on a narrow window), each group's under its
+	-- name when more than one shows; the wheel scrolls it, a thin thumb on
+	-- its right says where.
+	local scroll = CreateFrame("ScrollFrame", nil, shelf)
+	scroll:SetPoint("TOPLEFT", gridX, -10 - 22 - 8)
+	scroll:SetSize(gridW - 8, SHELF_H - 10 - 22 - 8 - 4)
+	local grid = CreateFrame("Frame", nil, scroll)
+	grid:SetSize(gridW - 8, 1)
+	scroll:SetScrollChild(grid)
+	local bar = shelf:CreateTexture(nil, "ARTWORK")
+	bar:SetColorTexture(unpack(EDGE))
+	bar:SetWidth(3)
+	local function ScrollTo(y)
+		local most = math.max(0, grid:GetHeight() - scroll:GetHeight())
+		y = math.max(0, math.min(most, y))
+		scroll:SetVerticalScroll(y)
+		bar:SetShown(most > 0)
+		if most > 0 then
+			local viewH = scroll:GetHeight()
+			local h = math.max(16, viewH * viewH / grid:GetHeight())
+			bar:SetHeight(h)
+			bar:ClearAllPoints()
+			bar:SetPoint("TOPRIGHT", scroll, "TOPRIGHT", 8, -(viewH - h) * (y / most))
+		end
+	end
+	scroll:EnableMouseWheel(true)
+	scroll:SetScript("OnMouseWheel", function(_, delta)
+		ScrollTo(scroll:GetVerticalScroll() - delta * (TILE_H + TILE_GAP))
+	end)
+	local cols = gridW >= 520 and 3 or 2
+	local tileW = math.floor((gridW - 8 - TILE_GAP * (cols - 1)) / cols)
+	local tiles, labels = {}, {}
+	for _, demo in ipairs(all) do
+		local b = DemoButton(grid, demo, tileW)
+		if ns.ShowMeCanTurnOn and ns.ShowMeCanTurnOn(demo.key) then TurnOnButton(b) end
+		b:Hide()
+		tiles[#tiles + 1] = b
+	end
+	for _, group in ipairs(SHELF_GROUPS) do
+		local label = Text(grid, "GameFontNormalSmall", L[group.label], group.color)
+		label:Hide()
+		labels[group.key] = label
+	end
+	local empty = Text(grid, "GameFontHighlightSmall", "", DIM, gridW - 16)
+	empty:SetPoint("TOPLEFT", 4, -6)
+	-- (the words searched, in this language, against each tile's name and tip)
+	local function Matches(demo, words)
+		if words == "" then return saved.group == "all" or demo.group == saved.group end
+		return (L[demo.label] .. " " .. L[demo.tip]):lower():find(words, 1, true) ~= nil
+	end
+	function Layout()
+		local words = (search:GetText() or ""):match("^%s*(.-)%s*$"):lower()
+		for _, g in ipairs(groupButtons) do
+			local on = words == "" and saved.group == g.group.key
+			g:SetBackdropColor(unpack(on and RAISED or BG))
+			Color(g.label, on and WHITE or SOFT)
+		end
+		for _, label in pairs(labels) do label:Hide() end
+		local y, shown = 0, 0
+		local several = words ~= "" or saved.group == "all"
+		for _, group in ipairs(SHELF_GROUPS) do
+			local n = 0
+			for _, b in ipairs(tiles) do
+				if b.demo.group == group.key and Matches(b.demo, words) then
+					if n == 0 and several then
+						local label = labels[group.key]
+						label:ClearAllPoints()
+						label:SetPoint("TOPLEFT", 2, -y - 2)
+						label:Show()
+						y = y + 18
+					end
+					b:ClearAllPoints()
+					b:SetPoint("TOPLEFT", (n % cols) * (tileW + TILE_GAP), -y - math.floor(n / cols) * (TILE_H + TILE_GAP))
+					b:Show()
+					n = n + 1
+				end
+			end
+			for _, b in ipairs(tiles) do
+				if b.demo.group == group.key and not Matches(b.demo, words) then b:Hide() end
+			end
+			if n > 0 then
+				y = y + math.ceil(n / cols) * (TILE_H + TILE_GAP) + 4
+				shown = shown + n
+			end
+		end
+		empty:SetText(shown == 0 and (L["Nothing called \"%s\" plays here."]):format(search:GetText() or "") or "")
+		grid:SetHeight(math.max(1, y))
+		ScrollTo(0)
+		if row.Update then row:Update(nil, true) end
+	end
+
+	local function Paint(b)
+		local key = b.demo.key
+		local running = ns.ShowMeRunning(key)
+		local blocked = not running and ns.ShowMeBlocked(key, true)
+		b:SetEnabled(not blocked)
+		b.name:SetText(running and L["Stop"] or L[b.demo.label])
+		Color(b.name, blocked and DIM or running and GOLD or SOFT)
+		b.icon:SetDesaturated(blocked and true or false)
+		b.icon:SetAlpha(blocked and 0.5 or 1)
+		b:SetBackdropBorderColor(unpack(running and GOLD or EDGE))
+		-- (when it shows in that level: In CineMode, 4 scenes, Off...; turned
+		-- on here: says so)
+		local tag, has = nil, nil
+		local level = TurnOnLevel()
+		if level and turned[key] then
+			tag, has = L["On: you turned it on"], true
+		elseif show then
+			tag, has = ns.ShowMeWhen(key, show.profile)
+		end
+		b.tag:SetText(tag or "")
+		if tag then Color(b.tag, has and GOLD or DIM) end
+		-- (Turn on: for the level picked when it hasn't it, not mid-demo or in a fight)
+		if b.turnOn then
+			local offer = level ~= nil and tag ~= nil and not has and not running and not InCombatLockdown()
+			b.turnOn:SetShown(offer)
+			local w = b.width - 38 - (offer and b.turnOn:GetWidth() + 8 or 0)
+			b.name:SetWidth(w)
+			b.tag:SetWidth(w)
+		end
 	end
 	-- keep: the same level as last time (a demo started or ended, a fight).
 	function row:Update(level, keep)
 		if not keep then show = level end
 		startFor = show and (show.profile or ns.DEFAULT_PROFILE) or nil
 		ShowStart()
+		local fight = InCombatLockdown()
+		hint:SetText(fight and L["In a fight: demos wait till it ends."] or "")
+		fightLine:SetShown(fight)
+		search:SetShown(not fight)
 		for _, b in ipairs(buttons) do
-			local key = b.demo.key
-			local running = ns.ShowMeRunning(key)
-			local blocked = not running and ns.ShowMeBlocked(key, true)
-			b:SetEnabled(not blocked)
-			b.name:SetText(running and L["Stop"] or L[b.demo.label])
-			Color(b.name, blocked and DIM or running and GOLD or SOFT)
-			b.icon:SetDesaturated(blocked and true or false)
-			b.icon:SetAlpha(blocked and 0.5 or 1)
-			b:SetBackdropBorderColor(unpack(running and GOLD or EDGE))
-			-- (when it shows in that level: In CineMode, 4 scenes, Off...)
-			local tag, has = nil, nil
-			if show then tag, has = ns.ShowMeWhen(key, show.profile) end
-			b.tag:SetText(tag or "")
-			if tag then Color(b.tag, has and GOLD or DIM) end
+			if b:IsShown() then Paint(b) end
 		end
 	end
+	-- A new level picked: what was turned on was that one's.
+	function row:LevelPicked()
+		wipe(turned)
+	end
+	-- Open or closed (saved): the row grows by the shelf, the window with it
+	-- (row.OnHeight, the levels page's).
+	local function SetOpen(open)
+		local was = shelf:IsShown()
+		shelf:SetShown(open)
+		saved.open = open or nil
+		more.name:SetText(open and L["Fewer"] or (L["See all %d"]):format(#all))
+		more.tag:SetText(open and "" or (L["%d more"]):format(#all - #list))
+		local h = closedH + (open and SHELF_H + 10 or 0)
+		row:SetHeight(h)
+		if open then
+			if not search:HasFocus() then search:SetText("") end
+			Layout()
+		else
+			search:ClearFocus()
+		end
+		if was ~= open and row.OnHeight then row.OnHeight(open and SHELF_H + 10 or -(SHELF_H + 10)) end
+		row:Update(nil, true)
+	end
+	more:SetScript("OnClick", function() SetOpen(not shelf:IsShown()) end)
+	row.SetShelfOpen = SetOpen
+	row.ShelfTiles = function() return tiles end
+	SetOpen(saved.open == true)
+
 	local function Recheck() if row:IsVisible() then row:Update(nil, true) end end
 	if ns.ShowMeListen then ns.ShowMeListen(Recheck) end
 	row:RegisterEvent("PLAYER_REGEN_DISABLED")
 	row:RegisterEvent("PLAYER_REGEN_ENABLED")
-	row:SetScript("OnEvent", Recheck)
+	-- (PLAYER_REGEN_DISABLED comes before the lock: a moment on, the fight's begun)
+	row:SetScript("OnEvent", function() C_Timer.After(0.1, Recheck) end)
 	row:SetScript("OnShow", function()
 		-- (the strength changed on the Tint page meanwhile)
 		if row.ShowStrength then row.ShowStrength() end
@@ -638,7 +1008,16 @@ local function BuildLevels(page)
 		rowH = demoRow:GetHeight() + 12
 	end
 	local box = CreateFrame("Frame", nil, page, BackdropTemplateMixin and "BackdropTemplate")
-	box:SetPoint("TOPLEFT", sub, "BOTTOMLEFT", 0, -18 - cardH - 12 - rowH)
+	-- (under the row: it grows as See all opens its shelf, the window with it)
+	if demoRow then
+		box:SetPoint("TOPLEFT", demoRow, "BOTTOMLEFT", 0, -12)
+		demoRow.OnHeight = function(delta)
+			page.height = page.height + delta
+			if window and window.page == 1 then window:SetHeight(page.height) end
+		end
+	else
+		box:SetPoint("TOPLEFT", sub, "BOTTOMLEFT", 0, -18 - cardH - 12)
+	end
 	box:SetSize(WIDTH - 2 * PAD, 56)
 	Flat(box, BG)
 	about = Text(box, "GameFontHighlightSmall", "", SOFT, WIDTH - 2 * PAD - 24)
@@ -1078,6 +1457,8 @@ local function CreateWindow()
 	window:SetPoint("CENTER", 0, 60)
 	window:SetFrameStrata("DIALOG")
 	window:SetToplevel(true)
+	-- (kept on the screen: taller with the shelf open, at a big UI scale its top went off it)
+	window:SetClampedToScreen(true)
 	window:EnableMouse(true)
 	window:SetMovable(true)
 	window:RegisterForDrag("LeftButton")

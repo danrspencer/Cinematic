@@ -668,6 +668,8 @@ local function Explain(entry)
 		Add(out, "block", L["Fading out for a layout change"])
 	elseif ns.previewRows then
 		Add(out, ns.previewRows[n.row] and "on" or "block", L["A profile preview shows just its own frames"])
+	elseif ns.fadeDemo then
+		Add(out, "block", L["The welcome window's Fading UI demo is playing"])
 	end
 	if n.immersive and not n.typingShown then
 		Add(out, "block", L["Chat Cam's Ultra immersive hides the whole UI in a conversation"], "Cameras")

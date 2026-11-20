@@ -11,6 +11,9 @@
 local _, ns = ...
 
 ns.CHANGELOG_FEATURES = {
+	{ date = "2026-11-20", title = "Try every feature",
+		text = "The welcome window's Feature List now previews almost any feature in a few seconds. Open it with " ..
+		"/cine welcome, then See all." },
 	{ date = "2026-11-19", page = "Death Vision", title = "Death Vision",
 		text = "The dim, cold screen and dark edges while you're dead now have a page of their own, with their " ..
 		"strength, how far the edges reach in and a Test button." },

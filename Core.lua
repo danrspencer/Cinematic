@@ -3991,7 +3991,8 @@ local function OnUpdate(_, elapsed)
 	-- nothing new since (CineMode, a fight, the mouse, a key down), every
 	-- other tick only, the skipped tick's time added to the next (a profile
 	-- showed it the tick's biggest part).
-	local fadeOn = cinematic or ns.previewRows ~= nil or ns.layoutFadeUntil ~= nil
+	-- (The welcome window's Fading UI demo: the frames as in CineMode, ShowMe.lua.)
+	local fadeOn = cinematic or ns.previewRows ~= nil or ns.layoutFadeUntil ~= nil or ns.fadeDemo == true
 	local fight = InCombatLockdown() or Flag(UnitAffectingCombat("player"))
 	local x, y = ns.CursorPosition()
 	-- (Out of CineMode the mouse only matters over a unit frame with parts
