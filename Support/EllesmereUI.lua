@@ -6,6 +6,9 @@
 --
 -- It sets its frames' alpha all the time (target changes, combat, mouseover):
 -- its own frames are hooked, and game frames it sets are checked every frame.
+-- Its Skyriding HUD follows the Encounter bar row, its Mythic+ tools get rows
+-- of their own, and its tooltip, chat bubble and minimap looks and its AFK
+-- screen each have an Addon Conflicts row against Cinematic's.
 local _, ns = ...
 local L = ns.L
 
@@ -233,6 +236,39 @@ for _, known in ipairs({
 		about = L["its raid tools' folded-up icon"],
 		names = { "EllesmereUIRaidToolsIcon" },
 	},
+	-- Its Mythic+ tools, a row each: the key timer (on UIParent, over the
+	-- quest tracker, in place of the game's timer there but with its own
+	-- counts), and its bars found by their Unlock Mode entries (no names).
+	{
+		key = "euiMythicTimer", addon = "EllesmereUIMythicTimer",
+		label = "EllesmereUI Mythic+ Timer", short = "EllesmereUI M+ timer",
+		about = L["its Mythic+ key timer"],
+		names = { "EllesmereUIMythicTimerStandalone" },
+	},
+	{
+		key = "euiKickBars", addon = "EllesmereUIMythicTimer",
+		label = "EllesmereUI Kick Tracker", short = "EllesmereUI kick tracker",
+		about = L["its bars for your group's interrupts"],
+		match = MatchUnlockFrames({ "EMT_KickBars" }),
+	},
+	{
+		key = "euiTargetedSpells", addon = "EllesmereUIMythicTimer",
+		label = "EllesmereUI Targeted Spell Bars", short = "EllesmereUI targeted spells",
+		about = L["its cast bars for enemies casting nearby"],
+		match = MatchUnlockFrames({ "EMT_TargetedSpellBars" }),
+	},
+	{
+		key = "euiTargetCastBar", addon = "EllesmereUIMythicTimer",
+		label = "EllesmereUI Target Cast Bar", short = "EllesmereUI target cast",
+		about = L["its own cast bar for your target"],
+		match = MatchUnlockFrames({ "EMT_TargetCastBar" }),
+	},
+	{
+		key = "euiFocusCastBar", addon = "EllesmereUIMythicTimer",
+		label = "EllesmereUI Focus Cast Bar", short = "EllesmereUI focus cast",
+		about = L["its own cast bar for your focus"],
+		match = MatchUnlockFrames({ "EMT_FocusCastBar" }),
+	},
 }) do
 	known.suite, known.hookAlpha = "EllesmereUI", true
 	table.insert(ns.ADDON_FRAMES, known)
@@ -415,6 +451,10 @@ do
 	end
 
 	ns.WhenAddonLoads("EllesmereUINameplates", function()
+		-- (Its Show Friendly Pets toggle writes the game's friendly pet and
+		-- minion plate settings, which the Nameplates page's rows decide: our
+		-- rows go on again after it, as for Platynator.)
+		ns.FollowOthersPlateWrites("EllesmereUINameplates", "EllesmereUI")
 		ns.AddPlateAlpha(SetPlateAlpha)
 		-- A new plate's frames are put on it in its own handler, which runs
 		-- after ours (Core: NAME_PLATE_UNIT_ADDED): give them the plate's
@@ -730,3 +770,139 @@ end
 ns.WhenAddonLoads("EllesmereUIChat", function()
 	ns.AddScanner(FindChat)
 end)
+
+-- Its Skyriding HUD (Blizz UI Enhanced): its own vigor charges and speed bar
+-- in place of the game's, which sit in the Encounter bar: with that row.
+ns.WhenAddonLoads("EllesmereUIBlizzardSkin", function()
+	ns.FadeWithRow("encounter", "encounter", { "EllesmereUIDragonRidingAnchor" }, true, true)
+end)
+
+-- Its looks and its AFK screen against Cinematic's (Addon Conflicts rows).
+-- Theirs: Cinematic's stands aside while its own is on. Ours: Cinematic's,
+-- and its own held at alpha 0 where it can be found; its settings left be.
+local function EuiDB()
+	return type(_G.EllesmereUIDB) == "table" and _G.EllesmereUIDB or nil
+end
+
+local TOOLTIPS = { "GameTooltip", "ItemRefTooltip", "ShoppingTooltip1", "ShoppingTooltip2", "EmbeddedItemTooltip" }
+
+-- Its tooltip look on one tooltip: its background (an unnamed texture at the
+-- very bottom of the tooltip's own BACKGROUND layer) and its border (an
+-- unnamed backdrop frame laid over the tooltip). Ours on a tooltip is a plain
+-- frame, not a backdrop one, so it's never among them.
+local function TooltipSkinParts(tooltip, out)
+	for _, region in ipairs({ tooltip:GetRegions() }) do
+		if region:GetObjectType() == "Texture" and not region:GetName() then
+			local layer, sub = region:GetDrawLayer()
+			if layer == "BACKGROUND" and sub == -8 then out[#out + 1] = region end
+		end
+	end
+	for _, child in ipairs({ tooltip:GetChildren() }) do
+		if not (child.IsForbidden and child:IsForbidden()) and not child:GetName()
+			and child ~= tooltip.NineSlice and type(child.SetBackdrop) == "function" then
+			local ok, _, relativeTo = pcall(child.GetPoint, child, 1)
+			if ok and relativeTo == tooltip then out[#out + 1] = child end
+		end
+	end
+end
+
+-- Its chat bubbles: unnamed frames of its own on UIParent (each with its
+-- back and text), shown over the game's. Looked for again only when
+-- UIParent's number of children changes.
+local bubbleFrames, bubbleCount = {}, -1
+local function BubbleFrames()
+	local count = UIParent:GetNumChildren()
+	if count == bubbleCount then return bubbleFrames end
+	bubbleCount = count
+	wipe(bubbleFrames)
+	for _, frame in ipairs({ UIParent:GetChildren() }) do
+		if not (frame.IsForbidden and frame:IsForbidden()) and not frame:GetName()
+			and frame:GetFrameStrata() == "HIGH" and frame:GetFrameLevel() == 150
+			and type(frame.bg) == "table" and type(frame.text) == "table"
+			and frame.text.GetObjectType and frame.text:GetObjectType() == "FontString" then
+			bubbleFrames[#bubbleFrames + 1] = frame
+		end
+	end
+	return bubbleFrames
+end
+
+ns.WhenAddonLoads("EllesmereUIBlizzardSkin", function()
+	ns.AddConflict({ key = "style:tooltip", addon = "EllesmereUI", label = "Tooltip look", group = "style",
+		noBoth = true, styleSwitch = "tooltipStyle",
+		about = "How tooltips look: the Interface hub's Tooltip Style page, or EllesmereUI's tooltips",
+		-- (On unless switched off, as it reads it.)
+		theirs = function()
+			local db = EuiDB()
+			return not db or db.customTooltips ~= false
+		end,
+		ours = function() return ns.StyleOn("tooltipStyle") end,
+		hide = function()
+			local list = {}
+			for _, name in ipairs(TOOLTIPS) do
+				local tooltip = _G[name]
+				if type(tooltip) == "table" and tooltip.GetRegions
+					and not (tooltip.IsForbidden and tooltip:IsForbidden()) then
+					TooltipSkinParts(tooltip, list)
+				end
+			end
+			return list
+		end,
+		onPick = function() if ns.RefreshTooltipStyle then ns.RefreshTooltipStyle() end end })
+
+	ns.AddConflict({ key = "style:bubbles", addon = "EllesmereUI", label = "Chat bubble look", group = "style",
+		noBoth = true, styleSwitch = "bubblesStyle",
+		about = "How chat bubbles look: the Interface hub's Chat Bubble Style page, or EllesmereUI's bubbles",
+		-- (Off unless switched on: its profile's chatBubbles.enabled.)
+		theirs = function()
+			local eui = _G.EllesmereUI
+			local get = type(eui) == "table" and eui.GetActiveProfileData
+			if type(get) ~= "function" then return false end
+			local ok, profile = pcall(get)
+			local bubbles = ok and type(profile) == "table" and profile.chatBubbles
+			return type(bubbles) == "table" and bubbles.enabled == true
+		end,
+		ours = function() return ns.StyleOn("bubblesStyle") end,
+		hide = BubbleFrames,
+		onPick = function() if ns.RefreshBubbleStyle then ns.RefreshBubbleStyle() end end })
+end)
+
+-- Its minimap: the Interface Recolor page leaves it as it draws it
+-- (Style/MinimapStyle.lua), unless this row says Ours.
+ns.WhenAddonLoads("EllesmereUIMinimap", function()
+	ns.AddConflict({ key = "style:minimap", addon = "EllesmereUI", label = "Minimap look", group = "style",
+		noBoth = true,
+		about = "Its minimap: left as EllesmereUI draws it, or also colored by the Style hub's Interface " ..
+			"Recolor page, which puts its ring and buttons in the theme's color",
+		theirs = function() return true end,
+		ours = function() return ns.StyleOn("irStyle") end,
+		onPick = function() if ns.RefreshMinimapStyle then ns.RefreshMinimapStyle() end end })
+end)
+
+-- Its AFK screen (a full-screen card of its own while you're away, its
+-- partyModeAfk setting) against Cinematic's AFK camera.
+ns.WhenAddonLoads("EllesmereUI", function()
+	ns.AddFeatureYield("scene:AFK", function()
+		local db = EuiDB()
+		return db and db.partyModeAfk and "EllesmereUI" or nil
+	end, {
+		key = "scene:AFK", addon = "EllesmereUI", label = "AFK scene", group = "scenes",
+		ours = function() return ns.TriggerRowNow("AFK") ~= nil end, hide = { "EllesmereUIAfkScreen" },
+		about = "What plays while you're away: Cinematic's AFK camera, or EllesmereUI's AFK screen",
+	})
+end)
+
+-- Its parts that draw only windows you open (bags and bank, group finder,
+-- friends list) or a palette shown while you hold its key (Quickdraw): left
+-- as they are. A note each, so they're not looked for on the Addons page.
+for _, part in ipairs({
+	{ "EllesmereUIBags", "Bags", "Its bag and bank windows open and close as you use them." },
+	{ "EllesmereUIGroupFinder", "Group Finder", "Its Group Finder changes show only in the game's window." },
+	{ "EllesmereUIFriends", "Friends", "Its friends list shows only in the game's window." },
+	{ "EllesmereUIQuickdraw", "Quickdraw", "Its action palette shows only while you hold its key." },
+}) do
+	table.insert(ns.ADDON_NOTES, {
+		addon = part[1], label = part[2],
+		works = L["Left as it is"],
+		about = L[part[3]],
+	})
+end

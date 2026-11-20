@@ -3,7 +3,7 @@
 # of its that's in neither = a MISS: decide it (a row, a fade, or here with
 # why). One per line: name or glob (*), a space, why. Its parts' own short
 # names (EUI, EAB, ERB_, ERF, ECME_...) count too: EXTRA_PREFIXES there.
-# Checked against v9.9, 2026-11-19. (Its mirror bars, ERB_Mirror_*, fade
+# Checked against v9.9.1, 2026-11-20. (Its mirror bars, ERB_Mirror_*, fade
 # with the Breath bar row since 2026-11-19.)
 
 # Inside a frame that is faded (or a gap's: covered once that gets its row).
@@ -27,6 +27,7 @@ EllesmereUIMinimapButton child of Minimap (minimap row)
 ECME_TBB* inside ECME_TBBWrap* (Cooldown Manager row)
 ERB_CastBar inside ERB_CastBarFrame (Cast bar row)
 ERB_GCDBar inside ERB_GCDBarFrame (a gap: no row yet)
+EWB_DUALSPEC_* click layer inside a data bar block (EllesmereUIDataBarsBar, faded)
 EllesmereUIDMIconStrip inside EllesmereUIDMIconHistoryFrame (Damage Meters row)
 
 # Invisible: never drawn.
@@ -71,6 +72,11 @@ EllesmereUIRaidToolsQuickFirePlace invisible secure key button: draws nothing
 EllesmereUIRaidToolsQuickFireUndo invisible secure key button: draws nothing
 EllesmereUIRaidToolsToggle key binding button (1x1, alpha 0, off-screen): draws nothing
 EllesmereUIUnitFrames_Hider pet battle hider, parent of its unit frames: draws nothing
+EUI_DialogKeysBtn* dialog key button (1x1, alpha 0, no mouse): draws nothing
+EUIQuickdrawSecureHeader secure handler for its palette: draws nothing
+EUIQuickdrawScrollCatcher mouse wheel catcher while its palette is open: draws nothing
+EllesmereUI_TooltipCursorAnchor anchor its tooltips sit on: draws nothing
+EllesmereUI_TooltipFixedAnchor anchor its tooltips sit on: draws nothing
 EllesmereUI_EscapeProxy hidden Escape proxy: draws nothing
 EllesmereUI_PadOverlayLayer gamepad layer for its popups, hidden till one opens
 
@@ -106,4 +112,26 @@ EllesmereUI_GameMenuButton button inside the game menu
 EllesmereUI_HouseVisitFrame its house list window
 EllesmereUI_MenuFallbackDock View Houses button beside a unit menu
 EllesmereUI_UnlockMenuButton button inside the game menu
+EUIMythicRunSummaryFrame its summary window after a Mythic+ run
+EUIQuickdrawFrame its action palette, shown only while its key is held
+EUIQuickdrawCancel inside EUIQuickdrawFrame
+EUIQuickdrawButton* inside EUIQuickdrawFrame
+EUI_BagsWindowFrame its bags window, opened by you
+EUI_MainBagFrame inside its bags window
+EUI_ReagentBagFrame inside its bags window
+EUI_BagMoneyFrame inside its bags window
+EUI_BagSearchBox inside its bags window
+EUI_BagsKeyringFrame its keyring window, opened by you
+EUI_BankFrame its bank window, opened at a banker
+EUI_BankFrame_TabSettingsMenu* inside its bank window
+EUI_BankSearchBox inside its bank window
+EUI_CharSheet_* its character sheet parts, inside the character window
+EUI_InspectSheet_* its inspect parts, inside the inspect window
+EllesmereUIMailAltList its alt list beside the mail window
+EllesmereUIPopupPreview its popup look preview in its settings
+EllesmereUITooltipPreview its tooltip look preview in its settings
+EllesmereUIGroupFinderRioTip its tooltip in the Group Finder
+WSkinMerchant* inside the merchant window it skins
+EUI_MerchantItem* inside the merchant window it skins
+EUI_MerchantPage* inside the merchant window it skins
 EllesmereUnlockMode its unlock mode overlay

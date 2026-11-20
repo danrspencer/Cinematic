@@ -151,10 +151,17 @@ function ns.SoloAddons(words)
 	local all = AddOns()
 	-- Its parts (folders starting with its name) that were on, and what each
 	-- kept one needs to load (and the libraries it can use), all the way down.
+	-- An addon that was off itself brings every part of it: its parts were off
+	-- with it, not picked (EllesmereUI turned off for another UI suite came back
+	-- as its core alone, none of its frames made, 2026-11-20).
 	for _, name in ipairs(wanted) do
 		keep[name] = true
+		local wasOn = false
 		for _, each in ipairs(all) do
-			if each.enabled and Belongs(each.name, name) then keep[each.name] = true end
+			if each.name == name then wasOn = each.enabled end
+		end
+		for _, each in ipairs(all) do
+			if (each.enabled or not wasOn) and Belongs(each.name, name) then keep[each.name] = true end
 		end
 	end
 	local changed = true
@@ -486,6 +493,9 @@ end
 
 local function Hidden(reading)
 	if Secret(reading.alpha) or Secret(reading.visible) then return nil end
+	-- (Its alpha unreadable, the read itself erroring: EllesmereUI's player
+	-- frame on WoW Forever, 2026-11-20, hidden on screen: can't tell.)
+	if reading.visible and reading.alpha == nil then return nil end
 	return not reading.visible or (type(reading.alpha) == "number" and reading.alpha <= 0.05)
 end
 -- Back to what it showed before the row was hidden (its own fade can keep
@@ -495,6 +505,7 @@ local before = {}
 local function Up(reading, entry)
 	if Secret(reading.alpha) or Secret(reading.visible) then return nil end
 	if not reading.visible then return nil end -- (hidden by the addon itself: can't tell)
+	if reading.alpha == nil then return nil end -- (unreadable: can't tell)
 	local was = before[entry] and before[entry].alpha
 	if type(was) ~= "number" or Secret(was) then
 		was = type(entry.baseAlpha) == "number" and not Secret(entry.baseAlpha) and entry.baseAlpha or 1
@@ -649,6 +660,8 @@ Finish = function(done)
 		Verdict("every frame on screen covered", #open == 0,
 			("%d covered, %d NOT COVERED"):format(covered, #open))
 		for _, line in ipairs(open) do Log("  NOT COVERED " .. line) end
+		Verdict("its parts loaded", #run.unloaded == 0, #run.unloaded > 0
+			and ("not loaded, their rows untested: " .. table.concat(run.unloaded, ", ")) or nil)
 		Verdict("ran alone", #run.others == 0, #run.others > 0 and ("also loaded: " .. table.concat(run.others, ", ")) or nil)
 		Log(("totals: %d pass, %d fail, %d can't tell"):format(run.tally.pass, run.tally.fail, run.tally.unclear))
 	end
@@ -699,6 +712,21 @@ function ns.AddonTest(words)
 		ns.AddonSupportOn and tostring(ns.AddonSupportOn(target)) or "?",
 		type(solo) == "table" and table.concat(solo.keep or {}, "+") or "off",
 		#run.others > 0 and table.concat(run.others, ", ") or "none", run.cineWasOn and "on" or "off"))
+	-- (Its parts its rows are for that aren't loaded: their rows can't be
+	-- tested, so the run fails rather than passing on the rest.)
+	-- (Only parts this client lists: one made for another client isn't in
+	-- its list at all, as EllesmereUIMythicTimer on WoW Forever.)
+	run.unloaded = {}
+	local unloadedSeen, listed = {}, {}
+	for _, each in ipairs(AddOns()) do listed[each.name] = true end
+	for _, known in ipairs(ns.ADDON_FRAMES or {}) do
+		if Belongs(known.addon, target) and listed[known.addon] and not IsLoaded(known.addon)
+			and not unloadedSeen[known.addon] then
+			unloadedSeen[known.addon] = true
+			run.unloaded[#run.unloaded + 1] = known.addon
+		end
+	end
+	table.sort(run.unloaded)
 	for _, known in ipairs(ns.ADDON_FRAMES or {}) do
 		if Belongs(known.addon, target) then
 			Log(("row addon:%s (%s): %s, loaded %s"):format(known.key, tostring(known.label),

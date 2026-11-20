@@ -1,4 +1,4 @@
-# version 9.9
+# version 9.9.1
 EnableMouse(false or a variable) in EllesmereUI/EUI_SpecOverrides_Session.lua
 EnableMouse(false or a variable) in EllesmereUI/EUI_UnlockMode_PointPicker.lua
 EnableMouse(false or a variable) in EllesmereUI/EUI_UnlockMode_PointVisuals.lua
@@ -28,6 +28,14 @@ EnableMouse(false or a variable) in EllesmereUIAuraBuffReminders/EUI_AuraBuffRem
 EnableMouse(false or a variable) in EllesmereUIAuraBuffReminders/EUI_AuraBuffReminders_Lifecycle.lua
 EnableMouse(false or a variable) in EllesmereUIAuraBuffReminders/EllesmereUIABR_BeaconMPlus.lua
 EnableMouse(false or a variable) in EllesmereUIAuraBuffReminders/EllesmereUIABR_TalentReminders.lua
+EnableMouse(false or a variable) in EllesmereUIBlizzardSkin/EUI_BlizzardSkin_TooltipAnchor.lua
+EnableMouse(false or a variable) in EllesmereUIBlizzardSkin/EUI_BlizzardSkin_TooltipSkin.lua
+EnableMouse(false or a variable) in EllesmereUIBlizzardSkin/EllesmereUIBlizzardSkin_BagBarForever.lua
+EnableMouse(false or a variable) in EllesmereUIBlizzardSkin/EllesmereUIBlizzardSkin_CharacterSheet.lua
+EnableMouse(false or a variable) in EllesmereUIBlizzardSkin/EllesmereUIBlizzardSkin_ChatBubbles.lua
+EnableMouse(false or a variable) in EllesmereUIBlizzardSkin/EllesmereUIBlizzardSkin_DragonRiding.lua
+EnableMouse(false or a variable) in EllesmereUIBlizzardSkin/EllesmereUIBlizzardSkin_GroupFinderForever.lua
+EnableMouse(false or a variable) in EllesmereUIBlizzardSkin/EllesmereUIBlizzardSkin_InspectSheet.lua
 EnableMouse(false or a variable) in EllesmereUIChat/EUI_Chat_Init.lua
 EnableMouse(false or a variable) in EllesmereUIChat/EUI_Chat_Position.lua
 EnableMouse(false or a variable) in EllesmereUIChat/EUI_Chat_Sidebar.lua
@@ -73,6 +81,10 @@ EnableMouse(false or a variable) in EllesmereUIMinimap/EUI_Minimap_Apply.lua
 EnableMouse(false or a variable) in EllesmereUIMinimap/EUI_Minimap_Layout.lua
 EnableMouse(false or a variable) in EllesmereUIMinimap/EUI_Minimap_Lifecycle.lua
 EnableMouse(false or a variable) in EllesmereUIMinimap/EUI_Minimap_Styles.lua
+EnableMouse(false or a variable) in EllesmereUIMythicTimer/EUI_MythicTimer_KickBars.lua
+EnableMouse(false or a variable) in EllesmereUIMythicTimer/EUI_MythicTimer_KickPlates.lua
+EnableMouse(false or a variable) in EllesmereUIMythicTimer/EUI_MythicTimer_TargetedSpellBars.lua
+EnableMouse(false or a variable) in EllesmereUIMythicTimer/EllesmereUIMythicTimer.lua
 EnableMouse(false or a variable) in EllesmereUINameplates/EUI_Nameplates_AuraContainers.lua
 EnableMouse(false or a variable) in EllesmereUINameplates/EUI_Nameplates_Cast.lua
 EnableMouse(false or a variable) in EllesmereUINameplates/EUI_Nameplates_Layout.lua
@@ -82,6 +94,7 @@ EnableMouse(false or a variable) in EllesmereUINameplates/EllesmereUINameplates_
 EnableMouse(false or a variable) in EllesmereUIQoL/EllesmereUIQoL.lua
 EnableMouse(false or a variable) in EllesmereUIQoL/EllesmereUIQoL_Alerts.lua
 EnableMouse(false or a variable) in EllesmereUIQoL/EllesmereUIQoL_Cursor.lua
+EnableMouse(false or a variable) in EllesmereUIQoL/EllesmereUIQoL_DialogKeys.lua
 EnableMouse(false or a variable) in EllesmereUIQoL/EllesmereUIQoL_Keys.lua
 EnableMouse(false or a variable) in EllesmereUIQoL/EllesmereUIQoL_RaidTools.lua
 EnableMouse(false or a variable) in EllesmereUIQoL/EllesmereUIQoL_Shifter.lua
@@ -114,6 +127,10 @@ SetAlpha hook in EllesmereUI/EUI_UnlockMode_Session.lua
 SetAlpha hook in EllesmereUI/EllesmereUI.lua
 SetAlpha hook in EllesmereUI/EllesmereUI_SharedHelpers.lua
 SetAlpha hook in EllesmereUIActionBars/EUI_ActionBars_ButtonArt.lua
+SetAlpha hook in EllesmereUIBlizzardSkin/EUI_BlizzardSkin_Dialogs.lua
+SetAlpha hook in EllesmereUIBlizzardSkin/EUI_BlizzardSkin_TooltipSkin.lua
+SetAlpha hook in EllesmereUIBlizzardSkin/EllesmereUIBlizzardSkin_GroupFinder.lua
+SetAlpha hook in EllesmereUIBlizzardSkin/EllesmereUIBlizzardSkin_WindowPacks.lua
 SetAlpha hook in EllesmereUINameplates/EUI_Nameplates_Plate.lua
 SetAlpha hook in EllesmereUINameplates/EllesmereUINameplatesFriendly.lua
 SetAlpha hook in EllesmereUIQoL/EllesmereUIQoL.lua
@@ -121,6 +138,10 @@ SetAlpha hook in EllesmereUIQuestTracker/EllesmereUIQuestTracker_Custom.lua
 SetAlpha hook in EllesmereUIQuestTracker/EllesmereUIQuestTracker_Skin.lua
 SetAlphaFromBoolean (secret alpha) in EllesmereUI/EllesmereUI_AbsorbGlow.lua
 SetAlphaFromBoolean (secret alpha) in EllesmereUIActionBars/EUI_ActionBars_Events.lua
+SetAlphaFromBoolean (secret alpha) in EllesmereUIBlizzardSkin/EllesmereUIBlizzardSkin_GroupFinder.lua
+SetAlphaFromBoolean (secret alpha) in EllesmereUIBlizzardSkin/EllesmereUIBlizzardSkin_WindowPacks.lua
+SetAlphaFromBoolean (secret alpha) in EllesmereUIMythicTimer/EUI_MythicTimer_TargetFocusBars.lua
+SetAlphaFromBoolean (secret alpha) in EllesmereUIMythicTimer/EUI_MythicTimer_TargetedSpellBars.lua
 SetAlphaFromBoolean (secret alpha) in EllesmereUINameplates/EUI_Nameplates_Cast.lua
 SetAlphaFromBoolean (secret alpha) in EllesmereUINameplates/EUI_Nameplates_CastState.lua
 SetAlphaFromBoolean (secret alpha) in EllesmereUIQoL/EllesmereUIQoL_RaidTools.lua
@@ -211,6 +232,7 @@ frame EUIInfoPopup
 frame EUIInputDimmer
 frame EUIInputPopup
 frame EUIKeysPopup
+frame EUIMythicRunSummaryFrame
 frame EUIRFTipEater
 frame EUIRFTipEater*
 frame EUISpecAssignDimmer
@@ -220,6 +242,21 @@ frame EUITeleportPopup
 frame EUIUpgCalcFrame
 frame EUIVisToggleKeyBtn
 frame EUIVisToggleKeyBtn*
+frame EUI_CharSheet_
+frame EUI_CharSheet_*
+frame EUI_CharSheet_CalcTab
+frame EUI_CharSheet_ModelScene
+frame EUI_CharSheet_ScrollChild
+frame EUI_CharSheet_ScrollFrame
+frame EUI_CharSheet_SocketContainer
+frame EUI_CharSheet_SocketFlyout
+frame EUI_CharSheet_StatsPanel
+frame EUI_CharSheet_TextEyeBtn
+frame EUI_CharSheet_TextOverlay
+frame EUI_CharSheet_TitlesPanel
+frame EUI_CharSheet_TitlesScrollChild
+frame EUI_CharSheet_TitlesScrollFrame
+frame EUI_CharSheet_TitlesSearchBox
 frame EUI_CharacterCrosshair
 frame EUI_ClassicSpellbook
 frame EUI_ClassicSpellbookEscape
@@ -227,12 +264,19 @@ frame EUI_ClassicSpellbookToggle
 frame EUI_ClassicTalents
 frame EUI_ClassicTalentsToggle
 frame EUI_CustomQuestTracker
+frame EUI_DialogKeysBtn
+frame EUI_DialogKeysBtn*
 frame EUI_EnvPingButton
 frame EUI_EnvPingHoldButton
 frame EUI_FPSBindBtn
 frame EUI_FPSCounter
 frame EUI_GatewayShardFrame
+frame EUI_InspectSheet_TextEyeBtn
+frame EUI_InspectSheet_TextOverlay
 frame EUI_MerchantHandler
+frame EUI_MerchantItem
+frame EUI_MerchantItem*
+frame EUI_MerchantPage*
 frame EUI_MouseLookBtn
 frame EUI_MovementAlertFrame
 frame EUI_NoRightClickState
@@ -245,6 +289,8 @@ frame EUI_SpellbookRoute
 frame EUI_TalentsRoute
 frame EUI_TimeSpiralFrame
 frame EUI_TrainAllButton
+frame EWB_DUALSPEC_
+frame EWB_DUALSPEC_*
 frame EWB_ILVL_
 frame EWB_ILVL_*
 frame EWB_LOC_
@@ -273,11 +319,14 @@ frame EllesmereUIDataBarsHearth_
 frame EllesmereUIDataBarsHearth_*
 frame EllesmereUIDataBarsTip
 frame EllesmereUIDataBarsTipActions
+frame EllesmereUIDragonRidingAnchor
 frame EllesmereUIFishingCastButton
 frame EllesmereUIFrame
 frame EllesmereUIJunkList
+frame EllesmereUIMailAltList
 frame EllesmereUIMicroMenu
 frame EllesmereUIMinimapButton
+frame EllesmereUIMythicTimerStandalone
 frame EllesmereUIPartyModeBindBtn
 frame EllesmereUIPartyModeFrame
 frame EllesmereUIPlayerAuraBars_Buffs
@@ -286,6 +335,7 @@ frame EllesmereUIPlayerAuraBars_CustomBuff*
 frame EllesmereUIPlayerAuraBars_CustomDebuff
 frame EllesmereUIPlayerAuraBars_CustomDebuff*
 frame EllesmereUIPlayerAuraBars_Debuffs
+frame EllesmereUIPopupPreview
 frame EllesmereUIProfileBind
 frame EllesmereUIProfileBind*
 frame EllesmereUIQTBackground
@@ -302,28 +352,42 @@ frame EllesmereUIRaidToolsTip
 frame EllesmereUIRaidToolsToggle
 frame EllesmereUIResourceBarsFrame
 frame EllesmereUIScrollFrame
+frame EllesmereUITooltipPreview
 frame EllesmereUIUnitFrames_Hider
 frame EllesmereUI_EscapeProxy
 frame EllesmereUI_GameMenuButton
 frame EllesmereUI_HouseVisitFrame
 frame EllesmereUI_MenuFallbackDock
 frame EllesmereUI_PadOverlayLayer
+frame EllesmereUI_TooltipCursorAnchor
+frame EllesmereUI_TooltipFixedAnchor
 frame EllesmereUI_UnlockMenuButton
 frame EllesmereUnlockMode
+frame WSkinMerchantScrollChild
+frame WSkinMerchantScrollFrame
+hooks AchievementFrameSummary_UpdateAchievements
+hooks AchievementObjectives_DisplayCriteria
 hooks ActionButtonDown
 hooks ActionButtonSpellAlertManager:HideAlert
 hooks ActionButtonSpellAlertManager:ShowAlert
 hooks ActionButtonUp
 hooks ActionButton_UpdateRangeIndicator
+hooks AddonList_InitAddon
 hooks AssistedCombatManager:UpdateAllAssistedHighlightFramesForSpell
+hooks AuctionHouseFilterButton_SetUp
 hooks BonusRollFrame_CloseBonusRoll
 hooks BonusRollFrame_StartBonusRoll
 hooks BuffFrame:Show
 hooks C_ClassTalents:UpdateLastSelectedSavedConfigID
 hooks C_PetJournal:DismissSummonedPet
 hooks C_PetJournal:SummonPetByGUID
+hooks CalendarFrame_Update
 hooks CameraOrSelectOrMoveStart
 hooks CameraOrSelectOrMoveStop
+hooks CharacterFrame:RefreshDisplay
+hooks CharacterFrame:SetPoint
+hooks CharacterFrame:SetPortraitToSpecIcon
+hooks CharacterFrame:UpdatePortrait
 hooks ClassTrainerFrame_Update
 hooks CompactRaidFrameManager_UpdateShown
 hooks CompactUnitFrame_SetUpFrame
@@ -334,6 +398,7 @@ hooks CooldownViewerUtilityItemMixin:OnCooldownIDSet
 hooks DebuffFrame:Show
 hooks EAB:ApplyBarOpacity
 hooks EAB:RefreshMouseover
+hooks EJSuggestFrame_RefreshDisplay
 hooks EditModeManagerFrame:Hide
 hooks EllesmereUI:ApplyColorsToOUF
 hooks EllesmereUI:RefreshPage
@@ -346,22 +411,51 @@ hooks EquipmentFlyout_UpdateItems
 hooks ExtraAbilityContainer:AddFrame
 hooks ExtraAbilityContainer:ApplySystemAnchor
 hooks ExtraAbilityContainer:Show
+hooks ExtraActionBar_Update
 hooks FriendsFrame_UpdateFriendButton
 hooks FriendsListSocialCardMixin:Initialize
 hooks FriendsListSocialCardMixin:SetSelected
+hooks GameMenuFrame:InitButtons
 hooks GameMenuFrame:Layout
+hooks GameTooltip:FadeOut
 hooks GameTooltip:SetAction
+hooks GameTooltip:SetOwner
 hooks GameTooltip:SetPetAction
+hooks GameTooltip:SetPoint
+hooks GameTooltipStatusBar:Show
+hooks GameTooltip_AddProgressBar
+hooks GameTooltip_AddStatusBar
+hooks GameTooltip_SetDefaultAnchor
+hooks GroupFinderFrameGroupButton_OnClick
+hooks GroupFinderFrame_SelectGroupButton
+hooks GroupLootContainer_AddFrame
+hooks GroupLootContainer_Update
+hooks GuildNewsButton_SetNews
 hooks HelpPlate:ShowTutorialTooltip
 hooks HelpPlateTooltip:Init
 hooks HelpTip:Show
+hooks InboxFrame_Update
+hooks InspectFrame:SetPoint
+hooks InspectSwitchTabs
+hooks InspectUnit
+hooks ItemSocketingFrame_Update
+hooks LFGListApplicationDialog_UpdateRoles
+hooks LFGListCategorySelectionButton_OnClick
 hooks LFGListCategorySelection_AddButton
 hooks LFGListSearchEntry_OnClick
+hooks LFGRewardsFrame_UpdateFrame
+hooks MailFrameTab_OnClick
 hooks MainMenuMicroButton_ShowAlert
+hooks MenuStyle1Mixin:Generate
+hooks MenuStyle2Mixin:Generate
+hooks MerchantFrame_Update
+hooks MerchantFrame_UpdateItemQualityBorders
+hooks MerchantItemButton_OnModifiedClick
 hooks Minimap:SetParent
 hooks Minimap:SetPoint
 hooks MinimapCluster:SetEditModeScale
 hooks MinimapCluster:SetIconScale
+hooks MountJournal_InitMountButton
 hooks MultiActionButtonDown
 hooks MultiActionButtonUp
 hooks MultiCastActionBarFrame_Update
@@ -371,24 +465,56 @@ hooks NamePlateDriverFrame:OnNamePlateAdded
 hooks NamePlateDriverFrame:OnNamePlateRemoved
 hooks NamePlateDriverFrame:SetupClassNameplateBars
 hooks NamePlateDriverFrame:UpdateNamePlateOptions
+hooks NavBar_AddButton
+hooks NotifyInspect
 hooks ObjectiveTrackerFrame:ApplySystemAnchor
+hooks OpenMail_Update
+hooks PVEFrame:SetPoint
+hooks PVEFrame:Show
+hooks PVEFrame_ShowFrame
+hooks PVEFrame_TabOnClick
+hooks PVPQueueFrame_SelectButton
+hooks PVPQueueFrame_ShowFrame
+hooks PanelTemplates_SetTab
+hooks PanelTemplates_UpdateTabs
+hooks PaperDollEquipmentManagerPane_InitButton
+hooks PaperDollEquipmentManagerPane_Update
+hooks PaperDollFrame_UpdateSidebarTabs
+hooks PaperDollItemSlotButton_Update
 hooks PetJournal_InitPetButton
+hooks ProfessionsBookFrame_Update
+hooks QuestFrameGreetingPanel_OnShow
+hooks QuestFrameProgressItems_Update
 hooks QuestInfo_Display
+hooks QuestLogQuests_Update
+hooks RaidFinderQueueFrameRewards_UpdateFrame
+hooks SetItemButtonQuality
+hooks SetItemButtonTexture
 hooks SetItemRef
+hooks SharedTooltip_SetBackdropStyle
 hooks ShowUIPanel
+hooks SpellBookItemMixin:OnIconEnter
+hooks SpellBookItemMixin:OnIconLeave
+hooks SpellBookItemMixin:UpdateVisuals
+hooks StaticPopupSpecial_Show
 hooks TakeTaxiNode
 hooks TaxiNodeOnButtonEnter
 hooks TaxiRequestEarlyLanding
+hooks ToggleBag
 hooks ToggleMinimap
+hooks TooltipComparisonManager:AnchorShoppingTooltips
 hooks TooltipComparisonManager:SetItemTooltip
 hooks TopBannerManager_BannerFinished
 hooks TopBannerManager_Show
 hooks TotemButtonMixin:OnLoad
 hooks TotemFrame:Update
+hooks TradeFrame_AlertItemIfChanged
 hooks TurnOrActionStart
 hooks TurnOrActionStop
 hooks UIParent:SetAlpha
+hooks UnitFrameManaBar_UpdateTypeOld
 hooks UnitPopup_OpenMenu
+hooks UpdateMicroButtons
 hooks _EABR_RequestRefresh
 partial mouse handling in EllesmereUI/EUI_SpecOverrides_Borders.lua
 partial mouse handling in EllesmereUI/EllesmereUI_AuraKit.lua
@@ -435,6 +561,8 @@ sets CVar SHOW_MULTI_ACTIONBAR_3
 sets CVar SHOW_MULTI_ACTIONBAR_4
 sets CVar ShowClassColorInFriendlyNameplate
 sets CVar ShowClassColorInNameplate
+sets CVar UberTooltips
+sets CVar UnitNameFriendlyMinionName
 sets CVar UnitNameFriendlyPlayerName
 sets CVar advancedCombatLogging
 sets CVar brightness
@@ -454,8 +582,11 @@ sets CVar nameplateSelectedScale
 sets CVar nameplateShowAll
 sets CVar nameplateShowEnemies
 sets CVar nameplateShowEnemyPets
+sets CVar nameplateShowFriendlyMinions
 sets CVar nameplateShowFriendlyNPCs
 sets CVar nameplateShowFriendlyNpcs
+sets CVar nameplateShowFriendlyPets
+sets CVar nameplateShowFriendlyPlayerMinions
 sets CVar nameplateShowOnlyNameForFriendlyPlayerUnits
 sets CVar nameplateSize
 sets CVar nameplateTargetBehindMaxDistance
@@ -472,6 +603,7 @@ state driver in EllesmereUIActionBars/EUI_ActionBars_Visibility.lua
 state driver in EllesmereUIActionBars/EUI_ActionBars_VisibilityDrivers.lua
 state driver in EllesmereUIActionBars/EllesmereUIActionBars.lua
 state driver in EllesmereUICooldownManager/EUI_CDM_Lifecycle.lua
+state driver in EllesmereUIDataBars/Blocks/DualSpec.lua
 state driver in EllesmereUIDataBars/Blocks/ItemLevel.lua
 state driver in EllesmereUIDataBars/Blocks/Location.lua
 state driver in EllesmereUIDataBars/Blocks/MicroMenu.lua
