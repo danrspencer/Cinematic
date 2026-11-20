@@ -20,7 +20,12 @@ SESSION = "session: ----"
 
 
 def unescape(text):
-    return text.encode("latin-1", "backslashescape").decode("unicode_escape").encode("latin-1").decode("utf-8", "replace")
+    try:
+        return text.encode("latin-1", "backslashreplace").decode("unicode_escape").encode("latin-1").decode("utf-8", "replace")
+    except (UnicodeError, ValueError):
+        # (A line with letters outside Latin-1 (read as UTF-8 already): its
+        # Lua escapes undone by hand.)
+        return text.replace("\\n", "\n").replace('\\"', '"').replace("\\\\", "\\")
 
 
 def main():
@@ -53,7 +58,9 @@ def main():
         if text.startswith(SESSION):
             session = "%s %s" % (when, text)
             continue
-        if text.startswith("ERROR:") or text.startswith("errors:"):
+        # (deverror: the dev copy's error box, saved since 2026-11-20: blocked
+        # calls and errors in the game's own code, not only Cinematic's.)
+        if text.startswith("ERROR:") or text.startswith("errors:") or text.startswith("deverror:"):
             found += 1
             print("=" * 70)
             if session:

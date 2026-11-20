@@ -172,11 +172,25 @@ end
 
 -- Diagnostics.lua calls this from the error handler (before anything is
 -- dropped), from its loops' catches and from ns.Log warnings.
+-- (And each new one into the saved log once a session, stack and all, so
+-- "check log" finds it after a /reload: this window keeps them in memory
+-- only, 2026-11-20 (a blocked call in a fight seen here, nowhere in the log).
+-- Cinematic's own errors are in the log already as ERROR lines too.)
+local logged = {}
+local function SaveToLog(kind, message, stack)
+	local key = tostring(kind) .. "|" .. Plain(message)
+	if logged[key] or not ns.Log then return end
+	logged[key] = true
+	local lines = Trim(stack, kind)
+	ns.Log("deverror", ("%s: %s%s"):format(tostring(kind), Plain(message), lines and ("\n" .. lines) or ""))
+end
+
 function ns.DevTap(kind, message, stack)
 	if busy then return end
 	busy = true
 	if kind == "error" then lastHandler.message, lastHandler.at = message, GetTime() end
 	pcall(Add, kind, message, stack)
+	pcall(SaveToLog, kind, message, stack)
 	busy = false
 end
 
