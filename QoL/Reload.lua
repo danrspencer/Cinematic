@@ -195,6 +195,25 @@ local function Uncover()
 	end
 	if cover and cover:IsShown() and not InCombatLockdown() then cover:Hide() end
 end
+-- Laid over the button by screen position, from UIParent: Forever won't
+-- anchor a secure frame to the popup's own button ("Cannot anchor protected
+-- frames to regions", 2026-11-20). Again from the ticker, if the popup moves.
+local function PlaceCover(target)
+	local ok, left, bottom, width, height, scale = pcall(function()
+		return target:GetLeft(), target:GetBottom(), target:GetWidth(), target:GetHeight(),
+			target:GetEffectiveScale() / UIParent:GetEffectiveScale()
+	end)
+	if not (ok and left and bottom and width and height) then return false end
+	left, bottom, width, height = left * scale, bottom * scale, width * scale, height * scale
+	local at = cover.placedAt
+	if at and at[1] == left and at[2] == bottom and at[3] == width and at[4] == height then return true end
+	cover.placedAt = { left, bottom, width, height }
+	cover:ClearAllPoints()
+	cover:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", left, bottom)
+	cover:SetSize(width, height)
+	return true
+end
+
 local function Cover(dialog, which, index)
 	if not ns.reloadBlocked or InCombatLockdown() or not dialog then return end
 	local target = PopupButton(dialog, index)
@@ -225,13 +244,14 @@ local function Cover(dialog, which, index)
 		end)
 	end
 	cover.dialog, cover.which, cover.index, cover.target = dialog, which, index, target
-	cover:ClearAllPoints()
-	cover:SetAllPoints(target)
+	cover.placedAt = nil
+	if not PlaceCover(target) then return end
 	cover:SetFrameLevel(math.min(dialog:GetFrameLevel() + 20, 9000))
 	cover:Show()
 	if not coverTicker then
 		coverTicker = C_Timer.NewTicker(0.2, function()
-			if not (cover.dialog:IsShown() and cover.dialog.which == cover.which) then Uncover() end
+			if not (cover.dialog:IsShown() and cover.dialog.which == cover.which) then return Uncover() end
+			if cover:IsShown() and not InCombatLockdown() then PlaceCover(cover.target) end
 		end)
 	end
 end

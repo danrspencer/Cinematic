@@ -9,6 +9,7 @@
 local client = arg and arg[1] or "forever"
 local reloads, printed = 0, {}
 local popups = {}
+local anchored, placed -- (the cover's anchors and size)
 -- luacheck: push ignore 111 112 113 121 122 212
 local ns = dofile("Tools/offline/load.lua")(client, nil, function()
 	-- (A real hooksecurefunc for the popup hook only: the stand-in's does nothing.)
@@ -32,6 +33,13 @@ local ns = dofile("Tools/offline/load.lua")(client, nil, function()
 			dialog.button1 = CreateFrame("Button", nil, dialog)
 			dialog.button2 = CreateFrame("Button", nil, dialog)
 			dialog.button3 = CreateFrame("Button", nil, dialog)
+			-- (Button 1 at a spot of its own, half scale: the cover goes there.)
+			local b = dialog.button1
+			b.GetLeft = function() return 300 end
+			b.GetBottom = function() return 200 end
+			b.GetWidth = function() return 120 end
+			b.GetHeight = function() return 30 end
+			b.GetEffectiveScale = function() return 0.5 end
 			popups[which] = dialog
 		end
 		dialog.which = which
@@ -43,6 +51,26 @@ local ns = dofile("Tools/offline/load.lua")(client, nil, function()
 		return d and d:IsShown() and d or nil
 	end
 	InCombatLockdown = function() return false end
+	-- (The cover's anchoring, watched: Forever refuses a secure frame anchored
+	-- to the popup's own button, "Cannot anchor protected frames to regions".)
+	local create = CreateFrame
+	CreateFrame = function(kind, name, ...)
+		local frame = create(kind, name, ...)
+		if name == "CinematicReloadCover" then
+			anchored = {}
+			local setPoint, setAll, setSize = frame.SetPoint, frame.SetAllPoints, frame.SetSize
+			frame.SetPoint = function(self, point, rel, ...)
+				anchored[#anchored + 1] = rel
+				return setPoint(self, point, rel, ...)
+			end
+			frame.SetAllPoints = function(self, rel, ...)
+				anchored[#anchored + 1] = rel or self:GetParent()
+				return setAll(self, rel, ...)
+			end
+			frame.SetSize = function(self, w, h) placed = { w = w, h = h } return setSize(self, w, h) end
+		end
+		return frame
+	end
 end)
 -- luacheck: pop
 local origPrint = ns.Print
@@ -68,6 +96,13 @@ local one = StaticPopup_Show("TEST_ONE")
 local cover = ns.ReloadCover()
 if blocked then
 	Check("popup covered", cover and cover:IsShown())
+	local onButton = false
+	for _, rel in ipairs(anchored or {}) do
+		if rel ~= UIParent then onButton = true end
+	end
+	Check("cover anchored only to UIParent (not the popup's button)", anchored and #anchored > 0 and not onButton)
+	Check("cover sized as the button (scaled)", placed and placed.w == 60 and placed.h == 15,
+		placed and (placed.w .. "x" .. placed.h))
 	local pre = cover and cover:GetScript("PreClick")
 	if pre then pre(cover, "LeftButton", false) end
 	Check("cover click ran OnAccept", ran.one)

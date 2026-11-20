@@ -231,6 +231,7 @@ local function PrintDebugHelp()
 	print("  /cine debug blockedline - one run checking the error box catches the yellow \"Interface action failed\" line, with or without the game's event (dev copy; again to stop)")
 	print("  /cine debug taintopen [ways] - which way of opening the settings leaves its lists written by us: 6 ways (or the numbers given), each after a /reload (click its Reload button); some ask for Escape > Options, way 6 in a fight (dev copy; again to stop)")
 	print("  /cine debug reloadpaths - one run checking each of our reloads (Reload button and key, the popups that reload) reloads rather than being blocked: you click each, one /reload a step (dev copy; again to stop)")
+	print("  /cine debug reloadcover - runs itself: each popup that reloads shows, and the secure Reload over it is checked on its button with no error (dev copy; again to stop)")
 	print("  /cine debug listfold - one run checking our settings' left list is never made again in a fight (no yellow \"Interface action failed\" lines); you start and end a fight (dev copy; again to stop)")
 	print("  /cine debug euiswing - one run recording why EllesmereUI's swing timer stays hidden in CineMode (dev copy; again to stop)")
 	print("  /cine debug solo <Addon> [more] - only that addon (its parts and what it needs) and Cinematic load: turns the rest off and reloads; solo off brings them back (dev copy)")
@@ -1894,6 +1895,10 @@ local function HandleSlash(msg)
 		-- (Dev copy: each of our reloads reloads or is blocked, one /reload a step, ReloadPathsTest.lua.)
 		if ns.ReloadPathsTest then ns.ReloadPathsTest()
 		else ns.Print("/cine debug reloadpaths is in the dev copy only.") end
+	elseif cmd == "debug" and arg == "reloadcover" then
+		-- (Dev copy: the secure Reload laid over each reload popup, no error, ReloadCoverTest.lua.)
+		if ns.ReloadCoverTest then ns.ReloadCoverTest()
+		else ns.Print("/cine debug reloadcover is in the dev copy only.") end
 	elseif cmd == "debug" and arg == "listfold" then
 		-- (Dev copy: our settings' left list never made again in a fight, ListFoldTest.lua.)
 		if ns.ListFoldTest then ns.ListFoldTest()
