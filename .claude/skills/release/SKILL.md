@@ -76,6 +76,34 @@ without asking.
      real error is a finding; stand-in noise (a stub's nil) is saved with
      `python -I Tools/offline/run.py Tools/offline/sweep.lua <client> --update`
      in phase 2, with the user's OK.
+   - **Existing players** (the "upgrade check" line, never a FAIL itself):
+     `Tools/upgrade-check.py` loads the last tag's code and this release's
+     on the same saved settings (a player on the last release with no
+     changes, one who flipped every on/off setting, and the user's own
+     Cinematic.lua) and lists what the update changes for them. Players
+     notice and complain when what they see changes on its own ("every
+     time I update, the zone text changes"), so each line gets a verdict in
+     the review: **meant** (say what the player sees, and that the commit
+     subject tells them) or a **finding** (with the fix). What each means:
+     - `CHANGED`: an update rewrites a saved value. On the flipped player
+       it overrode their own choice: a finding unless the old value can't
+       work any more. The fix: change only values still at the old default.
+     - `NEW ON`: a new feature on for existing players. Fine when it's a
+       split of something they had on (nothing they see changes); a
+       finding when it adds something to their screen they never asked
+       for (the New zone card, v2.1.14): start it off for existing players
+       (a once-only update) or say so in the subject and What's new.
+     - `NEW ... (new installs get X)`: existing players start differently
+       from new installs: say which and why.
+     - `DROPPED` / `TYPE`: a renamed or retyped setting with no update
+       carrying the old value over: the player's choice is lost. A finding.
+     - `DEFAULT`: new installs only; existing players keep the old one. A
+       finding when the change is a fix that players should get too.
+     - `RELOAD`: a value that changes again at every load: a finding.
+     - `FALLBACK`: a code default (`db.x or 12`) changed in the diff:
+       players who never set it see the new one at once.
+     Run alone for the full list: `python -I Tools/upgrade-check.py`
+     (`<old ref> [<new ref>]` to check any two versions).
    - Lines starting with `(`: check the line before isn't an expression
      statement (WoW's Lua 5.1 "ambiguous syntax"). The script doesn't.
    - The offline check alone, if needed:
@@ -135,6 +163,8 @@ without asking.
    - the version it will be (vX.Y.Z),
    - each planned commit: subject + its files,
    - check results (pass, or the exact failure),
+   - **for existing players**: each upgrade check line with its verdict
+     (meant, and what they'll see; or a finding), or "nothing changes",
    - in game: each client's NEW FAIL lines, or "skipped", or "running:
      say check log with your answer" (then phase 2 starts by reading them,
      and stops again if there's a NEW FAIL),

@@ -16,6 +16,10 @@ Runs side by side, each a PASS or FAIL line, then one line for all of it:
 - the once-only settings updates on your own saved settings (each client's
   Cinematic.lua and CinematicDev.lua, a copy: nothing is written there),
   every update run from scratch: none may error;
+- the upgrade check (Tools/upgrade-check.py): the last release's code and
+  this one's on the same players' saved settings; what changes for existing
+  players is listed (never a FAIL: the review judges it), only a version
+  that doesn't load or an update that errors fails;
 - the offline tests of fixed bugs (OFFLINE_TESTS: no FAIL line);
 - other addons as installed against Support/ (Tools/addon-check.py: a name
   our support uses gone fails; what changed since its baseline is listed).
@@ -52,8 +56,8 @@ OFFLINE_TESTS = [
     ("Mac notch covers, retail", "Tools/offline/notchgap.lua", "retail"),
     ("XP text font per character at login", "Tools/offline/xpfont.lua"),
     ("music volume never kept near 0", "Tools/offline/musicvolume.lua"),
-    ("combat text keeps the game's numbers as its rows say", "Tools/offline/combattextkeep.lua"),
     ("chat lines-only peeks only with the game's own chat", "Tools/offline/chatdefault.lua"),
+    ("combat text keeps the game's numbers as its rows say", "Tools/offline/combattextkeep.lua"),
     ("reloads through a secure /reload on Forever, forever", "Tools/offline/reload.lua", "forever"),
     ("reloads as before on retail, retail", "Tools/offline/reload.lua", "retail"),
 ]
@@ -155,6 +159,14 @@ def judge_migrate(ok, output):
     return ok, line.split(" lines written")[0] + " lines" if " lines written" in line else line
 
 
+def judge_upgrade(ok, output):
+    lines = output.splitlines()
+    shown = [l.strip() for l in lines if l.startswith(("  CHANGED", "  NEW ON", "  NEW ", "  DROPPED", "  DEFAULT",
+                                                        "  TYPE", "  RELOAD", "  FALLBACK", "FAIL"))]
+    detail = last_line(output, "upgrade check:")
+    return ok, detail + "".join("\n      " + l[:220] for l in shown[:30])
+
+
 def game_results():
     """The last /cine prerelease runs per client and kind, from the dev copy's saved settings."""
     try:
@@ -215,6 +227,8 @@ def main():
             jobs.append(Job("offline sweep, %s" % client, lua + ["Tools/offline/sweep.lua", client], judge_sweep))
         for name, script, *args in OFFLINE_TESTS:
             jobs.append(Job(name, lua + [script] + args, judge_test))
+        jobs.append(Job("upgrade check (existing players' settings)", [PY, "-I", "Tools/upgrade-check.py"],
+                        judge_upgrade))
         jobs.append(Job("other addons vs our support", [PY, "-I", "Tools/addon-check.py"], judge_addons))
         scratch = tempfile.mkdtemp(prefix="cine-prerelease-")
         for client in CLIENTS:

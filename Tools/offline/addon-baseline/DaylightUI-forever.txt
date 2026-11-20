@@ -1,4 +1,4 @@
-# version 1.9.6
+# version 2.0
 EnableMouse(false or a variable) in DaylightUI/Book/Fight.lua
 EnableMouse(false or a variable) in DaylightUI/Character/List.lua
 EnableMouse(false or a variable) in DaylightUI/Character/Slots.lua
@@ -11,6 +11,7 @@ EnableMouse(false or a variable) in DaylightUI/PrivateAuras.lua
 EnableMouse(false or a variable) in DaylightUI/Social/Raid.lua
 EnableMouse(false or a variable) in DaylightUI/Style.lua
 EnableMouse(false or a variable) in DaylightUI/Tour.lua
+EnableMouse(false or a variable) in DaylightUI/Welcome.lua
 EnableMouse(false or a variable) in DaylightUI/Windows/Follow.lua
 EnableMouse(false or a variable) in DaylightUI_ActionBars/Bars.lua
 EnableMouse(false or a variable) in DaylightUI_ActionBars/CdmEffects.lua
@@ -60,6 +61,10 @@ EnableMouse(false or a variable) in DaylightUI_Skins/Packs/LossOfControl.lua
 EnableMouse(false or a variable) in DaylightUI_Skins/Packs/Social.lua
 EnableMouse(false or a variable) in DaylightUI_Skins/Packs/Spells.lua
 EnableMouse(false or a variable) in DaylightUI_Skins/Packs/System.lua
+EnableMouse(false or a variable) in DaylightUI_Skins/Rolls/Stack.lua
+EnableMouse(false or a variable) in DaylightUI_Tooltip/Ghost.lua
+EnableMouse(false or a variable) in DaylightUI_Tooltip/Rich/Panel.lua
+EnableMouse(false or a variable) in DaylightUI_Tooltip/Rich/Pill.lua
 EnableMouse(false or a variable) in DaylightUI_UnitFrames/Arrive.lua
 EnableMouse(false or a variable) in DaylightUI_UnitFrames/Auras.lua
 EnableMouse(false or a variable) in DaylightUI_UnitFrames/Blizzard.lua
@@ -72,7 +77,9 @@ EnableMouse(false or a variable) in DaylightUI_UnitFrames/PartyTargets.lua
 EnableMouse(false or a variable) in DaylightUI_UnitFrames/Personal.lua
 EnableMouse(false or a variable) in DaylightUI_UnitFrames/PowerBar.lua
 EnableMouse(false or a variable) in DaylightUI_UnitFrames/Sample.lua
+EnableMouse(false or a variable) in DaylightUI_UnitFrames/Socket.lua
 SetAlpha hook in DaylightUI_InfoPanel/Panel.lua
+SetAlpha hook in DaylightUI_Tooltip/Rich/Rich.lua
 SetAlphaFromBoolean (secret alpha) in DaylightUI_Skins/Packs/Addons/OPie.lua
 SetAlphaFromBoolean (secret alpha) in DaylightUI_UnitFrames/CastBar.lua
 SetAlphaFromBoolean (secret alpha) in DaylightUI_UnitFrames/GroupParts.lua
@@ -172,6 +179,7 @@ frame DaylightUIQuestProgress
 frame DaylightUIQuestTracker
 frame DaylightUIRepBanner
 frame DaylightUIReputationBar
+frame DaylightUIRollStack
 frame DaylightUISocialRaidTarget
 frame DaylightUISocialRaidTarget*
 frame DaylightUISocialRaidTargets
@@ -181,6 +189,7 @@ frame DaylightUIThreatMeter
 frame DaylightUIThreatMeterFrame
 frame DaylightUIThreatTag_target
 frame DaylightUITooltipAnchor
+frame DaylightUITooltipPill
 frame DaylightUITourAsk
 frame DaylightUITrackerAnchor
 frame DaylightUITrainAllButton

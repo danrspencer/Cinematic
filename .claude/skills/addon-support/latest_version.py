@@ -24,6 +24,7 @@ CLIENTS = ["_forever_", "_retail_", "_classic_era_"]
 # Addons whose toc names no GitHub repository, but that release there (add
 # one each time you find it, so the next run needs no --github).
 KNOWN_REPOS = {
+    "daylightui": "dayightt/DaylightUI",
     "ellesmereui": "EllesmereGaming/EllesmereUI",
     "questie": "Questie/Questie",
     "rxpguides": "RestedXP/RXPGuides",
