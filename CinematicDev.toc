@@ -11,6 +11,7 @@
 # ## X-Cinematic-Locale: esES
 
 Dev\ErrorWindow.lua
+Dev\CVarTraceTest.lua
 Checks.lua
 FrameGuess.lua
 Locales\Locales.lua
@@ -256,6 +257,9 @@ Dev\HealIconsCastTest.lua
 Dev\OffscreenProbe.lua
 Dev\OffscreenHoldTest.lua
 Dev\NpcNamesTest.lua
+Dev\NameScaleTest.lua
+Dev\NpcTitleTest.lua
+Dev\FindTabsTest.lua
 Dev\ReadyAnyTimeTest.lua
 Dev\CdmLinesTest.lua
 Dev\DotNumbersTest.lua

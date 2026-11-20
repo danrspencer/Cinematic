@@ -1974,6 +1974,18 @@ local function HandleSlash(msg)
 	elseif cmd == "debug" and arg == "npcnames" then
 		-- (Dev copy: NPC names with no Service NPCs match flashing up as you turn, NpcNamesTest.lua.)
 		if ns.NpcNamesTest then ns.NpcNamesTest() else ns.Print("/cine debug npcnames is in the dev copy only.") end
+	elseif cmd == "debug" and arg == "namescale" then
+		-- (Dev copy: names over heads walking up to an NPC, the game's vs ours, NameScaleTest.lua.)
+		if ns.NameScaleTest then ns.NameScaleTest() else ns.Print("/cine debug namescale is in the dev copy only.") end
+	elseif cmd == "debug" and arg == "npctitle" then
+		-- (Dev copy: NPC titles going away up close, by plate settings, NpcTitleTest.lua.)
+		if ns.NpcTitleTest then ns.NpcTitleTest() else ns.Print("/cine debug npctitle is in the dev copy only.") end
+	elseif cmd == "debug" and arg == "findtabs" then
+		-- (Dev copy: /cine find on ids in each Nameplates and Names tab, FindTabsTest.lua.)
+		if ns.FindTabsTest then ns.FindTabsTest() else ns.Print("/cine debug findtabs is in the dev copy only.") end
+	elseif cmd == "debug" and arg == "cvartrace" then
+		-- (Dev copy: who changes plate, name and soft target settings at login, CVarTraceTest.lua.)
+		if ns.CVarTraceTest then ns.CVarTraceTest() else ns.Print("/cine debug cvartrace is in the dev copy only.") end
 	elseif cmd == "debug" and arg == "dotnumbers" then
 		-- (Dev copy: whether "Use the spell's cooldown, not its buff" hides DoT numbers, DotNumbersTest.lua.)
 		if ns.DotNumbersTest then ns.DotNumbersTest()

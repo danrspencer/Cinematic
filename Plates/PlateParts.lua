@@ -435,6 +435,8 @@ local function Look(band) -- luacheck: no unused args
 	return math.floor(size / SIZE_STEP + 0.5) * SIZE_STEP, math.floor(math.min(80, math.max(-80, y)) + 0.5)
 end
 
+ns.PlateNameLook = Look -- (for /cine debug namescale, NameScaleTest.lua)
+
 -- How far a plate's name is through swapping to its new look: 0 to 1 (1:
 -- none under way).
 local function SwapFade(plate)
