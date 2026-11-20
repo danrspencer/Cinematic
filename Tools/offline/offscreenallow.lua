@@ -97,6 +97,8 @@ for name, page in pairs(pages) do
 	if page.keys.plateShowOffscreen then elsewhere[#elsewhere + 1] = name .. " (old tick)" end
 end
 Check(#elsewhere == 0, "on no other page, the old tick gone (" .. table.concat(elsewhere, ", ") .. ")")
+local found, foundPage = ns.FindSetting("plateOffscreen")
+Check(found ~= nil, "/cine find plateOffscreen reaches it (" .. tostring(found) .. ", " .. tostring(foundPage) .. ")")
 
 print(failed == 0 and "ALL PASS" or (failed .. " FAILED"))
 if failed > 0 then os.exit(1) end

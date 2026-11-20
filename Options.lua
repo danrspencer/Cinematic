@@ -2489,6 +2489,7 @@ local function CreatePanel()
 			-- (A change is picked up as the old Nameplates tick's was: the
 			-- settings' Refresh, then the plates' next pass.)
 			local offMenu = Dropdown(panel, "plateOffscreen", OFF_CHOICES, 180)
+			local last = offMenu
 			if offMenu then
 				offMenu:SetPoint("TOPLEFT", offLabel, "BOTTOMLEFT", -4, -6)
 				Tooltip(offMenu, OFF_TIP)
@@ -2500,8 +2501,18 @@ local function CreatePanel()
 					pick:SetPoint("TOPLEFT", above, "BOTTOMLEFT", above == offLabel and -4 or 0, -2)
 					above = pick
 				end
+				last = above
 			end
-			offLabel.searchLabel = L["Allow offscreen nameplates in CineMode"]
+			-- (Its id for /cine find plateOffscreen: a dropdown is left out of
+			-- the search walk, and its label is only text. A frame of its own,
+			-- nothing drawn, carries the id and lights label and dropdown.)
+			local finder = CreateFrame("Frame", nil, panel)
+			finder:SetSize(1, 1)
+			finder:SetPoint("TOPLEFT", offLabel, "TOPLEFT")
+			finder.settingKey = "plateOffscreen"
+			finder.searchLabel = L["Allow offscreen nameplates in CineMode"]
+			finder.searchTip = OFF_TIP
+			finder.searchEdges = { top = offLabel, bottom = last, left = last, right = last }
 		end
 	end
 
