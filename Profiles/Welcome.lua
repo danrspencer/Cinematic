@@ -463,6 +463,8 @@ local SHELF_MORE = {
 		tip = "Title cards for the moments of your day: a new zone, a level, a fight." },
 	{ key = "plates", label = "Nameplates", icon = "Interface\\Icons\\Ability_Hunter_SniperShot", group = "ui",
 		tip = "Nameplates that show only for what matters: your target, a mob on you, a friend in need." },
+	{ key = "bubbles", label = "Chat Bubbles", icon = "Interface\\Icons\\Ability_Warrior_BattleShout", group = "ui",
+		tip = "Chat bubbles restyled, so talk stays readable with your UI gone." },
 	-- (the Mouseover page's own icon, a pointing hand)
 	{ key = "mouseover", label = "Mouseover", icon = "Interface\\Cursor\\Point", group = "ui",
 		tip = "Point at where a faded frame lives and it comes back, with its group." },
@@ -494,8 +496,8 @@ local TOUR = { { key = "fadeUI" }, { key = "bars" }, { key = "tint" }, { key = "
 -- The features with nothing to play: a line of links under the grid, "Also
 -- in Cinematic", each opening its settings page (by its English name, as
 -- ns.OpenOptions takes it) over the welcome window, closing back to it. The
--- ones waiting for a demo of their own (
--- Chat Bubbles, Combat Text, Skyriding Cam) are here till they have one.
+-- ones waiting for a demo of their own (Combat Text, Skyriding Cam) are
+-- here till they have one.
 local SHELF_LINKS = {
 	{ page = "Graphics+", label = "Graphics Boost", group = "atmo",
 		tip = "Raises the game's view distance and shadows in quiet moments, and lowers them for a fight." },
@@ -509,8 +511,6 @@ local SHELF_LINKS = {
 		tip = "Quest mobs keep their nameplates, with a quest mark." },
 	{ page = "Duel Vision", label = "Duel Vision", group = "vis",
 		tip = "In CineMode, the nameplates of two players dueling near you show." },
-	{ page = "Chat bubbles", label = "Chat Bubbles", group = "ui",
-		tip = "Chat bubbles restyled, so talk stays readable with your UI gone." },
 	{ page = "Tooltips", label = "Tooltips", group = "ui", tip = "Which parts of a tooltip show, and where it sits." },
 	{ page = "Cursor Hide", label = "Cursor Hide", group = "ui", tip = "Hides the mouse cursor when you aren't using it." },
 	{ page = "Style Themes", label = "Themes", group = "style", tip = "One look for your whole UI: fonts, borders, colors." },

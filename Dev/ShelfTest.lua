@@ -233,6 +233,13 @@ local SHOWS = {
 				hasTarget and "set" or "none",
 				hasTarget and (targetFaded and ", its plate FADED" or ", its plate kept") or "")
 	end,
+	-- (the two bubbles up, the /say one with a size)
+	bubbles = function()
+		if not ns.BubbleDemoState then return false, "no demo" end
+		local shown, w, h = ns.BubbleDemoState()
+		return shown and (w or 0) > 40 and (h or 0) > 10, ("bubbles shown %s, /say bubble %s x %s"):format(
+			tostring(shown), w and ("%.0f"):format(w) or "?", h and ("%.0f"):format(h) or "?")
+	end,
 	speech = function()
 		return TextOnScreen(ns.L["Speech from behind you shows here."]), "its line searched for on screen"
 	end,

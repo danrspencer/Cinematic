@@ -451,6 +451,9 @@ local DEMOS = {
 	plates = { seconds = 7, fade = true, switches = { "handlePlates" },
 		start = function() ns.plateDemo = true end,
 		stop = function() ns.plateDemo = nil end },
+	-- (Chat Bubbles: two in your bubble look over the world, Bubbles.lua.)
+	bubbles = { seconds = 7, fade = true, start = function() ns.ShowBubbleDemo(true) end,
+		stop = function() ns.ShowBubbleDemo(false) end },
 	-- (Heal Vision: its own party, above; the window faded.)
 	heal = { seconds = HEAL_END, fade = true, start = StartHealDemo, stop = StopHealDemo,
 		running = function() return healDemo ~= nil end },
@@ -509,7 +512,7 @@ end
 local NEEDS = { vitals = "FlashVitals", tele = "TestTeleportVision", emote = "TestEmoteVision",
 	roll = "TestRollWindow", damage = "TestDamageVision", shoulder = "ShoulderCamDemo",
 	timeTitle = "TestTimeChangeTitle", cards = "CardTest", recap = "TestDamageRecap", cdflash = "TestCooldownFlash",
-	speech = "TestSpeechBehind", audio = "SaveCVar", deathVision = "TestDeathVision" }
+	speech = "TestSpeechBehind", audio = "SaveCVar", bubbles = "ShowBubbleDemo", deathVision = "TestDeathVision" }
 for key in pairs(CAM_DEMOS) do NEEDS[key] = "CameraTestStart" end
 function ns.ShowMeAvailable(key)
 	return DEMOS[key] ~= nil and not (NEEDS[key] and not ns[NEEDS[key]])
@@ -607,7 +610,8 @@ local IN_PROFILE = { fadeUI = { "handleFrames" }, bars = { "letterboxPage", "let
 	weather = { "tintPage", "weatherTint" }, timeTitle = { "cards", "timeOfDayChange" }, cards = { "cards" },
 	recap = { "damageVision" }, damage = { "damageVision" }, emote = { "emoteVision" }, roll = { "rollWindow" },
 	deathVision = { "deathScreen" }, duel = { "duelPlates" }, audio = { "musicInCinematic" },
-	mouseover = { "handleFrames", "mouseover" }, heal = { "handleHealVision" }, plates = { "handlePlates" } }
+	mouseover = { "handleFrames", "mouseover" }, heal = { "handleHealVision" }, plates = { "handlePlates" },
+	bubbles = { "handleBubbles" } }
 -- A camera's Test by its scene (CameraRows.lua's triggers): on with the Cameras
 -- page's switch, the scene ticked and a camera picked (camera: the one to pick
 -- for Turn on).

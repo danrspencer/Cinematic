@@ -1133,3 +1133,35 @@ function ns.MakeBubblePreview(parent, width)
 	holder:SetScript("OnShow", holder.Refresh)
 	return holder
 end
+
+-- The welcome window's Chat Bubbles demo (ShowMe.lua): the preview's two
+-- bubbles over the world, in your bubble look: a /say in the middle of the
+-- screen, a yell to its right. Over the faded window (no one need speak:
+-- a real /say from here would go to everyone around you).
+local demoBubbles
+function ns.ShowBubbleDemo(on)
+	if not on then
+		if demoBubbles then demoBubbles:Hide() end
+		return
+	end
+	if not demoBubbles then
+		demoBubbles = CreateFrame("Frame", nil, UIParent)
+		demoBubbles:SetAllPoints(UIParent)
+		demoBubbles:SetFrameStrata("FULLSCREEN")
+		demoBubbles:EnableMouse(false)
+		demoBubbles.say, demoBubbles.yell = PreviewBubble(demoBubbles), PreviewBubble(demoBubbles)
+		demoBubbles.say:SetPoint("BOTTOM", demoBubbles, "CENTER", -60, 120)
+		demoBubbles.yell:SetPoint("BOTTOMLEFT", demoBubbles, "CENTER", 260, 40)
+	end
+	local look, info = Look(), _G.ChatTypeInfo or {}
+	DressPreviewBubble(demoBubbles.say, look, ns.L["Has anyone seen my turnip? It was right here a moment ago."],
+		info.SAY or { r = 1, g = 1, b = 1 }, 240)
+	DressPreviewBubble(demoBubbles.yell, look, ns.L["For the Alliance!"], info.YELL or { r = 1, g = 0.25, b = 0.25 }, 240)
+	demoBubbles:Show()
+end
+-- (For the shelf's test: shown, and the /say bubble's place and size.)
+function ns.BubbleDemoState()
+	if not (demoBubbles and demoBubbles:IsShown()) then return false end
+	local say = demoBubbles.say
+	return say:IsVisible(), say:GetWidth(), say:GetHeight()
+end
