@@ -17809,19 +17809,28 @@ local function CreateVisionPanel()
 		local healSwitch = PageSwitch(content, "handleHealVision", L["Enable Page"],
 			L["Turns Heal Vision on or off."], healIntro, ApplyFrames)
 
-		-- The row as the Standard Frames page's (GridRows.lua): Always, a
-		-- Location dropdown of the places and groups.
+		-- Two Show in rows (2026-11-20, the user's call), one at the top of
+		-- each tab: Unit Frames' (the "healVision" rule, its ticks) and
+		-- Nameplates' (ns.HEAL_VISION_PLATE_ROW, a rule only). Each as the
+		-- Standard Frames page's (GridRows.lua), its headings over it, in one
+		-- holder shown with its tab.
 		local NAME_WIDTH = 90
 		local LAYOUT = { edit = true }
-		local gridTop = CreateFrame("Frame", nil, content)
-		gridTop:SetSize(NAME_WIDTH + ns.GridWidth(LAYOUT), FRAME_HEADING_HEIGHT)
-		-- (Up into the headings' empty top, as ShowTable's underHeader.)
-		gridTop:SetPoint("TOPLEFT", healSwitch, "BOTTOMLEFT", 2, 6)
-		ns.GridHeadings(ns.GRID_KIT, content, gridTop, NAME_WIDTH, LAYOUT)
-		local row = CreateFrame("Frame", nil, content)
-		row:SetSize(gridTop:GetWidth(), 24)
-		row:SetPoint("TOPLEFT", gridTop, "TOPLEFT", 0, -FRAME_HEADING_HEIGHT - 4)
-		Label(row, "GameFontHighlight", L["Show in"]):SetPoint("LEFT", row, "LEFT", 0, 0)
+		local SHOW_IN_H = FRAME_HEADING_HEIGHT + 4 + 24
+		local function ShowInRow()
+			local holder = CreateFrame("Frame", nil, content)
+			holder:SetSize(NAME_WIDTH + ns.GridWidth(LAYOUT), SHOW_IN_H)
+			ns.GridHeadings(ns.GRID_KIT, holder, holder, NAME_WIDTH, LAYOUT)
+			local line = CreateFrame("Frame", nil, holder)
+			line:SetSize(holder:GetWidth(), 24)
+			line:SetPoint("TOPLEFT", holder, "TOPLEFT", 0, -FRAME_HEADING_HEIGHT - 4)
+			Label(line, "GameFontHighlight", L["Show in"]):SetPoint("LEFT", line, "LEFT", 0, 0)
+			return holder, line
+		end
+		local framesShow, row = ShowInRow()
+		RecordKey(content, "frameRules")
+		RecordRow(content, "frameRules", "healVision")
+		RecordRow(content, "frameRules", ns.HEAL_VISION_PLATE_ROW)
 		local function Set(key, value)
 			ns.GetDB()[key] = value
 			Apply()
@@ -17852,6 +17861,30 @@ local function CreateVisionPanel()
 				L["Heal Vision out of fights while you have a living enemy targeted."]),
 			Item(L["Friend targeted"], "healVisionTargetFriendly",
 				L["Heal Vision out of fights while you have anything else targeted."]) }
+		-- (The Unit Frames row's ticks as a rule, for the editor to start from.
+		-- Party and Raid are both "group": no word tells a party from a raid group.)
+		local function TicksRule()
+			local db, words, seen = ns.GetDB(), {}, {}
+			if db.healVision then return "always" end
+			local function Add(key, word)
+				if db[key] and not seen[word] then
+					seen[word] = true
+					words[#words + 1] = word
+				end
+			end
+			Add("healVisionInCombat", "combat")
+			Add("healVisionCalm", "calm")
+			Add("healVisionTargetEnemy", "enemy")
+			Add("healVisionTargetFriendly", "friendly")
+			Add("healVisionInWorld", "world")
+			Add("healVisionInCities", "city")
+			Add("healVisionInBGs", "bg")
+			Add("healVisionInDungeons", "dungeon")
+			Add("healVisionInRaids", "raid")
+			Add("healVisionInParty", "group")
+			Add("healVisionInRaid", "group")
+			return #words > 0 and table.concat(words, " or ") or "never"
+		end
 		ns.GridRow(ns.GRID_KIT, row, NAME_WIDTH, LAYOUT, {
 			band = 1,
 			always = { isOn = function() return ns.GetDB().healVision end,
@@ -17861,33 +17894,19 @@ local function CreateVisionPanel()
 			help = { [ns.GRID_COMBAT] = L["On in fights, and after them until the Calm Timer runs out."],
 				[ns.GRID_TARGET] = L["On while you have one of these targeted, out of fights."],
 				[ns.GRID_LOCATION] = L["On while you're in any of these. Party and Raid count anywhere, as long as you're in one."] },
-			rule = { key = function() return "healVision" end, label = function() return L["Heal Vision"] end,
-				changed = Apply },
-			-- (Its ticks as a rule, for the editor to start from. Party and Raid
-			-- are both "group": no word tells a party from a raid group.)
-			liveRule = function()
-				local db, words, seen = ns.GetDB(), {}, {}
-				if db.healVision then return "always" end
-				local function Add(key, word)
-					if db[key] and not seen[word] then
-						seen[word] = true
-						words[#words + 1] = word
-					end
-				end
-				Add("healVisionInCombat", "combat")
-				Add("healVisionCalm", "calm")
-				Add("healVisionTargetEnemy", "enemy")
-				Add("healVisionTargetFriendly", "friendly")
-				Add("healVisionInWorld", "world")
-				Add("healVisionInCities", "city")
-				Add("healVisionInBGs", "bg")
-				Add("healVisionInDungeons", "dungeon")
-				Add("healVisionInRaids", "raid")
-				Add("healVisionInParty", "group")
-				Add("healVisionInRaid", "group")
-				return #words > 0 and table.concat(words, " or ") or "never"
-			end,
+			rule = { key = function() return "healVision" end,
+				label = function() return L["Heal Vision"] .. ": " .. L["Unit Frames"] end, changed = Apply },
+			liveRule = TicksRule,
 		}):SetPoint("LEFT", row, "LEFT", NAME_WIDTH, 0)
+		-- The Nameplates tab's: a rule only (no ticks of its own; cleared, the
+		-- Unit Frames row's ticks decide, Core.lua's ns.HealVisionHere).
+		local platesShow, plateRow = ShowInRow()
+		ns.GridRow(ns.GRID_KIT, plateRow, NAME_WIDTH, LAYOUT, {
+			band = 1,
+			rule = { key = function() return ns.HEAL_VISION_PLATE_ROW end,
+				label = function() return L["Heal Vision"] .. ": " .. L["Nameplates"] end, changed = Apply },
+			liveRule = TicksRule,
+		}):SetPoint("LEFT", plateRow, "LEFT", NAME_WIDTH, 0)
 
 		-- Default, Tank, Healer and Damage tabs: the settings below are the
 		-- Default tab's, or a role's (ns.HEAL_VISION_ROLE_KEYS, <key>_<ROLE>),
@@ -17960,11 +17979,17 @@ local function CreateVisionPanel()
 				ns.TabContainer(roleTabs[i], Holder(), ns.HEAL_VISION_TABS[role or "DEFAULT"], ns.HEAL_VISION_TABS.FRAMES)
 			end
 		end
-		panel:SetPoint("TOPLEFT", row, "BOTTOMLEFT", 0, -14 - NOTE_H - TAB_H - 4)
-		-- (On the row, not the panel: the panel's bottom hangs on the rows under them.)
-		base:SetPoint("TOPLEFT", row, "BOTTOMLEFT", 0, -14 - NOTE_H - TAB_H - 4)
-		-- (The role tabs inside it, a line under them, as the Cards page's.)
-		subBase:SetPoint("TOPLEFT", base, "TOPLEFT", 8, -(10 + subH))
+		panel:SetPoint("TOPLEFT", healSwitch, "BOTTOMLEFT", 2, -10 - NOTE_H - TAB_H - 4)
+		-- (On the switch, not the panel: the panel's bottom hangs on the rows under them.)
+		base:SetPoint("TOPLEFT", healSwitch, "BOTTOMLEFT", 2, -10 - NOTE_H - TAB_H - 4)
+		-- (Each tab's Show in row at its top, up into its headings' empty top as
+		-- ShowTable's underHeader.)
+		framesShow:SetPoint("TOPLEFT", base, "TOPLEFT", 8, 2)
+		platesShow:SetPoint("TOPLEFT", base, "TOPLEFT", 8, 2)
+		roleWidgets[#roleWidgets + 1] = framesShow
+		plateWidgets[#plateWidgets + 1] = platesShow
+		-- (The role tabs under it, a line under them, as the Cards page's.)
+		subBase:SetPoint("TOPLEFT", framesShow, "BOTTOMLEFT", 0, -(10 + subH))
 		sub:SetPoint("TOPLEFT", subBase, "TOPLEFT")
 		sub:SetPoint("RIGHT", panel, "RIGHT", -8, 0)
 		sub:SetHeight(1)
@@ -18008,7 +18033,7 @@ local function CreateVisionPanel()
 		-- (The Nameplates tab's top, inside the panel where the role tabs would be.)
 		local platesTop = CreateFrame("Frame", nil, content)
 		platesTop:SetSize(1, 1)
-		platesTop:SetPoint("TOPLEFT", base, "TOPLEFT", 8, -10)
+		platesTop:SetPoint("TOPLEFT", platesShow, "BOTTOMLEFT", 0, -10)
 
 		local previous = tabsEnd
 		local function Option(key, label, tip, enabled)

@@ -4699,7 +4699,7 @@ end
 -- rest (frames, ns.RowOnNow) with the Calm Timer as combat: the fight still.
 function ns.RuleFactsFor(key)
 	if type(key) == "string" and (key:find("^plate:") or key:find("^name:") or key == "healVision"
-		or key:find("When$")) then
+		or key == ns.HEAL_VISION_PLATE_ROW or key:find("When$")) then
 		return ns.RuleFactsNow()
 	end
 	return ns.RuleFacts(InCombatLockdown() or ns.Flag(UnitAffectingCombat("player")) or ns.InCalm())

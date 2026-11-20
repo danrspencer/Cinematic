@@ -1457,9 +1457,11 @@ do
 		local role = ns.PlayerRole()
 		local tab = ns.HEAL_VISION_TABS[(role and db["healVisionOwn_" .. role]) and role or "DEFAULT"]
 		if not plates and tab and not (ns.PageOn(tab) and ns.PageOn(ns.HEAL_VISION_TABS.FRAMES)) then return false end
-		-- (Its rule, edited on its row, decides instead of its ticks.)
+		-- (Its rule, edited on its row, decides instead of its ticks. The
+		-- plates have their own row, its Nameplates tab's; with no rule there,
+		-- the Unit Frames row's ticks.)
 		local facts = ns.RuleFactsNow and ns.RuleFactsNow()
-		local rule = facts and ns.RuleShows("healVision", facts)
+		local rule = facts and ns.RuleShows(plates and ns.HEAL_VISION_PLATE_ROW or "healVision", facts)
 		if rule ~= nil then return rule end
 		if db.healVision or db["healVisionIn" .. (VISION_PLACE[ns.GetPlaceType()] or "World")] then return true end
 		if facts then
@@ -1939,10 +1941,15 @@ end
 ns.RULE_DEFAULTS = {}
 -- The Names grid's Service NPCs row: titles up whenever no camera plays.
 ns.RULE_DEFAULTS["name:ServiceNPCs"] = "not camera"
--- Heal Vision: everywhere but cities (crowds: its plates would be every
--- friendly player's), not while you're dead (no healing to aim). Until
--- 2026-11-19 dungeons and raids only (Migrations.lua's healVisionWorldRuleV1).
-ns.RULE_DEFAULTS.healVision = "not city and not dead"
+-- Heal Vision: two Show in rows (2026-11-20, the user's call), one per tab.
+-- Unit Frames: dungeons and raids, not while you're dead (no healing to
+-- aim). Out in the world it faded healthy party members' frames, which
+-- players took for a bug (v2.1.17 to v2.1.20, Migrations.lua's
+-- healVisionTwoRulesV1). Nameplates: everywhere but cities (crowds: every
+-- friendly player's plate), and its Show only while hurt picker starts Off.
+ns.HEAL_VISION_PLATE_ROW = "healVisionNameplates"
+ns.RULE_DEFAULTS.healVision = "(dungeon or raid) and not dead"
+ns.RULE_DEFAULTS[ns.HEAL_VISION_PLATE_ROW] = "not city and not dead"
 do
 	local OFF_GRID_ROWS, OLD_GRID_DEFAULTS = {}, {}
 

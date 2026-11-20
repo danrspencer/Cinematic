@@ -5051,6 +5051,38 @@ STEPS[#STEPS + 1] = function()
 	ns.db.plateOffscreenV1 = true
 end
 
+-- (Step: Heal Vision's two Show in rows, 2026-11-20.)
+STEPS[#STEPS + 1] = function()
+	-- Heal Vision had one rule for its frames and its plates; now each tab
+	-- has its own (Core.lua's ns.HEAL_VISION_PLATE_ROW). The frames' start
+	-- is "(dungeon or raid) and not dead" again: "not city and not dead"
+	-- (v2.1.17's start, healVisionWorldRuleV1) faded healthy party members
+	-- out in the world, which players took for a bug. Untouched, it goes
+	-- back; a rule the player wrote stays, and the plates keep it too (they
+	-- went by it). Saved profiles and reset points too. Once.
+	if ns.db.healVisionTwoRulesV1 then return end
+	local WIDE, PLATES = "not city and not dead", ns.HEAL_VISION_PLATE_ROW
+	local function Split(t)
+		local rules = type(t) == "table" and t.frameRules
+		if type(rules) ~= "table" then return end
+		local old = rules.healVision
+		if old == WIDE then
+			rules.healVision = "(dungeon or raid) and not dead"
+		elseif type(old) == "string" and rules[PLATES] == nil then
+			rules[PLATES] = old
+		end
+	end
+	Split(ns.db)
+	for _, saved in pairs(ns.db.profiles or {}) do
+		if type(saved) == "table" then
+			Split(saved)
+			Split(saved.settings)
+		end
+	end
+	for _, point in pairs(ns.db.profileResetPoints or {}) do Split(point) end
+	ns.db.healVisionTwoRulesV1 = true
+end
+
 -- Runs them all, each on its own: an error is logged and reported (the
 -- addon's error net, Diagnostics.lua), and the steps after it still run.
 function ns.RunMigrations()
