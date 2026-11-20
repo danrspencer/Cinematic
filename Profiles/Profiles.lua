@@ -1060,7 +1060,7 @@ function ns.ResetAddon(settingsOnly)
 	end
 	CinematicCharDB = next(charKept) and charKept or nil
 	ns.db.profiles = {} -- (so logout's ns.SaveProfile writes into nothing kept)
-	ReloadUI()
+	ns.Reload() -- (Forever: the popup's secure Reload button does it, QoL/Reload.lua)
 end
 
 -- Settings changed from the active profile's base, for the Profiles page's
@@ -1171,7 +1171,7 @@ function ns.AddSharedProfile(name, settings, note, icon)
 	StaticPopupDialogs.CINEMATIC_PROFILE_ADDED_RELOAD = {
 		text = L["Some style settings only show right after a reload. Reload now?"],
 		button1 = RELOADUI or L["Reload"], button2 = L["Later"],
-		OnAccept = ReloadUI,
+		OnAccept = function() ns.Reload() end, cineReload = 1,
 		timeout = 0, whileDead = true, hideOnEscape = true,
 	}
 	StaticPopup_Show("CINEMATIC_PROFILE_ADDED_RELOAD")

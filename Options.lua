@@ -18673,7 +18673,7 @@ local function CreateExtrasPanel()
 	StaticPopupDialogs.CINEMATIC_SUPPORT_RELOAD = {
 		text = L["Switching an addon's support on or off counts after a reload. Reload now?"],
 		button1 = RELOADUI or L["Reload"], button2 = L["Later"],
-		OnAccept = ReloadUI,
+		OnAccept = function() ns.Reload() end, cineReload = 1,
 		timeout = 0, whileDead = true, hideOnEscape = true,
 	}
 	-- A row per installed addon supported with no frames of its own (Support/,
@@ -20498,6 +20498,7 @@ StaticPopupDialogs.CINEMATIC_ADDON_RESET = {
 	button1 = L["Reset EVERYTHING"], button2 = CANCEL, button3 = L["Reset Settings"],
 	OnAccept = function() StaticPopup_Show("CINEMATIC_ADDON_RESET_ALL") end,
 	OnAlt = function() ns.ResetAddon(true) end,
+	cineReload = 3, -- (Reset Settings reloads; Forever: a secure Reload over it, QoL/Reload.lua)
 	timeout = 0, whileDead = true, hideOnEscape = true,
 }
 StaticPopupDialogs.CINEMATIC_ADDON_RESET_ALL = {
@@ -20507,6 +20508,7 @@ StaticPopupDialogs.CINEMATIC_ADDON_RESET_ALL = {
 	OnShow = function(self) AlignPopupText(self, "LEFT") end,
 	OnHide = function(self) AlignPopupText(self, "CENTER") end,
 	OnAccept = function() ns.ResetAddon() end,
+	cineReload = 1,
 	timeout = 0, whileDead = true, hideOnEscape = true, showAlert = true,
 }
 
@@ -21779,7 +21781,7 @@ ns.OnLanguage(function()
 	StaticPopupDialogs.CINEMATIC_LANGUAGE_RELOAD = {
 		text = L["Cinematic's language changes after a reload. Reload now?"],
 		button1 = RELOADUI or L["Reload"], button2 = L["Later"],
-		OnAccept = ReloadUI,
+		OnAccept = function() ns.Reload() end, cineReload = 1,
 		timeout = 0, whileDead = true, hideOnEscape = true,
 	}
 	-- The game reads the floating-text font as you log in: a /reload keeps the

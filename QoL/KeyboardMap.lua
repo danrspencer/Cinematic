@@ -282,6 +282,7 @@ local SHORT = {
 	["CLICK CinematicMenuWheelButton:LeftButton"] = "Menu wheel",
 	["CLICK CinematicMarkerWheelButton:LeftButton"] = "Markers",
 	["CLICK CinematicVisionWheelButton:LeftButton"] = "Visions",
+	["CLICK CinematicReloadKey:LeftButton"] = "Reload", -- (Forever's Reload key, QoL/Reload.lua)
 }
 local function FullName(command)
 	if command == nil or command == "" or command == "NONE" then return nil end

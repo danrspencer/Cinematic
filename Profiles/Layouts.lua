@@ -1205,13 +1205,13 @@ ns.OnLanguage(function()
 		text = L["Edit Mode keeps its old list of layouts until you reload, and saving there before then " ..
 			"would undo this. Reload now?"],
 		button1 = RELOADUI or L["Reload"], button2 = L["Later"],
-		OnAccept = ReloadUI,
+		OnAccept = function() ns.Reload() end, cineReload = 1,
 		timeout = 0, whileDead = true, hideOnEscape = true,
 	}
 	StaticPopupDialogs.CINEMATIC_BARS_RELOAD = {
 		text = L["This Edit Mode layout's action bars come on or off after a reload. Reload now?"],
 		button1 = RELOADUI or L["Reload"], button2 = L["Later"],
-		OnAccept = ReloadUI,
+		OnAccept = function() ns.Reload() end, cineReload = 1,
 		timeout = 0, whileDead = true, hideOnEscape = true,
 	}
 end)

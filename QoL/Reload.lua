@@ -128,26 +128,183 @@ local function Restore()
 	end
 end
 
--- The key (Bindings.xml) and the button.
-function Cinematic_Reload()
+-- Forever blocks ReloadUI from addon code (2026-11-20: ADDON_ACTION_BLOCKED
+-- UNKNOWN() via C_UI.Reload, from a timer and from a plain button's click),
+-- while a secure button running /reload as a macro, clicked by the player,
+-- works (Dev/BlockedLineTest.lua's taint test). So there: the Reload button
+-- and the Reload key are such buttons, and a popup of ours that reloads
+-- (cineReload = the number of its button that does) gets one laid over that
+-- button. Retail as before: ReloadUI. (/cine debug reloadpaths)
+ns.reloadBlocked = not ns.isRetail
+
+local secureNext -- a secure click's PreClick running: its macro reloads next
+
+-- Where our code can't reload and no secure click is under way (in a fight,
+-- where the cover can't go on; a popup's button taken by Enter or the gamepad).
+function ns.ReloadFallback()
+	ns.Print(L["Type /reload to finish."])
+end
+
+-- Reload the UI (a popup's OnAccept, a reset): what was open saved first.
+function ns.Reload()
 	Save()
+	if secureNext then return end
+	if ns.reloadBlocked then return ns.ReloadFallback() end
 	ReloadUI()
+end
+
+-- A secure button that runs /reload. (Down or up as the game's own buttons,
+-- not both: two reloads. upOnly for the button you drag, so pressing to drag
+-- it isn't a reload.)
+local function SecureReload(name, parent, template, upOnly)
+	local button = CreateFrame("Button", name, parent,
+		template and ("SecureActionButtonTemplate, " .. template) or "SecureActionButtonTemplate")
+	button:SetAttribute("type", "macro")
+	button:SetAttribute("macrotext", "/reload")
+	if upOnly then
+		button:SetAttribute("useOnKeyDown", false)
+		button:RegisterForClicks("LeftButtonUp")
+	else
+		button:RegisterForClicks(GetCVarBool("ActionButtonUseKeyDown") and "AnyDown" or "AnyUp")
+	end
+	return button
+end
+
+-- The key (Bindings.xml). (On Forever its keys click CinematicReloadKey
+-- instead, below; this is left for when that can't be set up.)
+function Cinematic_Reload()
+	ns.Reload()
 end
 -- (Your own /reload too. Saved again by the key's own call: no harm.)
 if ReloadUI then hooksecurefunc("ReloadUI", Save) end
 if C_UI and C_UI.Reload then hooksecurefunc(C_UI, "Reload", Save) end
 
+-- A popup's reload button covered by a secure one (Forever): its PreClick runs
+-- what the popup's button does (ns.Reload left to the macro), then the macro
+-- reloads. Over the popup while it's up, off when it goes, and off for a
+-- fight (the fight's start event comes just before the lockdown).
+local cover, coverTicker
+local function PopupButton(dialog, index)
+	return dialog["button" .. index] or (dialog.GetButton and dialog:GetButton(index))
+		or (dialog.ButtonContainer and dialog.ButtonContainer["Button" .. index])
+end
+local function Uncover()
+	if coverTicker then
+		coverTicker:Cancel()
+		coverTicker = nil
+	end
+	if cover and cover:IsShown() and not InCombatLockdown() then cover:Hide() end
+end
+local function Cover(dialog, which, index)
+	if not ns.reloadBlocked or InCombatLockdown() or not dialog then return end
+	local target = PopupButton(dialog, index)
+	if not target then return end
+	if not cover then
+		cover = SecureReload("CinematicReloadCover", UIParent)
+		cover:SetFrameStrata("FULLSCREEN_DIALOG")
+		cover:Hide()
+		cover:SetScript("PreClick", function(self)
+			local shown, info = self.dialog, StaticPopupDialogs[self.which]
+			local fn = info and (self.index == 3 and info.OnAlt or self.index == 2 and info.OnCancel or info.OnAccept)
+			secureNext = true
+			if fn and shown then xpcall(fn, geterrorhandler(), shown, shown.data, shown.data2) end
+			secureNext = nil
+			Save()
+			if shown and shown:IsShown() then shown:Hide() end
+		end)
+		cover:SetScript("OnEnter", function(self) if self.target then self.target:LockHighlight() end end)
+		cover:SetScript("OnLeave", function(self) if self.target then self.target:UnlockHighlight() end end)
+		cover:RegisterEvent("PLAYER_REGEN_DISABLED")
+		cover:RegisterEvent("PLAYER_REGEN_ENABLED")
+		cover:SetScript("OnEvent", function(self, event)
+			if event == "PLAYER_REGEN_DISABLED" then
+				if self:IsShown() then self:Hide() end
+			elseif self.dialog and self.dialog:IsShown() and self.dialog.which == self.which then
+				Cover(self.dialog, self.which, self.index)
+			end
+		end)
+	end
+	cover.dialog, cover.which, cover.index, cover.target = dialog, which, index, target
+	cover:ClearAllPoints()
+	cover:SetAllPoints(target)
+	cover:SetFrameLevel(math.min(dialog:GetFrameLevel() + 20, 9000))
+	cover:Show()
+	if not coverTicker then
+		coverTicker = C_Timer.NewTicker(0.2, function()
+			if not (cover.dialog:IsShown() and cover.dialog.which == cover.which) then Uncover() end
+		end)
+	end
+end
+function ns.ReloadCover() return cover end -- (the test's)
+
+local function FindPopup(which)
+	if StaticPopup_FindVisible then return StaticPopup_FindVisible(which) end
+	for i = 1, (_G.STATICPOPUP_NUMDIALOGS or 4) do
+		local dialog = _G["StaticPopup" .. i]
+		if dialog and dialog:IsShown() and dialog.which == which then return dialog end
+	end
+end
+if ns.reloadBlocked and StaticPopup_Show then
+	hooksecurefunc("StaticPopup_Show", function(which)
+		local info = StaticPopupDialogs[which]
+		if info and info.cineReload then Cover(FindPopup(which), which, info.cineReload) end
+	end)
+end
+
+-- Asks to reload (a popup with Reload, covered on Forever), or reloads
+-- straight away where our code can.
+function ns.ReloadOrAsk(text)
+	if not ns.reloadBlocked then return ReloadUI() end
+	StaticPopupDialogs.CINEMATIC_RELOAD_NOW = {
+		text = "%s",
+		button1 = RELOADUI or L["Reload"], button2 = L["Later"],
+		OnAccept = function() ns.Reload() end,
+		cineReload = 1,
+		timeout = 0, whileDead = true, hideOnEscape = true,
+	}
+	StaticPopup_Show("CINEMATIC_RELOAD_NOW", text)
+end
+
+-- The Reload key on Forever: the keys CINEMATIC_RELOAD has click
+-- CinematicReloadKey instead (an override, set out of fights and kept through
+-- them), unless the Keybinds tab has it off.
+local keyOwner, boundKeys
+if ns.reloadBlocked then
+	local reloadKey = SecureReload("CinematicReloadKey", UIParent)
+	reloadKey:SetScript("PreClick", Save)
+	_G["BINDING_NAME_CLICK CinematicReloadKey:LeftButton"] = L["Reload the UI"]
+	keyOwner = CreateFrame("Frame")
+end
+local function BindKey()
+	if not keyOwner or InCombatLockdown() then return end
+	local on = not Cinematic_KeyOn or Cinematic_KeyOn("CINEMATIC_RELOAD")
+	local keys = on and table.concat({ GetBindingKey("CINEMATIC_RELOAD") }, " ") or ""
+	if keys == boundKeys then return end
+	boundKeys = keys
+	ClearOverrideBindings(keyOwner)
+	for key in keys:gmatch("%S+") do
+		SetOverrideBindingClick(keyOwner, false, key, "CinematicReloadKey", "LeftButton")
+	end
+end
+
 -- The button. No parent, so hiding the UI (Alt+Z, CineMode) leaves it up;
--- scaled as UIParent is so it's the size of the rest.
-local button = CreateFrame("Button", "CinematicReloadButton", nil, "UIPanelButtonTemplate")
+-- scaled as UIParent is so it's the size of the rest. (Forever: a secure
+-- one, see above. It can't be shown, hidden or moved in a fight: those wait.)
+local button = ns.reloadBlocked and SecureReload("CinematicReloadButton", nil, "UIPanelButtonTemplate", true)
+	or CreateFrame("Button", "CinematicReloadButton", nil, "UIPanelButtonTemplate")
+local function Locked() return ns.reloadBlocked and InCombatLockdown() end
 button:SetSize(64, 20)
 button:SetFrameStrata("FULLSCREEN_DIALOG")
 button:SetMovable(true)
 button:SetClampedToScreen(true)
 button:RegisterForDrag("LeftButton")
 button:Hide()
-button:SetScript("OnClick", Cinematic_Reload)
-button:SetScript("OnDragStart", button.StartMoving)
+if ns.reloadBlocked then
+	button:SetScript("PreClick", Save)
+else
+	button:SetScript("OnClick", Cinematic_Reload)
+end
+button:SetScript("OnDragStart", function(self) if not Locked() then self:StartMoving() end end)
 button:SetScript("OnDragStop", function(self)
 	self:StopMovingOrSizing()
 	local point, _, relativePoint, x, y = self:GetPoint()
@@ -166,6 +323,7 @@ button:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
 local function Place()
 	button:SetText(L["Reload"])
+	if Locked() then return end
 	button:SetScale(UIParent:GetEffectiveScale())
 	button:ClearAllPoints()
 	local saved = ns.db and ns.db.reloadPoint
@@ -179,7 +337,9 @@ end
 -- Shown while ticked (and its page on), checked now and then: the tick, the
 -- page's switch and a profile change all come round to it.
 local function Update()
-	local on = ns.Setting("reloadButton") and true or false
+	BindKey()
+	if Locked() then return end
+	local on = (ns.reloadTestShowButton or ns.Setting("reloadButton")) and true or false
 	if on ~= button:IsShown() then button:SetShown(on) end
 end
 

@@ -4256,9 +4256,10 @@ function ns.TurnOffCompletely(onCancel)
 			local SaveAddOns = (C_AddOns and C_AddOns.SaveAddOns) or SaveAddOns
 			DisableAddOn(ADDON_NAME)
 			SaveAddOns()
-			ReloadUI()
+			ns.Reload()
 		end,
 		OnCancel = function() if onCancel then onCancel() end end,
+		cineReload = 1, -- (Forever: a secure Reload over it, QoL/Reload.lua)
 		timeout = 0,
 		whileDead = true,
 		hideOnEscape = true,
@@ -5275,7 +5276,8 @@ if ADDON_NAME == "CinematicDev" then
 			text = "Cinematic (Dev) turned off the released Cinematic for all characters. Reload now?",
 			button1 = RELOADUI or "Reload UI",
 			button2 = CANCEL,
-			OnAccept = ReloadUI,
+			OnAccept = function() ns.Reload() end,
+			cineReload = 1,
 			timeout = 0,
 			whileDead = true,
 			hideOnEscape = true,

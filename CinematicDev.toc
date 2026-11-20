@@ -287,3 +287,4 @@ ProfilerPage.lua
 GameSettingsPage.lua
 MinimapButton.lua
 QoL\Reload.lua
+Dev\ReloadPathsTest.lua

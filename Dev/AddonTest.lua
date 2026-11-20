@@ -129,7 +129,7 @@ function ns.SoloAddons(words)
 		db.soloAddons = nil
 		SaveAddOns()
 		ns.Print("solo off: your addon list is back. Reloading.")
-		ReloadUI()
+		ns.ReloadOrAsk("Solo off: your addon list is back. Reload now?")
 		return
 	end
 	if type(db.soloAddons) == "table" then
@@ -186,7 +186,7 @@ function ns.SoloAddons(words)
 	db.soloAddons = { keep = kept, turnedOff = turnedOff, turnedOn = turnedOn, at = date("%Y-%m-%d %H:%M") }
 	SaveAddOns()
 	ns.Print(("solo: only %s now. Reloading; /cine debug solo off brings the rest back."):format(table.concat(kept, ", ")))
-	ReloadUI()
+	ns.ReloadOrAsk(("Solo: only %s now. Reload now?"):format(table.concat(kept, ", ")))
 end
 
 -- Other addons loaded besides the solo ones (and the game's own): the check.

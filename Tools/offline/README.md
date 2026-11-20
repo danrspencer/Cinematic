@@ -34,6 +34,9 @@ looks for `lua5.1`. (Don't put a `lua5.1` stand-in on PATH: Windows asks what to
 - `notchgap.lua <forever|retail>`: full-screen effects (ns.CoverWorld: letterbox, tint edges, death screen, Focus,
   low health, teleport) reach up over a Mac's camera notch strip above UIParent, at UI scale 1 and 0.8, and come back
   down when it goes.
+- `reload.lua <forever|retail>`: our reloads (QoL/Reload.lua). Forever, where ReloadUI from our code is blocked: a
+  popup that reloads gets a secure /reload button over the right button, whose click runs the popup's work without
+  our ReloadUI, and with no such click it says to type /reload. Retail: ReloadUI as before, nothing covered.
 - `castlook.lua <forever|retail>`: a cast bar's These bars pick of the other kind's game look (PlateCastStyle.lua's
   GameAs/DressAs) on the style lab's real-layout stand-in: put on (border, name, icon as the game lays the other kind
   out) and taken off again (every anchor, size and justify back).

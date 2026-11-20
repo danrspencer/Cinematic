@@ -230,6 +230,7 @@ local function PrintDebugHelp()
 	print("  /cine debug xprelog - one run checking whether a relog changes the floating XP text's font (kill one, relog, kill one; dev copy; again to stop)")
 	print("  /cine debug blockedline - one run checking the error box catches the yellow \"Interface action failed\" line, with or without the game's event (dev copy; again to stop)")
 	print("  /cine debug taintopen [ways] - which way of opening the settings leaves its lists written by us: 6 ways (or the numbers given), each after a /reload (click its Reload button); some ask for Escape > Options, way 6 in a fight (dev copy; again to stop)")
+	print("  /cine debug reloadpaths - one run checking each of our reloads (Reload button and key, the popups that reload) reloads rather than being blocked: you click each, one /reload a step (dev copy; again to stop)")
 	print("  /cine debug listfold - one run checking our settings' left list is never made again in a fight (no yellow \"Interface action failed\" lines); you start and end a fight (dev copy; again to stop)")
 	print("  /cine debug euiswing - one run recording why EllesmereUI's swing timer stays hidden in CineMode (dev copy; again to stop)")
 	print("  /cine debug solo <Addon> [more] - only that addon (its parts and what it needs) and Cinematic load: turns the rest off and reloads; solo off brings them back (dev copy)")
@@ -1889,6 +1890,10 @@ local function HandleSlash(msg)
 		-- (Dev copy: which way of opening the settings taints its lists, one /reload a way, BlockedLineTest.lua.)
 		if ns.TaintOpenTest then ns.TaintOpenTest(arg:match("^taintopen%s*(.*)$"))
 		else ns.Print("/cine debug taintopen is in the dev copy only.") end
+	elseif cmd == "debug" and arg == "reloadpaths" then
+		-- (Dev copy: each of our reloads reloads or is blocked, one /reload a step, ReloadPathsTest.lua.)
+		if ns.ReloadPathsTest then ns.ReloadPathsTest()
+		else ns.Print("/cine debug reloadpaths is in the dev copy only.") end
 	elseif cmd == "debug" and arg == "listfold" then
 		-- (Dev copy: our settings' left list never made again in a fight, ListFoldTest.lua.)
 		if ns.ListFoldTest then ns.ListFoldTest()
