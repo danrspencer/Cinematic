@@ -1378,7 +1378,6 @@ local BAR_ART_KEYS = {
 }
 local barArt, barArtSeen = {}, { off = false }
 local artStandIn
-
 -- (border: the band the buttons sit on, which round buttons take off: ns.SetBarBorderOff.)
 local function AddBarArt(region, border)
 	if type(region) ~= "table" or barArtSeen[region] or type(region.SetAlpha) ~= "function"
@@ -1399,8 +1398,11 @@ local function AddBarArt(region, border)
 		hooksecurefunc(artStandIn, "SetAlpha", function(_, alpha)
 			for _, art in ipairs(barArt) do
 				art.region:SetAlpha(art.border and barArtSeen.off and 0 or alpha)
+				-- (Its parts another addon detached follow it: the gryphons, FadeDetached.lua.)
+				ns.SyncDetached(art.region, artStandIn)
 			end
 		end)
+		ns.barArtStandIn = artStandIn -- (Tools/offline/gryphons.lua)
 	end
 	region:SetAlpha(border and barArtSeen.off and 0 or artStandIn:GetAlpha())
 end
@@ -2055,6 +2057,9 @@ function ns.SetEntryAlpha(entry, alpha)
 		ns.SetMinimapBlobsHidden(alpha <= 0 and not entry.shrunk)
 	end
 	ApplyAlpha(entry)
+	-- (Its parts that ignore its alpha follow it while it's faded: FadeDetached.lua.
+	-- Not a raid tile's: FadeLooseParts has them.)
+	if not LOOSE_PART_GROUPS[entry.group] then ns.SyncDetached(entry.frame) end
 end
 ns.SetEntryAlpha = ns.Profiled("SetEntryAlpha", ns.SetEntryAlpha)
 
@@ -13688,6 +13693,7 @@ local function ReleaseBarArt(barName)
 		if art.bar == barName then
 			ns.Reattach(art.region)
 			art.region:SetAlpha(1)
+			ns.SyncDetached(art.region)
 			table.remove(barArt, i)
 		end
 	end

@@ -668,6 +668,9 @@ function ns.ApplyBarArtOverride()
 			artHidden[art] = nil
 			art:SetAlpha(1)
 		end
+		-- (Its parts another addon detached, the gryphons on Forever with FlareUI
+		-- 6.13, go with it: FadeDetached.lua.)
+		if ns.SyncDetached then ns.SyncDetached(art, ns.barArtStandIn) end
 	end
 end
 

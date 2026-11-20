@@ -806,6 +806,25 @@ local function Explain(entry)
 				text = L["CineMode hides it: nothing ticked on its row applies right now"] })
 		end
 	end
+	-- Its parts that ignore its opacity (another addon detached them, FlareUI's
+	-- gryphons say): faded with it by FadeDetached.lua, or still drawn.
+	local caught = ns.DetachedFor and ns.DetachedFor(entry.frame) or {}
+	if #caught > 0 then
+		local names, whos, drawn, seenWho = {}, {}, {}, {}
+		for _, part in ipairs(caught) do
+			names[#names + 1] = part.name
+			if part.drawn then drawn[#drawn + 1] = part.name end
+			local who = part.by or L["the game or an addon"]
+			if not seenWho[who] then seenWho[who] = true whos[#whos + 1] = who end
+		end
+		if #drawn > 0 then
+			Add(out, "block", L["Still drawn while it's hidden: %s ignores its opacity (set by %s)"]:format(
+				table.concat(drawn, ", "), table.concat(whos, ", ")), FramePage(key))
+		else
+			Add(out, "on", L["Faded with it: %s ignores its opacity (set by %s)"]:format(
+				table.concat(names, ", "), table.concat(whos, ", ")), FramePage(key))
+		end
+	end
 	return title, status, out, key
 end
 

@@ -14,6 +14,7 @@ Dev\ErrorWindow.lua
 Dev\CVarTraceTest.lua
 Checks.lua
 FrameGuess.lua
+FadeDetached.lua
 Locales\Locales.lua
 Locales\deDE.lua
 Locales\esES.lua
@@ -245,6 +246,7 @@ Dev\LookDockTest.lua
 Dev\BlockedLineTest.lua
 Dev\SecretErrorTest.lua
 Dev\CombatTextKeepTest.lua
+Dev\DetachedFadeTest.lua
 Dev\XpRelogTest.lua
 Dev\ListFoldTest.lua
 Dev\GradientTest.lua

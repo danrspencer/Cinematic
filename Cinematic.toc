@@ -21,6 +21,7 @@
 
 Checks.lua
 FrameGuess.lua
+FadeDetached.lua
 Locales\Locales.lua
 Locales\deDE.lua
 Locales\esES.lua

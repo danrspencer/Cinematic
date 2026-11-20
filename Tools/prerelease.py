@@ -60,6 +60,7 @@ OFFLINE_TESTS = [
     ("combat text keeps the game's numbers as its rows say", "Tools/offline/combattextkeep.lua"),
     ("reloads through a secure /reload on Forever, forever", "Tools/offline/reload.lua", "forever"),
     ("reloads as before on retail, retail", "Tools/offline/reload.lua", "retail"),
+    ("detached parts follow our fade (FlareUI's gryphons)", "Tools/offline/gryphons.lua"),
     ("loose parts survey (/cine debug loose) finds exactly the detached parts", "Tools/offline/loosesurvey.lua"),
 ]
 

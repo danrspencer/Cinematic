@@ -52,6 +52,11 @@ looks for `lua5.1`. (Don't put a `lua5.1` stand-in on PATH: Windows asks what to
 - `castlook.lua <forever|retail>`: a cast bar's These bars pick of the other kind's game look (PlateCastStyle.lua's
   GameAs/DressAs) on the style lab's real-layout stand-in: put on (border, name, icon as the game lays the other kind
   out) and taken off again (every anchor, size and justify back).
+- `gryphons.lua`: parts that ignore their frame's alpha follow our fade (FadeDetached.lua). Action bar 1's
+  gryphons on Forever, made to ignore EndCaps' alpha by another addon (FlareUI 6.13): the HUD's Action bar art row
+  and the Overrides tab's Hide still reach them (kept down if that addon raises them, following a half fade, handed
+  back after). And any faded frame: another addon's detached part follows it, Cinematic's own stays, /cine why
+  says who detached it.
 - `loosesurvey.lua`: `/cine debug loose` (Dev/LoosePartsSurvey.lua, step A of Tools/loose-parts-plan.md) on the
   dev copy: finds exactly the parts under faded frames that ignore their alpha (regions, children, deeper ones),
   not frames with a row of their own or our own detached parts, counts secret answers apart, changes no alpha.

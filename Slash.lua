@@ -1911,6 +1911,10 @@ local function HandleSlash(msg)
 		-- (Dev copy: our error catcher given a secret error text, SecretErrorTest.lua.)
 		if ns.SecretErrorTest then ns.SecretErrorTest()
 		else ns.Print("/cine debug secreterror is in the dev copy only.") end
+	elseif cmd == "debug" and arg == "detached" then
+		-- (Dev copy: parts that ignore their frame's alpha follow our fade, DetachedFadeTest.lua.)
+		if ns.DetachedFadeTest then ns.DetachedFadeTest()
+		else ns.Print("/cine debug detached is in the dev copy only.") end
 	elseif cmd == "debug" and arg == "ctkeep" then
 		-- (Dev copy: Combat Text Style keeps the game's damage numbers through a reset, CombatTextKeepTest.lua.)
 		if ns.CombatTextKeepTest then ns.CombatTextKeepTest()
