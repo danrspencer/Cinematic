@@ -5155,6 +5155,10 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 		ns.stillSince = nil -- the AFK timer starts once you can see the world
 		if ns.ClearMouseCameraHeld then ns.ClearMouseCameraHeld() end -- (a release lost in the load)
 	elseif event == "PLAYER_ENTERING_WORLD" then
+		-- A real login (not a /reload) forgets the tab last open under each
+		-- settings icon (Options.lua's Select): each opens on its own page again.
+		-- (First, so nothing below can stop it.)
+		if arg1 and not arg2 and ns.db then ns.db.hubLastTab = nil end
 		-- After a login, /reload or any loading screen, the AFK timer starts
 		-- afresh (the orbit has been running since login, counting the loading
 		-- screen as standing still).

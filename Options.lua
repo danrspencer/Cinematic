@@ -2915,7 +2915,8 @@ do
 			{ "Triggers", "Interface\\Icons\\INV_Misc_PocketWatch_02", section = "Cameras" },
 			{ "Trigger Priority", "Interface\\Icons\\INV_Misc_PocketWatch_02", tabOf = "Triggers" },
 			{ "Trigger Log", "Interface\\Icons\\INV_Misc_PocketWatch_02", tabOf = "Triggers" },
-			{ "Trigger Settings", "Interface\\Icons\\INV_Misc_PocketWatch_02", tabOf = "Triggers" },
+			{ "Trigger Settings", "Interface\\Icons\\INV_Misc_PocketWatch_02", tabOf = "Triggers",
+				forget = true }, -- (one trigger's page: not reopened by the icon, Select)
 			{ "Camera Scripts", "Interface\\Icons\\INV_Scroll_05", label = "Scripts", section = "Cameras" }, -- (CameraScriptsPage.lua)
 			{ "My Shots", "Interface\\Icons\\INV_Misc_Spyglass_02", section = "Cameras" }, -- (ShotsPage.lua)
 			-- (Surge Forward's own icon, from the game: SkyrideCam.lua, retail.)
@@ -3039,9 +3040,10 @@ do
 			-- (its Settings tab: what's for every card)
 			{ "Card General", "Interface\\Icons\\INV_Misc_Book_09", tabOf = "Card Vision", label = "Settings" },
 			-- (an event's own pages: not tabs on the page's, opened from its row)
-			{ "Card Settings", "Interface\\Icons\\INV_Misc_Book_09", tabOf = "Card Vision" },
-			{ "Card Style", "Interface\\Icons\\INV_Misc_Book_09", tabOf = "Card Vision" },
-			{ "Card Sounds", "Interface\\Icons\\INV_Misc_Book_09", tabOf = "Card Vision" },
+			-- (forget: not reopened by the icon, Select: its event is lost on a /reload)
+			{ "Card Settings", "Interface\\Icons\\INV_Misc_Book_09", tabOf = "Card Vision", forget = true },
+			{ "Card Style", "Interface\\Icons\\INV_Misc_Book_09", tabOf = "Card Vision", forget = true },
+			{ "Card Sounds", "Interface\\Icons\\INV_Misc_Book_09", tabOf = "Card Vision", forget = true },
 			{ "Wind Guide", "Interface\\Icons\\Spell_Nature_Cyclone", dev = true },
 		} },
 		{ name = "Quality of life", label = "Quality of Life", colors = { Helpers = { 0.3, 0.7, 0.5 } }, pages = {
@@ -3450,11 +3452,14 @@ do
 		Light(Lit(tile), true)
 		-- (The tab last open under each icon: its icon and left list line open
 		-- that one again, not the first (ns.LastHubTab), after a reload too:
-		-- db.hubLastTab, the account's. 2026-11-17.)
+		-- db.hubLastTab, the account's. 2026-11-17. A logout forgets them:
+		-- Core.lua's PLAYER_ENTERING_WORLD, 2026-11-20.)
 		local db = ns.db
 		if db then
 			db.hubLastTab = db.hubLastTab or {}
-			db.hubLastTab[Lit(tile).english] = tile ~= Lit(tile) and tile.english or nil
+			-- (forget: one event's or trigger's own page, its pick held only in
+			-- memory: the icon's list page next time instead, 2026-11-20.)
+			db.hubLastTab[Lit(tile).english] = tile ~= Lit(tile) and not tile.forget and tile.english or nil
 		end
 		-- (A collapsed hub's bands open and close by the page picked: laid out again.)
 		if hub.collapse then Layout(hub) end
@@ -3929,6 +3934,7 @@ do
 						end
 					end
 						tile.showIn = tab.showIn -- (its Show in list's key: ns.HubOverview's tabs)
+						tile.forget = page.forget -- (one item's page: not saved as the last tab, Select)
 						if page.dev and tile.CreateLine then
 							-- (A red X over the icon: dev copy only.)
 							tile.dev = true

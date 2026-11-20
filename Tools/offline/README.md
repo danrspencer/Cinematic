@@ -56,3 +56,6 @@ looks for `lua5.1`. (Don't put a `lua5.1` stand-in on PATH: Windows asks what to
   in-game `/cine prerelease` results from the saved settings.
 - `export.lua`: `lua5.1 Tools/offline/export.lua > profiles.json` writes the options pages and their sections, the
   modules and the built-in profiles as JSON, for mock-ups and the like.
+- `hublasttab.lua`: the tab last open under each settings icon (db.hubLastTab) kept through a /reload and a loading
+  screen, forgotten by a real login, so each icon opens on its own page after a logout. One item's pages (`forget` in
+  HUBS: Card Settings, Card Style, Card Sounds, Trigger Settings) are never saved: their icon opens its list page.
