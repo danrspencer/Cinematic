@@ -10635,8 +10635,33 @@ do
 	-- (Each spell's row, else its bar's: ns.CooldownRowSetting. The bar an
 	-- icon is in kept as it's looked at, for its hooks.)
 	local groupOfIcon = setmetatable({}, { __mode = "k" }) -- icon -> its bar's group
+
+	-- A spell with no cooldown of its own (a DoT: Corruption, Immolate) is
+	-- left to the game: its "buff" is its debuff on the target, with the time
+	-- left and the countdown, and the spell's cooldown swapped in was nothing
+	-- but the global cooldown's flick. (A player's report 2026-11-20: no
+	-- numbers on a warlock's DoTs; /cine debug dotnumbers, Forever.) Known
+	-- once read plainly, out of a fight; not known yet, swapped as before.
+	local noCooldown = {} -- spell ID -> true (none of its own) or false
+	local function OwnCooldown(id)
+		if type(id) ~= "number" then return true end
+		local known = noCooldown[id]
+		if known == nil and GetSpellBaseCooldown then
+			local ok, base = pcall(GetSpellBaseCooldown, id)
+			if ok and type(base) == "number" and not Secret(base) then
+				local charges = C_Spell and C_Spell.GetSpellCharges
+				local okCharges, info = false, nil
+				if charges then okCharges, info = pcall(charges, id) end
+				local max = okCharges and type(info) == "table" and info.maxCharges
+				local many = type(max) == "number" and not Secret(max) and max > 1
+				known = base <= 0 and not many
+				noCooldown[id] = known
+			end
+		end
+		return not known
+	end
 	function ns.CooldownNoBuffOn(id, group)
-		return ns.CooldownRowSetting("notBuff", id, group) and true or false
+		return ns.CooldownRowSetting("notBuff", id, group) and OwnCooldown(id) and true or false
 	end
 
 	local function Apply(icon, id)

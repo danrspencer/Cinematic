@@ -252,6 +252,7 @@ Dev\OffscreenProbe.lua
 Dev\OffscreenHoldTest.lua
 Dev\NpcNamesTest.lua
 Dev\ReadyAnyTimeTest.lua
+Dev\DotNumbersTest.lua
 Dev\FollowHudTest.lua
 Dev\ResetTest.lua
 Dev\DeathVisionTest.lua
