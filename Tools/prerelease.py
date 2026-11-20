@@ -61,6 +61,7 @@ OFFLINE_TESTS = [
     ("combat text keeps the game's numbers as its rows say", "Tools/offline/combattextkeep.lua"),
     ("combat text: a totem's hit matched to its cast", "Tools/offline/totemcast.lua"),
     ("totem test (/cine debug totemhit) steps and verdicts", "Tools/offline/totemhit.lua"),
+    ("page snapshot (/cine debug pagestate) logs the preview and what hangs from it", "Tools/offline/pagestate.lua"),
     ("combat text page's Experimental notice, forever", "Tools/offline/combattextwarn.lua", "forever"),
     ("combat text page's Experimental notice, retail", "Tools/offline/combattextwarn.lua", "retail"),
     ("reloads through a secure /reload on Forever, forever", "Tools/offline/reload.lua", "forever"),

@@ -291,6 +291,7 @@ Dev\ChecksProbe.lua
 Dev\WhoseHitTest.lua
 Dev\CorpseTest.lua
 Dev\TotemHitTest.lua
+Dev\PageStateDebug.lua
 Camera\CameraScriptsPage.lua
 Camera\CameraManager.lua
 Options.lua
