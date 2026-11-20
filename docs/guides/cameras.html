@@ -162,7 +162,7 @@ table.grid tr:last-child td { border-bottom: 0 }
   <section>
     <div class="eyebrow">Scenes page</div>
     <h2>Scenes: what starts what</h2>
-    <p>The <b>Cameras</b> page has a row for each <b>scene</b>, named for what starts it (its <b>trigger</b>): resting at a campfire, <code>/sit</code>, the campfire card (not on retail), <code>/sleep</code>, <code>/dance</code>, <code>/kneel</code>, a chair, drawing your weapon, your Hearthstone, a teleport, logging out, <code>/stare</code>, Fishing, going AFK, standing still, a flight, a quest giver, auto-walking, auto-running and dying. Each row shows its camera, and small tags for anything set apart from the usual, like music or where it's turned off. Untick the box at the start of a row to turn it off for now (its settings stay). The copy button near the end of a row makes another row for the same trigger, just below, with its own camera and When: a trigger tries its rows in order (move them with the arrows) and the first whose When fits picks the camera, so one can say "the vista camera in cities, the cozy camera elsewhere". The red button deletes a row: a copy, or a whole trigger. A deleted built-in trigger starts no camera and its rows go, but its settings are kept: <b>Add back</b>, beside Import above the rows, brings it back as it was (so does Reset page). Click a row to open its settings:</p>
+    <p>The <b>Scenes</b> page, in the Camera hub, has a row for each <b>scene</b>, named for what starts it (its <b>trigger</b>): resting at a campfire, <code>/sit</code>, the campfire card (not on retail), <code>/sleep</code>, <code>/dance</code>, <code>/kneel</code>, a chair, drawing your weapon, your Hearthstone, a teleport, logging out, <code>/stare</code>, Fishing, going AFK, standing still, a flight, a quest giver, auto-walking, auto-running and dying. Each row shows its camera, and small tags for anything set apart from the usual, like music or where it's turned off. Untick the box at the start of a row to turn it off for now (its settings stay). The copy button near the end of a row makes another row for the same trigger, just below, with its own camera and When: a trigger tries its rows in order (move them with the arrows) and the first whose When fits picks the camera, so one can say "the vista camera in cities, the cozy camera elsewhere". The red button deletes a row: a copy, or a whole trigger. A deleted built-in trigger starts no camera and its rows go, but its settings are kept: <b>Add back</b>, beside Import above the rows, brings it back as it was (so does Reset page). Click a row to open its settings:</p>
     <div class="cards">
       <div class="card"><h3>Camera</h3><p>Which camera the scene plays, or <b>No camera</b>. The emotes can pick the cozy, vista, fish or AFK camera; a flight only the flight camera or none. Beside it, <b>Music</b>: whether that camera starts music as it starts (see <a href="music.html">Music and sound</a>), and <b>CineMode</b>: only with <b>Start in CineMode</b> off, the camera brings CineMode on while it runs, and it ends with the camera.</p></div>
       <div class="card"><h3>When</h3><p>Where it can start: the open world, cities, dungeons, raids, PvP, grouped, or a rule of your own with <b>Edit</b>, and the roles it's for. Anywhere else it doesn't start, and stops if it's running; the UI stays faded with the camera left to you. For flights, Cities means taking off from one. <b>Wait for the Calm Timer</b>, in the Combat dropdown, holds the camera back until the Calm Timer has run out after a fight.</p></div>
@@ -180,23 +180,69 @@ table.grid tr:last-child td { border-bottom: 0 }
       <div class="card"><h3>Triggers</h3><p>What starts it, a line each; any one of them starts the scene, so one Celebrate scene can start on <code>/cheer</code>, <code>/dance</code>, leveling up and a boss kill. A trigger is an <b>emote</b> you do, a <b>spell</b> you cast (by name or spell ID), a <b>buff</b> on you, a <b>place</b> you're in (a zone or subzone; <b>Here</b> fills in where you are), a <b>moment</b> (you level up, earn an achievement, turn in a quest, your group kills a boss, you come back to life), something you <b>are</b> (mounted, swimming, flying, indoors or out, resting, stealthed, out at night), an <b>interaction</b> (at a mailbox, the bank or the auction house, the world map open, or talking to an NPC: chat, a vendor, a trainer; it ends as its window closes), or one of five <b>keys</b> (Scene key 1 to 5, set on the Keybinds page). <b>+ Add trigger</b> adds a line (up to six); the red button removes one.</p></div>
       <div class="card"><h3>Ends</h3><p>When its camera stops: when you move, when it ends (the trigger that started it: the cast, the buff, leaving the place), after a set time, or when you press its key again. Moving stops it, as it does every camera that runs while you stand still, except a scene started by being mounted, flying or swimming whose camera is a camera script: that one plays on as you go, and ends as you land or dismount. Beside it, where it comes among the other scenes: after the emotes to start with, or anywhere from first to last.</p></div>
     </div>
-    <p>A scene of your own can play the cozy, vista, fish or AFK camera, the tele camera (its spin and zoom, for the scene's time), the death camera (its orbit, as its test runs it, without lying down), one of your shots, or no camera. <b>New shot...</b> at the bottom of the list makes a shot, picks it, and opens My Shots on it. The flight, RP walk, auto-run, quest and chat cameras aren't in the list: they need you flying, walking or talking to an NPC.</p>
+    <p>A scene of your own can play the cozy, vista, fish or AFK camera, the tele camera (its spin and zoom, for the scene's time), the death camera (its orbit, as its test runs it, without lying down), a camera script of yours (see below), or no camera. The flight, RP walk, auto-run, quest and chat cameras aren't in the list: they need you flying, walking or talking to an NPC.</p>
     <p><b>Built-in scenes are grouped by camera.</b> Built-in triggers that play the same camera with the same settings are one scene: <b>Cozy moments</b> (the campfire buff, the campfire card, <code>/sleep</code>, <code>/dance</code>, <code>/kneel</code>, a chair, drawing your weapon, logging out), <b>Looking out</b> (<code>/sit</code>, <code>/stare</code>), <b>Departing</b> (your Hearthstone, a teleport), <b>Quest givers</b> (talking to a quest giver, talking about a quest) and <b>Away</b> (going AFK, and standing still once you set it to the AFK camera). A change to the scene reaches all its triggers; each keeps what it needs of its own (the campfire buffs, the seat words, a wait) on a line of its own, and its place in the priority list. Set one of them apart (another camera, say) and it becomes a row of its own again; make it the same and it rejoins.</p>
     <p><b>Built-in scenes take triggers too.</b> Open one whose camera runs while you stand still and its Triggers line shows its own triggers, then any of yours: add <code>/read</code> to Cozy moments, say. Yours end as their kind does: an emote when you move, a buff when it fades, a moment after a few seconds.</p>
     <p class="muted">A spell trigger's camera keeps going through the cast, as fishing does. On retail your own buffs can't be read in a fight, so a buff trigger waits until the fight is over.</p>
+  </section>
+
+  <section id="hub">
+    <div class="eyebrow">Camera hub</div>
+    <h2>Every camera at a glance</h2>
+    <p>The Camera hub's <b>General</b> page shows every camera, built in and yours, as an icon. Click one to open a tab with its script and the scenes that play it, and jump straight to either. Its <b>Enable Cameras</b> switch turns every camera on or off at once; the Shoulder Cam and Skyriding Cam go with it.</p>
+  </section>
+
+  <section id="scripts">
+    <div class="eyebrow">Camera hub</div>
+    <h2>Camera scripts</h2>
+    <p>Every camera is a script of small steps, on the <b>Scripts</b> page. Click the camera's name at the top to pick another from the list (every camera, built in and yours, with <b>Find a camera</b>, <b>+ New camera</b> and <b>Import</b>). Under it: <b>Copy</b>, <b>Delete</b>, <b>Share</b>, <b>Starts when</b> (the scenes set to it) and <b>Run</b>, which plays it where you stand (again to stop).</p>
+    <p>A preview window beside the settings plays the script over and over on a drawing, from above and from the side, with a bar of its steps in time: click the drawing to pause, the bar to jump there. <b>Pop out</b> lets you drag it anywhere; <b>Dock</b> puts it back.</p>
+    <div class="cards">
+      <div class="card"><h3>Script</h3><p>Its steps in order, a row each: click one to open its settings under it. The buttons below add a step after the one picked. <b>Move the camera</b>: Rotate, Tilt, Zoom, Spin, Sway, Aim at, Keep up with who's talking, Follow your turns, Undo its turns, Swing behind you. <b>Wait</b>. <b>Group steps</b>: Together (these at once) and Repeat. <b>Other</b>: Emote, Play script (another camera's steps) and End music. Then <b>When it ends</b>: the steps that run when the camera ends, whatever ends it.</p></div>
+      <div class="card"><h3>Stop rules</h3><p>What each of these does to the camera: you move the camera, a fight starts, you walk, you zoom, its trigger ends, your cast ends, a window opens, its quest window closes, its steps run out. Each can stop it where it is, run When it ends, pause then carry on, start again or carry on. <b>While it runs</b>: its <b>Edge haze</b> (a soft haze around the screen's edges; 0 turns it off) and a <b>Stop button</b> on screen.</p></div>
+    </div>
+    <p>The built-in cameras show their steps but don't change: <b>Copy</b> one first, and the copy is yours to change. A built-in one is made from your settings, and <b>Reset</b> puts ours back in place of your changes. You can have 30 scripts of your own, each up to 80 steps. The page's <b>Enable Page</b> lets scenes play your scripts, and our cameras play your changes to theirs.</p>
   </section>
 
   <section>
     <div class="eyebrow">Camera hub</div>
     <h2>My Shots</h2>
     <p>A shot is one of the cameras that run while you stand still (cozy, vista, fish or AFK) with numbers of your own for how it sways and zooms: how far it sways either side (or, for the AFK camera, how far it turns each move), how far it tilts up and down, how long each move and each pause takes, its drift, and how far and how slowly it zooms in and out. Make one on the <b>My Shots</b> page with <b>+ New shot</b>, pick its camera, and move the sliders. A number you haven't changed follows that camera's own setting; <b>Use the camera's own numbers</b> puts them all back.</p>
-    <p>Then pick the shot as a camera on the Scenes page: it's in the camera list of every row that can pick the cozy camera, your own scenes' and the built-in ones' alike. <b>Test</b> plays it where you stand. Deleting a shot puts the rows that played it back on its camera.</p>
+    <p>Then pick the shot as a camera on the Scenes page: it's in the camera list of every row that can pick the cozy camera, your own scenes' and the built-in ones' alike. <b>Test</b> plays it where you stand. Deleting a shot puts the rows that played it back on its camera. For more than sway and zoom, copy a camera's script instead (above).</p>
+  </section>
+
+  <section id="triggers">
+    <div class="eyebrow">Camera hub</div>
+    <h2>Triggers</h2>
+    <p>Everything that can start a scene, in one list, on the <b>Triggers</b> page. Show <b>All</b>, <b>Yours</b>, <b>Ours</b>, <b>Unused</b> or <b>On now</b>, grouped <b>By group</b> or <b>By kind</b>. Each row shows the trigger, what it <b>Starts when</b> and its <b>Scene</b>; click one to open its page. <b>+ New trigger</b> makes one of your own and opens it.</p>
+    <div class="cards">
+      <div class="card"><h3>Trigger Settings</h3><p>A trigger's own page, with <b>Fire now</b> (starts its scenes now, ignoring its rules), <b>Copy</b>, <b>Delete</b> and <b>Reset</b>, and four tabs. <b>Starts</b>: its name, its kind and which (an emote, a spell or buff name or ID, a zone with <b>Here</b>, a key), and an <b>Only if</b> rule (empty means always). <b>Ends</b>: the first of its endings to happen (the cast ends, the buff fades, you leave, a set time, its key pressed again, another trigger starts...), with <b>+ Add ending</b>. <b>Timing</b>: <b>Wait before starting</b>, <b>Keep going at least</b>, a <b>Cooldown</b>, a <b>Chance (%)</b>, and <b>Don't start again until it has stopped being true</b>. <b>Scenes</b>: its priority, the scenes it starts (<b>Used by</b>) and <b>Use in...</b> to add it to one.</p></div>
+      <div class="card"><h3>Priority</h3><p>The order triggers win in when two fire at once: the higher one in the list wins. Move them with the arrows; <b>Put ours back</b> puts our triggers back in their original places.</p></div>
+      <div class="card"><h3>Log</h3><p>What fired this session, what was held back and why each did or didn't play. <b>Clear</b> empties it.</p></div>
+    </div>
+    <p class="muted">Our own triggers take an Only if, timing and a priority of their own too. The page's <b>Enable Page</b> lets your triggers fire, and ours go by your priorities and settings.</p>
+  </section>
+
+  <section id="skyriding">
+    <div class="eyebrow">Special Cams</div>
+    <h2>Skyriding Cam</h2>
+    <p><b>Retail only.</b> While you skyride, the camera zooms out so you see where you're going, and each skyriding ability gets a move of its own. Landing brings it all back. Its page has a <b>Show in</b> row (Always: wherever you skyride) and a section for each moment:</p>
+    <div class="cards">
+      <div class="card"><h3>Take off</h3><p><b>Zoom out</b> as you take to the air: <b>Zoom out to</b>, <b>Over</b>, and <b>Start after</b> (how long you're in the air first, so a hop doesn't start it).</p></div>
+      <div class="card"><h3>Surge Forward · Whirling Surge</h3><p>Surge Forward pulls the camera out for a moment, then lets it drift back; Whirling Surge throws it out fast, then lets it catch up slowly. Each with how far, how long it holds and how long it takes back.</p></div>
+      <div class="card"><h3>Skyward Ascent · Second Wind</h3><p><b>Tilt up</b> as you climb, then back; <b>Zoom in and back</b>.</p></div>
+      <div class="card"><h3>Aerial Halt</h3><p><b>Swing around and zoom in</b> for a close shot of you hovering.</p></div>
+      <div class="card"><h3>Climbing · Diving · Turning</h3><p>Tilt up as you climb steeply and down toward where you dive. <b>Swing into the turn</b> when you turn hard with the keys, or <b>Follow your turns</b>: the camera holds its direction as you turn, then glides back behind you (<b>Glide back after</b>, <b>Fall behind at most</b>).</p></div>
+      <div class="card"><h3>Landing</h3><p><b>Zoom back to your distance</b>, over a time you set, after you've been landed a moment.</p></div>
+      <div class="card"><h3>Blend · CineMode</h3><p>The fastest turn, tilt and zoom, and <b>Blend into the next move</b>. <b>CineMode while skyriding</b> brings CineMode on while you skyride, if Start in CineMode is off.</p></div>
+    </div>
+    <p class="muted">It plays the built-in <b>Skyriding zoom</b> camera script, made from this page's settings. Steering with the mouse stops its turns and tilts, and scrolling the zoom yourself stops its zoom.</p>
   </section>
 
   <section>
     <div class="eyebrow">Sharing</div>
-    <h2>Share a scene or a shot</h2>
-    <p><b>Share</b> on a scene of your own (on its Name line) or on the My Shots page gives you a line of text to copy and send. Your friend pastes it into <b>Import</b>, on their Scenes page or My Shots page, sees what it holds, and adds it. A scene comes with all its triggers and the shot it plays. Where it may start (its When) stays with you: it arrives set to anywhere but battlegrounds and arenas, out of fights.</p>
+    <h2>Share a scene, a camera or a shot</h2>
+    <p><b>Share</b> on a scene of your own (on its Name line), on the Scripts page or on the My Shots page gives you a line of text to copy and send. Your friend pastes it into <b>Import</b>, on their Scenes page, in the Scripts page's camera list or on My Shots, sees what it holds, and adds it. A scene comes with all its triggers and the shot it plays. Where it may start (its When) stays with you: it arrives set to anywhere but battlegrounds and arenas, out of fights.</p>
   </section>
 
   <section>
@@ -208,12 +254,8 @@ table.grid tr:last-child td { border-bottom: 0 }
 
   <section>
     <div class="eyebrow">Tuning</div>
-    <h2>Camera Settings</h2>
-    <p>Each camera's own settings are on the <b>Camera Settings</b> page: click a camera's name to open them. Most have the same groups: <b>Rotation</b> (how it sways or sweeps), <b>Zoom</b>, <b>Height</b> and <b>Depth of field</b>. Each camera has its own <b>Reset</b>, and a <b>Test</b> button that runs it for 30 seconds where you stand.</p>
-    <ol class="steps">
-      <li><div><h3>Indoors</h3><p class="muted"><b>Limit the camera indoors</b>: inside buildings and caves the cameras zoom out less and swing less, so the camera doesn't keep pushing into walls and ceilings. You set how far they may zoom out and swing, and <b>No AFK camera sweep indoors</b> keeps the AFK camera from sweeping right round you in tight rooms.</p></div></li>
-      <li><div><h3>Depth of field</h3><p class="muted">Each camera's <b>Edge haze</b> slider adds a soft haze around the edges of the screen, as if the camera had focused on you. It needs <b>Depth of field</b> on the Visual Effects page. The Tele Cam uses the Cozy Cam's.</p></div></li>
-    </ol>
+    <h2>Each camera's settings</h2>
+    <p>A built-in camera's settings (how far it sways, zooms and tilts, how long each move takes) are its script's steps' settings: pick it on the <b>Scripts</b> page, click a step to see them, and <b>Copy</b> it to change them. <b>Run</b> tries it where you stand. The scenes that play it are on the Scenes page; open one for its When and what it needs.</p>
     <p class="muted">To keep the whole normal UI somewhere instead, use <b>Exit CineMode</b> on the CineMode page's Settings tab: see <a href="cinemode.html">CineMode and fading</a>.</p>
   </section>
 
@@ -232,6 +274,8 @@ table.grid tr:last-child td { border-bottom: 0 }
         <tr><td><b>Fish</b></td><td>The vista camera made for fishing: a narrower sway so your bobber stays in view.</td></tr>
         <tr><td><b>RP Walk</b></td><td>Sways gently from side to side while you auto-walk.</td></tr>
         <tr><td><b>Auto-run</b></td><td>A travel camera that sways from side to side and drifts in and out as you go.</td></tr>
+        <tr><td><b>Chat</b></td><td>As NPCs talk, zooms in and turns to whoever's speaking, then turns back and zooms out once they're done.</td></tr>
+        <tr><td><b>Skyriding</b></td><td>Retail only. Zooms out as you take off and gives each skyriding ability its own move. <a href="#skyriding">More above</a>.</td></tr>
         <tr><td><b>Quest</b></td><td>Eases in close and comes round to a shot past your shoulder at the quest giver.</td></tr>
         <tr><td><b>Death</b></td><td>Rises and circles slowly round your body over a cold, dimmed screen, with a song of its own.</td></tr>
       </tbody>
@@ -340,7 +384,7 @@ table.grid tr:last-child td { border-bottom: 0 }
       startsEl.appendChild(li);
     });
     document.getElementById("camEnds").textContent = cam.ends;
-    document.getElementById("camFoot").textContent = "Shown for " + (state.client === "forever" ? "WoW Forever" : "Retail") + ". Settings: Camera Settings page, " + cam.name + " Cam.";
+    document.getElementById("camFoot").textContent = "Shown for " + (state.client === "forever" ? "WoW Forever" : "Retail") + ". Its settings: its script on the Scripts page.";
   }
 
   document.querySelectorAll("#cams .seg button").forEach(function (b) {
