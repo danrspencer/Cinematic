@@ -2,15 +2,23 @@
 -- Tools/offline/run.py):
 --   python -I Tools/offline/run.py Tools/offline/castlook.lua <forever|retail> < /dev/null
 -- These bars' pick of the other kind's game look (PlateCastStyle.lua's
--- GameAs and DressAs, 2026-11-19), on the style lab's real-layout stand-in
+-- GameAs and DressAs), on the style lab's real-layout stand-in
 -- (Tools/style-lab/frames.lua), through the same sample the pages' previews
 -- use (ns.MakeCastLookSample; the game's templates aren't here, so it's the
--- drawn stand-in, which has the same part names):
---   a target bar in the nameplates' look: its border hidden, the name left
---     beside a 12 wide icon; then off: the name, its anchors and the icon as
---     they were;
---   a nameplate bar in the unit frames' look: their border on it, the name
---     centered, a 20 wide icon; then off: the border gone, all as it was.
+-- drawn stand-in, which has the same part names). The look draws its own
+-- copy of the name and icon where it wants them and fades the game's out,
+-- never moving them (since 2026-11-20: moving them failed where their place
+-- is secret, Forever's target bar):
+--   your bar and the target's in the nameplates' look: the border hidden,
+--     our name shown on the left beside our 12 wide icon, the game's name
+--     faded and still where the game put it; off: ours hidden, the game's
+--     back, nothing of it moved;
+--   a nameplate bar in the unit frames' look: their border on it, our name
+--     centered under it, our icon 20 wide; off: all as it was;
+--   the copies follow the game's words as it changes them;
+--   in a fight, secret alpha and sizes: no error;
+--   your bar's preview asks Interface Recolor for its tint;
+--   each cast tab's switch reaches only its own bars.
 -- Says PASS or FAIL per check; exits 1 on any FAIL.
 local F = dofile("Tools/style-lab/frames.lua")
 local client = ... or "forever"
@@ -47,10 +55,6 @@ local function Points(region)
 	end
 	return table.concat(list, " ")
 end
-local function Snapshot(bar)
-	return { justify = bar.Text:GetJustifyH(), text = Points(bar.Text), icon = Points(bar.Icon),
-		iconW = bar.Icon:GetWidth() }
-end
 local function UnitBorderOn(bar)
 	for _, region in ipairs({ bar:GetRegions() }) do
 		local atlas = region.GetAtlas and region:GetAtlas()
@@ -58,66 +62,66 @@ local function UnitBorderOn(bar)
 	end
 	return false
 end
+local function CopyShown(bar)
+	local copy = bar.cinematicAsText
+	return copy ~= nil and copy:IsShown()
+end
 
 Check("sample maker there", ns.MakeCastLookSample ~= nil)
 if not ns.MakeCastLookSample then os.exit(1) end
 
--- Your bar in the nameplates' game look, then back (only You has the pick for
--- now: the target's and bosses' anchors are secret on Forever, AsHeld).
-db.unitCastStyle = true
-db.plateCastOn_PLAYER, db.plateCastFrame_PLAYER, db.plateCastGameAs_PLAYER = true, false, false
-local target = ns.MakeCastLookSample(UIParent, "unit", 2, "PLAYER")
-target:Refresh()
-local before = Snapshot(target)
-db.plateCastGameAs_PLAYER = true
-target:Refresh()
-local border = target.Border
-Check("your bar: border hidden", border and border:GetAlpha() < 0.01, border and border:GetAlpha())
-Check("your bar: name on the left", target.Text:GetJustifyH() == "LEFT", target.Text:GetJustifyH())
-Check("your bar: icon 12 wide", math.abs(target.Icon:GetWidth() - 12) < 0.01, target.Icon:GetWidth())
-Check("your bar: name beside the icon", Points(target.Text):find("LEFT>", 1, true) == 1, Points(target.Text))
-db.plateCastGameAs_PLAYER = false
-target:Refresh()
-local after = Snapshot(target)
-Check("your bar back: name justify", after.justify == before.justify, after.justify .. " was " .. before.justify)
-Check("your bar back: name anchors", after.text == before.text, after.text .. " | was " .. before.text)
-Check("your bar back: icon anchors", after.icon == before.icon, after.icon .. " | was " .. before.icon)
-Check("your bar back: icon size", math.abs(after.iconW - before.iconW) < 0.01, after.iconW .. " was " .. before.iconW)
-Check("your bar back: border shown", border and border:GetAlpha() > 0.5, border and border:GetAlpha())
-
--- A saved Nameplates' pick on the target's row is held back: the game's look.
-db.plateCastOn_TARGET, db.plateCastFrame_TARGET, db.plateCastGameAs_TARGET = true, false, false
-local held = ns.MakeCastLookSample(UIParent, "unit", 1, "TARGET")
-held:Refresh()
-local heldBefore = Snapshot(held)
-db.plateCastGameAs_TARGET = true
-held:Refresh()
-local heldNow = Snapshot(held)
-Check("target: Nameplates' pick held back (name)", heldNow.justify == heldBefore.justify and heldNow.text == heldBefore.text,
-	heldNow.justify .. " " .. heldNow.text)
-Check("target: Nameplates' pick held back (border shown)", held.Border and held.Border:GetAlpha() > 0.5,
-	held.Border and held.Border:GetAlpha())
-db.plateCastGameAs_TARGET = false
+-- Your bar and the target's in the nameplates' game look, then back.
+for _, id in ipairs({ "PLAYER", "TARGET" }) do
+	local who = id == "PLAYER" and "your bar" or "target"
+	db["plateCastOn_" .. id], db["plateCastFrame_" .. id], db["plateCastGameAs_" .. id] = true, false, false
+	local bar = ns.MakeCastLookSample(UIParent, "unit", 2, id)
+	bar:Refresh()
+	local gameText, gameIcon = Points(bar.Text), Points(bar.Icon)
+	local gameJustify = bar.Text:GetJustifyH()
+	db["plateCastGameAs_" .. id] = true
+	bar:Refresh()
+	local copy, copyIcon = bar.cinematicAsText, bar.cinematicAsIcon
+	Check(who .. ": border hidden", bar.Border and bar.Border:GetAlpha() < 0.01, bar.Border and bar.Border:GetAlpha())
+	Check(who .. ": our name shown, the game's faded", CopyShown(bar) and bar.Text:GetAlpha() < 0.01,
+		tostring(CopyShown(bar)) .. " " .. bar.Text:GetAlpha())
+	Check(who .. ": our name on the left", copy and copy:GetJustifyH() == "LEFT", copy and copy:GetJustifyH())
+	Check(who .. ": our name says the spell", copy and copy:GetText() == bar.Text:GetText(), copy and copy:GetText())
+	Check(who .. ": our icon 12 wide", copyIcon and math.abs(copyIcon:GetWidth() - 12) < 0.01,
+		copyIcon and copyIcon:GetWidth())
+	Check(who .. ": our name beside our icon", copy and Points(copy):find("LEFT>", 1, true) == 1, copy and Points(copy))
+	Check(who .. ": the game's name not moved", Points(bar.Text) == gameText and Points(bar.Icon) == gameIcon
+		and bar.Text:GetJustifyH() == gameJustify, Points(bar.Text))
+	bar.Text:SetText("Frostbolt")
+	Check(who .. ": our name follows the game's words", copy and copy:GetText() == "Frostbolt", copy and copy:GetText())
+	db["plateCastGameAs_" .. id] = false
+	bar:Refresh()
+	Check(who .. " back: our name and icon hidden", not CopyShown(bar) and not (copyIcon and copyIcon:IsShown()))
+	Check(who .. " back: the game's name shown", bar.Text:GetAlpha() > 0.5, bar.Text:GetAlpha())
+	Check(who .. " back: border shown", bar.Border and bar.Border:GetAlpha() > 0.5, bar.Border and bar.Border:GetAlpha())
+	Check(who .. " back: nothing of the game's moved", Points(bar.Text) == gameText and Points(bar.Icon) == gameIcon)
+	db["plateCastOn_" .. id] = false
+end
 
 -- A nameplate bar in the unit frames' game look, then back.
-db.plateCastStyle = true
 db.plateCastOwn_PLATE, db.plateCastGameAs_PLATE = false, false
 local plate = ns.MakeCastLookSample(UIParent, "plate", 1, "PLATE")
 plate:Refresh()
-local plateBefore = Snapshot(plate)
+local plateText = Points(plate.Text)
 Check("plate: no unit border to start", not UnitBorderOn(plate))
 db.plateCastGameAs_PLATE = true
 plate:Refresh()
 Check("plate: unit frames' border on", UnitBorderOn(plate))
-Check("plate: name centered", plate.Text:GetJustifyH() == "CENTER", plate.Text:GetJustifyH())
-Check("plate: icon 20 wide", math.abs(plate.Icon:GetWidth() - 20) < 0.01, plate.Icon:GetWidth())
+Check("plate: our name centered", plate.cinematicAsText and plate.cinematicAsText:GetJustifyH() == "CENTER",
+	plate.cinematicAsText and plate.cinematicAsText:GetJustifyH())
+Check("plate: our name under the bar", plate.cinematicAsText and Points(plate.cinematicAsText):find("TOPLEFT>", 1, true) == 1,
+	plate.cinematicAsText and Points(plate.cinematicAsText))
+Check("plate: our icon 20 wide", plate.cinematicAsIcon and math.abs(plate.cinematicAsIcon:GetWidth() - 20) < 0.01,
+	plate.cinematicAsIcon and plate.cinematicAsIcon:GetWidth())
 db.plateCastGameAs_PLATE = false
 plate:Refresh()
-local plateAfter = Snapshot(plate)
 Check("plate back: border gone", not UnitBorderOn(plate))
-Check("plate back: name justify", plateAfter.justify == plateBefore.justify, plateAfter.justify)
-Check("plate back: name anchors", plateAfter.text == plateBefore.text, plateAfter.text .. " | was " .. plateBefore.text)
-Check("plate back: icon size", math.abs(plateAfter.iconW - plateBefore.iconW) < 0.01, plateAfter.iconW)
+Check("plate back: our name hidden, the game's shown", not CopyShown(plate) and plate.Text:GetAlpha() > 0.5)
+Check("plate back: the game's name not moved", Points(plate.Text) == plateText, Points(plate.Text))
 
 -- The theme's Interface Recolor on your cast bar's art (irCast): the
 -- preview's "You" bar asks for that row's tint, as your real bar has it
@@ -172,10 +176,10 @@ db.plateCastOn_PLAYER, db.plateCastFrame_PLAYER, db.plateCastGameAs_PLAYER = tru
 local mine = ns.MakeCastLookSample(UIParent, "unit", 1, "PLAYER")
 db.unitCastStyle = false
 mine:Refresh()
-Check("Cast Bars tab off: your bar keeps its look", mine.Text:GetJustifyH() == "LEFT", mine.Text:GetJustifyH())
+Check("Cast Bars tab off: your bar keeps its look", CopyShown(mine), tostring(CopyShown(mine)))
 db.unitCastStyle, db.playerCastStyle = true, false
 mine:Refresh()
-Check("Your Cast Bar tab off: your bar the game's", mine.Text:GetJustifyH() ~= "LEFT", mine.Text:GetJustifyH())
+Check("Your Cast Bar tab off: your bar the game's", not CopyShown(mine), tostring(CopyShown(mine)))
 db.playerCastStyle, db.plateCastGameAs_PLAYER = true, false
 mine:Refresh()
 

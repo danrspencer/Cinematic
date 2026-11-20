@@ -261,17 +261,9 @@ end
 -- 2026-11-19, user): the nameplates' as the unit frames' bars look in the
 -- game ("unit"), the unit frames' as the nameplates' do ("plate"). nil
 -- otherwise. Drawn on the bar by DressAs.
--- (Not on the target's and bosses' bars yet: on Forever their name's anchors
--- are secret, so it can't be moved and stayed floating under the bar with
--- its box gone (Preview Match, 2026-11-19). Their pick stays saved but the
--- bars show the game's own look till that's done: AsHeld.)
-local AS_OFFERED = { PLATE = true, PLAYER = true }
-local function AsHeld(id, db)
-	return id and not AS_OFFERED[id] and db and db["plateCastGameAs_" .. id] and true or false
-end
 local function GameAs(id, db)
 	db = db or ns.db
-	if not (id and AS_OFFERED[id] and db and db["plateCastGameAs_" .. id] and Active(id, db)) then return nil end
+	if not (id and db and db["plateCastGameAs_" .. id] and Active(id, db)) then return nil end
 	return id == "PLATE" and "unit" or "plate"
 end
 -- (Its look: the game's own settings, and which game look to dress it in.)
@@ -287,7 +279,7 @@ end
 
 -- The look a kind of bar gets now: the game's while it isn't restyled.
 local function Look(id)
-	if id and (not Active(id) or AsHeld(id, ns.db)) then
+	if id and not Active(id) then
 		return ns.StyleLook("plateCastStyle", true)
 	end
 	local as = GameAs(id)
@@ -910,7 +902,7 @@ local function Apply(bar, look, sample, sized)
 		state.timer:Hide()
 	end
 	Size(bar, state, look, sized)
-	DressAs(bar, state, look.plateCastGameAs, look.plateCastText)
+	DressAs(bar, state, look.plateCastGameAs, look)
 	state.on = true
 end
 ns.StylePlateCastBar = Apply
@@ -998,33 +990,16 @@ end
 --   plate (on a unit frame's bar): no border nor box, the icon 12x12 (under
 --     the bar at its left on retail, on it on Forever), the name beside it,
 --     the nameplates' font, a thin bright spark.
--- What it changes on the game's bar is put back when it's turned off: the
--- name's and icon's anchors (Pin), sizes, the name's justify and font, the
--- spark's size and blend.
+-- The name and icon are copies of ours (asText, asIcon), placed as that look
+-- has them, the game's own faded out under them (alpha only): the game's
+-- stay where it puts them. Moving the game's didn't work where their place
+-- is secret (Forever's target and boss bars, plates: the name stayed under
+-- the bar, 2026-11-19). The copies take the game's words and icon as it sets
+-- them (secret ones too: handed on, never read). Turned off: the copies
+-- hidden, the game's shown again by Apply, the spark's size and blend back.
 local AS_FONT = { unit = "SystemFont_Shadow_Small", plate = "SystemFont_NamePlateCastBar" }
-local function Keep(state, region)
-	if not Usable(region) then return end
-	state.asOwn = state.asOwn or {}
-	if state.asOwn[region] then return end
-	local own = {}
-	pcall(function()
-		local w, h = region:GetSize()
-		-- (Only sizes we can read: a plate's are secret in fights.)
-		if Known(w) and Known(h) then own.w, own.h = w, h end
-		if region.GetJustifyH then own.justify = region:GetJustifyH() end
-		if region.GetFontObject then own.font = region:GetFontObject() end
-		if region.GetBlendMode then own.blend = region:GetBlendMode() end
-	end)
-	state.asOwn[region] = own
-end
 local function Resize(region, w, h)
 	if Usable(region) and Known(w) and Known(h) then pcall(region.SetSize, region, w, h) end
-end
-local function SetFontAs(text, which)
-	local object = _G[AS_FONT[which]]
-	if not (object and text.SetFontObject) then return end
-	pcall(text.SetFontObject, text, object)
-	pcall(function() text:SetText(text:GetText()) end) -- (after the font: else boxes in Russian)
 end
 local function Art(bar, state, key, layer, atlas)
 	if not state[key] then
@@ -1033,31 +1008,87 @@ local function Art(bar, state, key, layer, atlas)
 	end
 	return state[key]
 end
-function DressAs(bar, state, which, showText)
+-- (Whether the game shows its icon now: hidden for yours, and on a plate for
+-- a cast that can't be interrupted.)
+local function IconShown(icon)
+	if not Usable(icon) then return false end
+	local ok, shown = pcall(icon.IsShown, icon)
+	return ok and Known(shown) and shown and true or false
+end
+local function ShowCopyIcon(state)
+	if state.asIcon then state.asIcon:SetShown(state.as ~= nil and state.asIconWanted and IconShown(state.asGameIcon)) end
+end
+-- (The copies made once, and the game's name and icon followed from then on.)
+local function Copies(bar, state)
+	if state.asText then return state.asText, state.asIcon end
+	local copy = bar:CreateFontString(nil, "OVERLAY")
+	pcall(copy.SetFontObject, copy, _G.GameFontHighlightSmall)
+	pcall(copy.SetWordWrap, copy, false)
+	local copyIcon = bar:CreateTexture(nil, "OVERLAY", nil, 1)
+	state.asText, state.asIcon = copy, copyIcon
+	-- (For the Preview Match test: our copies, read like the game's parts.)
+	bar.cinematicAsText, bar.cinematicAsIcon = copy, copyIcon
+	local text, icon = Part(bar, "Text"), Part(bar, "Icon")
+	state.asGameIcon = icon
+	if Usable(text) then
+		pcall(hooksecurefunc, text, "SetText", function(_, value)
+			if state.as then pcall(copy.SetText, copy, value) end
+		end)
+	end
+	if Usable(icon) then
+		pcall(hooksecurefunc, icon, "SetTexture", function(_, value)
+			if state.as then pcall(copyIcon.SetTexture, copyIcon, value) end
+		end)
+		for _, method in ipairs({ "Show", "Hide", "SetShown" }) do
+			pcall(hooksecurefunc, icon, method, function() ShowCopyIcon(state) end)
+		end
+	end
+	return copy, copyIcon
+end
+function DressAs(bar, state, which, look)
 	local text, icon, spark = Part(bar, "Text"), Part(bar, "Icon"), Part(bar, "Spark")
 	if state.as and state.as ~= which then
-		-- (Off, or the other one: the game's own back first.)
-		if state.asBorder then state.asBorder:Hide() end
-		if state.asBox then state.asBox:Hide() end
-		for _, region in ipairs({ text, icon }) do
-			if Usable(region) then Unpin(region) end
+		-- (Off, or the other one: ours hidden; the game's name and icon are
+		-- shown again by Apply's own pass, its spark put back here.)
+		for _, key in ipairs({ "asBorder", "asBox", "asText", "asIcon" }) do
+			if state[key] then state[key]:Hide() end
 		end
-		for region, own in pairs(state.asOwn or {}) do
-			pcall(function()
-				if own.w and own.h then region:SetSize(own.w, own.h) end
-				if own.justify and region.SetJustifyH then region:SetJustifyH(own.justify) end
-				if own.blend and region.SetBlendMode then region:SetBlendMode(own.blend) end
-				if own.font and region.SetFontObject then
-					region:SetFontObject(own.font)
-					region:SetText(region:GetText())
-				end
-			end)
+		local own = state.asSpark
+		if own and Usable(spark) then
+			if own.w and own.h then pcall(spark.SetSize, spark, own.w, own.h) end
+			if own.blend then pcall(spark.SetBlendMode, spark, own.blend) end
 		end
-		state.asOwn, state.as = nil, nil
+		state.asSpark, state.as = nil, nil
 	end
 	if not which then return end
 	state.as = which
-	for _, region in ipairs({ text, icon, spark }) do Keep(state, region) end
+	if Usable(spark) and not state.asSpark then
+		local own = {}
+		pcall(function()
+			local w, h = spark:GetSize()
+			-- (Only sizes we can read: a plate's are secret in fights.)
+			if Known(w) and Known(h) then own.w, own.h = w, h end
+			own.blend = spark:GetBlendMode()
+		end)
+		state.asSpark = own
+	end
+	local copy, copyIcon = Copies(bar, state)
+	-- (The words and icon the game has now: handed on as they are.)
+	pcall(copy.SetFontObject, copy, _G[AS_FONT[which]] or _G.GameFontHighlightSmall)
+	if Usable(text) then
+		pcall(function() copy:SetText(text:GetText()) end) -- (after the font: else boxes in Russian)
+		local ok, r, g, b = pcall(text.GetTextColor, text)
+		if ok and Known(r) and Known(g) and Known(b) and r then copy:SetTextColor(r, g, b) end
+	end
+	if Usable(icon) then pcall(function() copyIcon:SetTexture(icon:GetTexture()) end) end
+	local showText = look.plateCastText ~= false and Usable(text)
+	copy:SetShown(showText and true or false)
+	state.asIconWanted = look.plateCastIcon ~= false
+	ShowCopyIcon(state)
+	ShowPart(state, text, false)
+	ShowPart(state, icon, false)
+	copy:ClearAllPoints()
+	copyIcon:ClearAllPoints()
 	if which == "unit" then
 		local border = Art(bar, state, "asBorder", "OVERLAY", "UI-CastingBar-Frame")
 		border:ClearAllPoints()
@@ -1070,35 +1101,33 @@ function DressAs(bar, state, which, showText)
 		box:SetPoint("BOTTOMRIGHT", bar, "BOTTOMRIGHT", 0, -12)
 		-- (By the look's name tick: the name's alpha is secret on plates in
 		-- fights, Forever 2026-11-19.)
-		box:SetShown(showText and Usable(text) and true or false)
-		if Usable(text) then
-			Pin(text, { { "TOPLEFT", bar, "TOPLEFT", 0, -8 }, { "TOPRIGHT", bar, "TOPRIGHT", 0, -8 } })
-			pcall(text.SetHeight, text, 16)
-			pcall(text.SetJustifyH, text, "CENTER")
-			SetFontAs(text, which)
-		end
-		if Usable(icon) then
-			Resize(icon, 20, 20)
-			Pin(icon, { { "RIGHT", bar, "LEFT", -2, -5 } })
-		end
+		box:SetShown(showText and true or false)
+		copy:SetPoint("TOPLEFT", bar, "TOPLEFT", 0, -8)
+		copy:SetPoint("TOPRIGHT", bar, "TOPRIGHT", 0, -8)
+		copy:SetHeight(16)
+		copy:SetJustifyH("CENTER")
+		copyIcon:SetSize(20, 20)
+		copyIcon:SetPoint("RIGHT", bar, "LEFT", -2, -5)
 		Resize(spark, 6, 16)
 		if Usable(spark) then pcall(spark.SetBlendMode, spark, "BLEND") end
 	else
 		ShowPart(state, Part(bar, "Border"), false)
 		ShowPart(state, Part(bar, "TextBorder"), false)
-		if Usable(icon) then
-			Resize(icon, 12, 12)
-			if ns.isRetail then
-				Pin(icon, { { "TOPLEFT", bar, "BOTTOMLEFT", 0, -1 } })
-			else
-				Pin(icon, { { "LEFT", bar, "LEFT", 0, 0 } })
-			end
+		copyIcon:SetSize(12, 12)
+		if ns.isRetail then
+			copyIcon:SetPoint("TOPLEFT", bar, "BOTTOMLEFT", 0, -1)
+		else
+			copyIcon:SetPoint("LEFT", bar, "LEFT", 0, 0)
 		end
-		if Usable(text) then
-			Pin(text, { { "LEFT", icon, "RIGHT", 2, 0 } })
-			pcall(text.SetJustifyH, text, "LEFT")
-			SetFontAs(text, which)
+		-- (Beside the icon, or where it would be when the game shows none: yours.)
+		if copyIcon:IsShown() then
+			copy:SetPoint("LEFT", copyIcon, "RIGHT", 2, 0)
+		elseif ns.isRetail then
+			copy:SetPoint("TOPLEFT", bar, "BOTTOMLEFT", 2, -1)
+		else
+			copy:SetPoint("LEFT", bar, "LEFT", 2, 0)
 		end
+		copy:SetJustifyH("LEFT")
 		Resize(spark, 4, 12)
 		if Usable(spark) then pcall(spark.SetBlendMode, spark, "ADD") end
 	end
@@ -1985,7 +2014,7 @@ local function BuildCastPage(kit, spec)
 		local db = ns.GetDB()
 		if not (db and id) then return nil end
 		if id ~= "PLATE" and not db["plateCastOn_" .. id] then return "game" end
-		if db["plateCastGameAs_" .. id] then return AS_OFFERED[id] and "other" or "game" end
+		if db["plateCastGameAs_" .. id] then return "other" end
 		if FRAME_IDS[id] and db["plateCastFrame_" .. id] then return "frame" end
 		return db["plateCastOwn_" .. id] and "own" or "default"
 	end
@@ -2117,9 +2146,7 @@ local function BuildCastPage(kit, spec)
 				local list = {}
 				if id ~= "PLATE" then
 					list[#list + 1] = { "game", L["The game's"], L["Cinematic leaves these cast bars alone."] }
-					if AS_OFFERED[id] then
-						list[#list + 1] = { "other", L["Nameplates'"], L["The game's nameplate cast bar look."] }
-					end
+					list[#list + 1] = { "other", L["Nameplates'"], L["The game's nameplate cast bar look."] }
 				else
 					list[#list + 1] = { "other", L["Unit frames'"], L["The game's unit frame cast bar look."] }
 				end

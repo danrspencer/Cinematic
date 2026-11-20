@@ -472,10 +472,75 @@ local function KeepSettings()
 	for _, key in ipairs(KEPT_KEYS) do kept[key] = { value = db[key] } end
 	CinematicDB.previewMatchKept = kept
 end
+-- The nameplates the plate steps need, on for those steps only: enemies',
+-- friendly players' and their pets' whole plates (out of CineMode the game's
+-- own settings often show friendly units as a name only, so there was no
+-- cast bar to read: user 2026-11-20, "the nameplate steps are not working").
+-- Each one this client has; yours kept and put back (at login too).
+local PLATE_CVARS = { nameplateShowAll = "1", nameplateShowEnemies = "1", nameplateShowFriends = "1",
+	nameplateShowFriendlyPlayerPets = "1", nameplateShowFriendlyPets = "1", nameplateShowFriendlyPlayerMinions = "1",
+	nameplateShowFriendlyNPCs = "1", nameplateShowOnlyNameForFriendlyPlayerUnits = "0", nameplateShowOnlyNames = "0" }
+local function GetCVarSafe(name)
+	local get = C_CVar and C_CVar.GetCVar or GetCVar
+	local ok, value = pcall(get, name)
+	return ok and value or nil
+end
+local function SetCVarSafe(name, value)
+	local set = C_CVar and C_CVar.SetCVar or SetCVar
+	pcall(set, name, value)
+end
+-- (Never in a fight: the game blocks addons changing nameplate settings then,
+-- "blocked: UNKNOWN() (in combat)", 2026-11-20, with your pet fighting. Done
+-- as the fight ends, in order.)
+local afterFight = {}
+local fightWatch = CreateFrame("Frame")
+fightWatch:SetScript("OnEvent", function(self)
+	self:UnregisterAllEvents()
+	local list = afterFight
+	afterFight = {}
+	for _, fn in ipairs(list) do pcall(fn) end
+end)
+local function OutOfFight(fn, waiting)
+	if not InCombatLockdown() then
+		fn()
+		return
+	end
+	afterFight[#afterFight + 1] = fn
+	fightWatch:RegisterEvent("PLAYER_REGEN_ENABLED")
+	if waiting then Log(waiting) end
+end
+local function SetPlatesOn()
+	local kept = CinematicDB.previewMatchCVars or {}
+	for name, value in pairs(PLATE_CVARS) do
+		local now = GetCVarSafe(name)
+		if now ~= nil then
+			if kept[name] == nil then kept[name] = now end
+			if now ~= value then SetCVarSafe(name, value) end
+		end
+	end
+	CinematicDB.previewMatchCVars = kept
+	Log("nameplates on for the plate step")
+end
+local function PlatesOn()
+	OutOfFight(SetPlatesOn, "in a fight: nameplates go on as it ends")
+end
+local function PlatesBack()
+	local kept = CinematicDB and CinematicDB.previewMatchCVars
+	if not kept then return false end
+	OutOfFight(function()
+		local now = CinematicDB and CinematicDB.previewMatchCVars
+		if not now then return end
+		for name, value in pairs(now) do SetCVarSafe(name, value) end
+		CinematicDB.previewMatchCVars = nil
+		Log("your nameplate settings put back")
+	end, "in a fight: your nameplate settings go back as it ends")
+	return true
+end
 local function PutBack()
+	local platesBack = PlatesBack()
 	local kept = CinematicDB and CinematicDB.previewMatchKept
 	local db = DB()
-	if not (kept and db) then return false end
+	if not (kept and db) then return platesBack end
 	for key, entry in pairs(kept) do db[key] = entry.value end
 	CinematicDB.previewMatchKept = nil
 	if ns.RefreshPlateCastStyle then pcall(ns.RefreshPlateCastStyle) end
@@ -521,8 +586,19 @@ end
 local function Facts(bar)
 	if not bar then return nil end
 	local facts = {}
-	local text = bar.Text
+	-- (The look's own copy of the name when it shows (PlateCastStyle.lua's
+	-- DressAs): the game's then sits faded where the game put it.)
+	local copy = bar.cinematicAsText
+	local copyShown = copy and Plain(Call(copy, "IsShown"))
+	local text = copyShown and copy or bar.Text
+	facts.copy = copyShown and true or false
 	facts.justify = text and Plain(Call(text, "GetJustifyH"))
+	if copyShown then
+		local point, relative = Call(copy, "GetPoint", 1)
+		facts.copyPoint = Plain(point)
+		facts.copyBeside = relative ~= nil and relative == bar.cinematicAsIcon
+	end
+	facts.gameTextAlpha = bar.Text and Num(Call(bar.Text, "GetAlpha"))
 	for _, part in ipairs({ "Border", "TextBorder" }) do
 		local region = bar[part]
 		facts[part] = region and Num(Call(region, "GetAlpha")) or nil
@@ -537,7 +613,7 @@ local function Facts(bar)
 			facts.unitBorder = true
 		end
 	end
-	local icon = bar.Icon
+	local icon = copyShown and bar.cinematicAsIcon or bar.Icon
 	local w = icon and Num(Call(icon, "GetWidth"))
 	facts.iconW = w and Round(w, 1) or nil
 	return facts
@@ -627,7 +703,7 @@ local function SetOther()
 	for _, id in ipairs({ "PLAYER", "TARGET" }) do
 		db["plateCastOn_" .. id] = true
 		db["plateCastFrame_" .. id] = false
-		db["plateCastGameAs_" .. id] = true -- (held back on the target's: AsHeld, PlateCastStyle.lua)
+		db["plateCastGameAs_" .. id] = true
 	end
 	db.plateCastGameAs_PLATE = true
 	if ns.RefreshPlateCastStyle then pcall(ns.RefreshPlateCastStyle) end
@@ -645,16 +721,21 @@ local function CheckOther(which, facts, label)
 			label, tostring(facts.unitBorder), tostring(facts.justify)))
 	else
 		local hidden = (facts.Border or 0) < 0.01 and (facts.TextBorder or 0) < 0.01
-		Verdict(hidden and facts.justify == "LEFT",
-			("%s in the nameplates' game look: border and box hidden %s, name %s, icon %s wide"):format(
-			label, tostring(hidden), tostring(facts.justify), tostring(facts.iconW)))
+		-- (Its place: LEFT or TOPLEFT (under yours on retail); unreadable on the
+		-- target's bar, whose place the game keeps secret: not held against it.)
+		local placed = facts.copyPoint == nil or (type(facts.copyPoint) == "string" and facts.copyPoint:find("LEFT", 1, true) ~= nil)
+		Verdict(hidden and facts.copy and facts.justify == "LEFT" and placed,
+			("%s in the nameplates' game look: border and box hidden %s, our name shown %s at %s, %s, icon %s wide, the game's name faded to %s"):format(
+			label, tostring(hidden), tostring(facts.copy), tostring(facts.copyPoint), tostring(facts.justify),
+			tostring(facts.iconW), tostring(facts.gameTextAlpha)))
 	end
 end
 
 local function PlateStep(step)
 	run.step, run.tag = step, step == 2 and "game" or "other"
-	ns.TestPrompt(("Preview match %d/5: a NAMEPLATE must show a CAST: pull a caster mob, or stand in a city with "
-		.. "friendly plates on. Or type /cine debug previewmatch skip"):format(step), 600)
+	PlatesOn()
+	ns.TestPrompt(("Preview match %d/5: nameplates are on. Get a CAST on one: fight something with your PET out "
+		.. "(its spells count), or a caster mob. Or type /cine debug previewmatch skip"):format(step), 600)
 end
 local function CastStep(step)
 	run.step, run.tag = step, step == 1 and "game" or "other"
@@ -662,6 +743,7 @@ local function CastStep(step)
 		:format(step, step == 3 and ". Your bars are in the other kind's game look now" or ""), 600)
 end
 local function AfterPlate()
+	PlatesBack()
 	if run.step < 3 then
 		SetOther()
 		CastStep(3)
@@ -679,6 +761,15 @@ local function OnEvent(_, event, unit)
 		C_Timer.After(INTO, function()
 			if not run then return end
 			RefreshSamples()
+			-- (Your bar must be showing: a cast that ended early showed nothing,
+			-- 2026-11-20. Then another cast is waited for.)
+			local now = ReadBar(PlayerBar(), "player")
+			if not (now and now.parts and next(now.parts)) then
+				Log("your cast bar isn't showing: waiting for another cast")
+				run.step = step
+				ns.TestPrompt(("Preview match %d/5: your cast bar didn't show. Cast again, one with a longer CAST TIME (Hearthstone)."):format(step), 600)
+				return
+			end
 			local stamp = Shot(phase .. " cast")
 			Keep(phase .. ":player", ReadBar(PlayerBar(), "player"), stamp)
 			run.facts[phase .. ":player"] = Facts(PlayerBar())
@@ -702,21 +793,13 @@ local function OnEvent(_, event, unit)
 			end
 			if phase == "other" then
 				CheckOther("unit", run.facts["other:player"], "your bar")
-				-- (The target's pick is held back for now: its bar keeps the game's
-				-- look, its name centered under it, its box shown.)
-				local target = run.facts["other:target"]
-				if target then
-					Verdict(target.justify == "CENTER" and (target.TextBorder or 1) > 0.01,
-						("target bar's Nameplates' pick held back: name %s, box alpha %s"):format(tostring(target.justify),
-							tostring(target.TextBorder)))
-				else
-					Verdict(nil, "target bar held back: not read")
-				end
+				CheckOther("unit", run.facts["other:target"], "target bar")
+				CheckOther("unit", Facts(samples.unit), "target sample")
 				CheckOther("plate", Facts(samples.plate), "plate sample")
 			end
 			C_Timer.After(AFTER_SHOT, function() if run then PlateStep(step + 1) end end)
 		end)
-	elseif (run.step == 2 or run.step == 4) and type(unit) == "string" and unit:find("^nameplate") then
+	elseif (run.step == 2 or run.step == 4) and type(unit) == "string" and (unit:find("^nameplate") or unit == "pet") then
 		local phase, step = run.tag, run.step
 		run.step = step + 0.5
 		C_Timer.After(INTO, function()
@@ -748,9 +831,9 @@ end
 local function Stop()
 	if not run then return end
 	run.events:UnregisterAllEvents()
+	PutBack()
 	SetCine(run.cineWasOn)
 	if strip then strip:Hide() end
-	PutBack()
 	run = nil
 	ns.TestPrompt("Preview match stopped. Your settings are back.", 5)
 end
