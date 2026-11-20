@@ -143,13 +143,23 @@ ns.DirectorStep = ns.Profiled("Camera director", ns.DirectorStep)
 -- With the orbit asleep (no camera of ours moving the view) and no script
 -- steering with the mouse, its own frame steps it IDLE_STEP apart rather
 -- than every frame: what it looks at changes far slower than a frame, and a
--- wake (an event) still steps it on the next frame. Awake, the orbit steps it
--- every frame itself.
+-- wake (an event: a fight, death, a cast, an aura...) still steps it on the
+-- next frame. Awake, the orbit steps it every frame itself. With nothing at
+-- all happening (ns.Pace, Core.lua: the same answer the update tick goes by),
+-- QUIET_STEP apart: 30 looks a second at the cheap things and a scene 10
+-- times a second for nothing, standing still with no camera of ours moving
+-- the view; a camera starting a moment later is never noticed (2026-11-20).
+-- A fight starting steps it at once. The mouse held on the camera is still
+-- noted every frame (a cheap look): a short drag would be missed.
 local IDLE_STEP = 1 / 30 -- seconds
+local QUIET_STEP = 0.25 -- seconds
 local sinceStep = 0
 local function OnUpdate(_, elapsed)
 	sinceStep = sinceStep + (elapsed or 0)
-	if sinceStep < IDLE_STEP and not wake and ns.OrbitAsleep() and ns.PlayingCameraScript() == nil then
+	local pace = ns.Pace and ns.Pace()
+	if sinceStep < (pace and pace.quiet and QUIET_STEP or IDLE_STEP) and not wake
+		and not (pace and pace.fightStarted) and ns.OrbitAsleep() and ns.PlayingCameraScript() == nil then
+		ns.NoteHeldCameraInput()
 		return
 	end
 	sinceStep = 0

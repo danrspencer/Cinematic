@@ -12331,6 +12331,8 @@ do
 	wake.soft = { UNIT_AURA = true, UNIT_HEALTH = true, UNIT_MAXHEALTH = true, UNIT_POWER_UPDATE = true,
 		SPELL_UPDATE_COOLDOWN = true, UNIT_SPELLCAST_SUCCEEDED = true, BAG_UPDATE_DELAYED = true,
 		QUEST_LOG_UPDATE = true }
+	-- (Core.lua's idle tick: these wake it, but don't keep it at the full pace after.)
+	ns.FRAMES_SOFT_WAKE = wake.soft
 	wake:SetScript("OnEvent", function(self, event)
 		if self.soft[event] and InCombatLockdown() then return end
 		ns.framesWake = event

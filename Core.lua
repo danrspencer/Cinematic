@@ -3822,12 +3822,116 @@ local framesPass = { elapsed = 0, sinceFull = 0, fightWait = 0.125 } -- (sinceFu
 local IDLE_PASS = 0.5 -- (seconds: the frames pass out of CineMode, all settled)
 local CINE_IDLE_PASS = 0.25 -- (seconds: in CineMode, out of fights, all settled and nothing changed)
 
+-- The idle tick: with nothing moving (every frame settled, no fight, camera,
+-- move, fade or effect under way, the mouse and keys still), the tick runs
+-- only CINE seconds apart in CineMode (what brings the UI back: a tenth of a
+-- second at most) and OFF seconds apart out of it (CineMode starting, the UI
+-- fading out: within a second). Each tick asked again the same questions 33
+-- times a second for nothing: three quarters of our time standing still, an
+-- offline profile, 2026-11-20. What the frames go by (ns.framesWake, in
+-- CineMode) brings the tick at once, and a change (CineMode, a fight, an
+-- effect wanted, a woken pass) keeps the full pace until its fades are done.
+-- (One table: this file's main chunk is near Lua's 200 locals.)
+local idleTick = { CINE = 0.1, OFF = 1, MAX_STEP = 0.25, busyUntil = 0, effects = {} }
+-- (The longest fade a change can start: the UI's, music, the zone tint, the
+-- letterbox, plates. The full pace that long after one, and a little more.)
+function idleTick.Settle()
+	local db = ns.db
+	return math.max(db.fadeOutTime or 0, db.fadeInTime or 0, db.musicFadeTime or 0, db.zoneFadeTime or 0,
+		db.letterboxTime or 0, db.plateStyleFadeTime or 0, db.plateNameFadeTime or 0) + 0.5
+end
+-- The pace, one answer a frame for every loop that slows down while nothing
+-- happens (this tick, the camera director), so they all go quiet and wake
+-- together rather than each asking the same questions its own way:
+--   fight, fightStarted: in a fight; and it began this frame (the UI's combat
+--     fade in: the one thing that can't wait, so every loop runs at once);
+--   quiet: nothing moving (no fight, move, flight, death, fade, effect or
+--     change under way, the mouse and keys still, no tooltip or chat input);
+--   wait: seconds a quiet loop may wait between looks (0: not quiet): CINE in
+--     CineMode (the UI coming back), OFF out of it (CineMode starting), CINE
+--     there too with something of it kept up outside CineMode.
+local pace = { at = -1, fight = false, fightStarted = false, quiet = false, wait = 0 }
+function ns.Pace()
+	local now = GetTime()
+	if pace.at == now then return pace end
+	pace.at = now
+	local fight = (InCombatLockdown() or Flag(UnitAffectingCombat("player"))) and true or false
+	pace.fightStarted = fight and not pace.fight
+	pace.fight = fight
+	if not ns.db then
+		pace.quiet, pace.wait = false, 0
+		return pace
+	end
+	local cine = ns.lastCinematic
+	-- (The mouse moving: in CineMode it may come onto a faded frame; out of it
+	-- it matters over unit frames with parts hidden. The full pace while it moves.)
+	local unitParts = ns.AnyUnitPartHidden and ns.AnyUnitPartHidden() or false
+	local x, y = ns.CursorPosition()
+	local mouseMoved = x ~= pace.x or y ~= pace.y
+	pace.x, pace.y = x, y
+	pace.quiet = not (fight or now < idleTick.busyUntil or not ns.framesSettled or ns.framesFadeOnly
+		or (cine and ns.framesWake) or ns.previewRows or ns.layoutFadeUntil
+		or ns.fadeDemo or ns.effectsDemo or ns.plateDemo
+		or ns.playerMoving or ns.stopWhileGliding or ns.OnTaxi() or Flag(UnitIsDeadOrGhost("player"))
+		or IsModifierKeyDown() or (ns.IsChatActive and ns.IsChatActive()) or Flag(GameTooltip:IsShown())
+		or (ns.ChatCamImmersive and ns.ChatCamImmersive())
+		or (mouseMoved and (cine or unitParts)))
+	if not pace.quiet then
+		pace.wait = 0
+	elseif cine or unitParts or ns.db.outsideCinePlates then
+		pace.wait = idleTick.CINE
+	else
+		pace.wait = idleTick.OFF
+		for _, key in pairs(OUTSIDE_EFFECT) do
+			if ns.db[key] then pace.wait = idleTick.CINE break end
+		end
+	end
+	return pace
+end
+-- Seconds the tick waits now: the pace's, and TICK at least; TICK while
+-- something of the tick's own is under way.
+function idleTick.Wait(p)
+	if idleTick.wake then
+		idleTick.wake = nil
+		return TICK
+	end
+	if framesPass.scanning or switchedProfile or GetTime() < startSnapUntil or calmTrace.endedAt then
+		return TICK
+	end
+	return math.max(TICK, p.wait)
+end
+-- After a tick: a change starts the full pace for its fades.
+function idleTick.Note(now, cinematic, fight, wakeEvent)
+	local soft = wakeEvent and ns.FRAMES_SOFT_WAKE and ns.FRAMES_SOFT_WAKE[wakeEvent]
+	if cinematic ~= idleTick.cine or fight ~= idleTick.fight or (cinematic and wakeEvent and not soft) then
+		idleTick.cine, idleTick.fight = cinematic, fight
+		idleTick.busyUntil = now + idleTick.Settle()
+	end
+end
+-- After the effects are asked: one wanted on or off now starts the full pace too.
+function idleTick.NoteEffects(now, wanted)
+	local was = idleTick.effects
+	for _, key in ipairs(GRID_EFFECTS) do
+		if was[key] ~= wanted[key] then
+			was[key] = wanted[key]
+			idleTick.busyUntil = now + idleTick.Settle()
+		end
+	end
+end
+-- The most of a wait a fade takes as one step: a fade starting as an idle
+-- wait ends doesn't jump ahead by the whole wait (a slow frame still counts in full).
+function idleTick.Step(elapsed, frameElapsed)
+	return math.min(elapsed, math.max(idleTick.MAX_STEP, frameElapsed))
+end
+-- (idleTick.wake: the next tick at once, set by the CineMode key's snooze and turning it on or off.)
+
 local function OnUpdate(_, elapsed)
 	-- Every frame (with EllesmereUI, or watching with /cine debug alpha): frames
 	-- setting their own alpha are faded again before they're drawn.
 	if (ns.syncEveryFrame or ns.alphaWatch) and ns.SyncOwnAlphas then
 		Step(ns.SyncOwnAlphas)
 	end
+	local frameElapsed = elapsed -- (this frame's own, for idleTick.Step)
 	accumulated = accumulated + elapsed
 	if tickRest.cinematic ~= nil then
 		local cinematic, restElapsed = tickRest.cinematic, tickRest.elapsed
@@ -3915,6 +4019,7 @@ local function OnUpdate(_, elapsed)
 			effectWanted.letterbox = Step(ns.LetterboxExtra, effectWanted.letterbox, inCombat, cinematic)
 				or false
 		end
+		idleTick.NoteEffects(now, effectWanted)
 		Step(ns.UpdateLetterbox, effectWanted.letterbox, restElapsed)
 		-- (The vignette and weather share the tint's overlay, each fading on its own.)
 		Step(ns.UpdateTint, effectWanted.tint, restElapsed, effectWanted.vignette, effectWanted.weather)
@@ -3932,10 +4037,15 @@ local function OnUpdate(_, elapsed)
 			if changed then Step(ns.RefreshOutsideCine) end
 		end
 	end
-	if accumulated < TICK then
+	-- (A fight starting: this frame, not at the next tick: the UI's combat fade
+	-- in is the one thing that can't wait. Nothing moving otherwise: a longer
+	-- wait, ns.Pace above.)
+	local p = ns.Pace()
+	if not p.fightStarted and (accumulated < TICK or accumulated < idleTick.Wait(p)) then
 		return
 	end
 	elapsed, accumulated = accumulated, 0
+	local wakeEvent = ns.framesWake -- (for idleTick.Note: the pass below clears it)
 
 	-- A stop that came mid-glide (see PLAYER_STOPPED_MOVING): once the glide
 	-- ends, stop for real if you're not moving any more.
@@ -4067,7 +4177,8 @@ local function OnUpdate(_, elapsed)
 		pass.sinceFull = pass.sinceFull + pass.elapsed + elapsed
 		Step(ns.UpdateFadingFrames, pass.elapsed + elapsed)
 		pass.elapsed = 0
-	elseif (pass.skip and same and not woken) or idle then
+	-- (The skipped tick only at the full pace: after an idle wait, the wait was it.)
+	elseif (pass.skip and same and not woken and elapsed < idleTick.CINE) or idle then
 		pass.skip = false
 		pass.elapsed = pass.elapsed + elapsed
 	else
@@ -4089,11 +4200,12 @@ local function OnUpdate(_, elapsed)
 		ns.framesWake = nil
 		pass.skip = true
 		pass.fadeOn, pass.fight, pass.immersive, pass.x, pass.y = fadeOn, fight, immersive, x, y
-		Step(ns.UpdateFrames, fadeOn, elapsed + pass.elapsed)
+		Step(ns.UpdateFrames, fadeOn, idleTick.Step(elapsed + pass.elapsed, frameElapsed))
 		pass.elapsed, pass.sinceFull = 0, 0
 	end
-	-- (The rest next frame, see tickRest.)
-	tickRest.cinematic, tickRest.elapsed = cinematic, elapsed
+	idleTick.Note(GetTime(), cinematic, fight, wakeEvent)
+	-- (The rest next frame, see tickRest. Its fades a step at most, idleTick.Step.)
+	tickRest.cinematic, tickRest.elapsed = cinematic, idleTick.Step(elapsed, frameElapsed)
 end
 OnUpdate = ns.Profiled("Update tick", OnUpdate)
 do -- (timed for /cine debug loops)
@@ -4215,6 +4327,7 @@ end
 -- Global entry points for Bindings.xml
 function ns.SetEnabled(enabled)
 	ns.db.enabled = enabled
+	idleTick.wake = true
 	lastBusy = GetTime()
 	quickStart = enabled
 	if enabled then
@@ -4693,9 +4806,11 @@ end
 ns.GetDB = function() return ns.db end
 ns.Snooze = function(seconds)
 	snoozeUntil = GetTime() + seconds
+	idleTick.wake = true -- (out of CineMode at once, not at the next idle tick)
 end
 ns.Unsnooze = function()
 	snoozeUntil = 0
+	idleTick.wake = true
 	lastBusy = GetTime()
 	quickStart = false
 end
