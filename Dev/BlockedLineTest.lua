@@ -15,6 +15,11 @@
 --   5 page       the same at a sub-page, as /reload puts it back (PASS/FAIL)
 --   6 control    the old way (Settings.OpenToCategory from us): how many it
 --                blocks now, to show the trigger was live (INFO)
+--   7 fight      the settings key in a fight (taken down the fight path with
+--                ns.testFakeFight): with Forever's gamepad UI the window isn't
+--                opened (its left list's SetAttribute calls are blocked in a
+--                fight, once a line), it waits for the fight's end; the wait
+--                is dropped after (PASS/FAIL)
 -- Into CinematicDB.blockedLineTestLog, a verdict a step, a screenshot a step.
 -- The yellow lines in chat during it are the test's. Run again to stop it.
 -- Dev copy only.
@@ -144,6 +149,31 @@ local STEPS = {
 		local new = hook1 - hook0 + chat1 - chat0
 		run.info = run.info + 1
 		Say(("  verdict INFO: the old way blocked %d time(s) now (it blocks only while the gamepad cursor is in no focus group)"):format(new))
+		CloseSettings()
+	end },
+	{ "the settings key in a fight (fight path, faked)", function()
+		CloseSettings()
+		if ns.OptionsOpenAfterFight then ns.OptionsOpenAfterFight(true) end
+		ns.testFakeFight = true
+		local ok, err = pcall(Cinematic_ToggleSettings)
+		ns.testFakeFight = nil
+		if not ok then Say("  toggle error: " .. tostring(err)) end
+		return true
+	end, function(hook0, chat0, hook1, chat1)
+		local new = hook1 - hook0 + chat1 - chat0
+		local waits = ns.OptionsOpenAfterFight and ns.OptionsOpenAfterFight(true)
+		local shown = ns.OurSettingsShown and ns.OurSettingsShown()
+		local pad = _G.SmartNavigation ~= nil
+		Say(("  gamepad UI %s, page shown %s, waits for the fight's end %s"):format(pad and "there" or "not there",
+			tostring(shown), tostring(waits)))
+		if pad then
+			Verdict(new == 0 and not shown and waits, ("blocked lines +%d (0 wanted), window %s (closed wanted), %s"):format(
+				new, shown and "open" or "closed", waits and "waits for the fight's end" or "does NOT wait"))
+		else
+			-- (no gamepad UI: opened in the fight where the window allows it)
+			Verdict(new == 0 and (shown or waits), ("blocked lines +%d (0 wanted), %s"):format(new,
+				shown and "opened" or waits and "waits for the fight's end" or "neither opened nor waiting"))
+		end
 		CloseSettings()
 	end },
 }

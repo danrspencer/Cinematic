@@ -20055,6 +20055,13 @@ openAfterFight:SetScript("OnEvent", function(self)
 	self:UnregisterEvent("PLAYER_REGEN_ENABLED")
 	ns.OpenOptions(self.page)
 end)
+-- (BlockedLineTest.lua: whether an open waits for the fight's end, and
+-- dropping it.)
+function ns.OptionsOpenAfterFight(cancel)
+	local waiting = openAfterFight:IsEventRegistered("PLAYER_REGEN_ENABLED")
+	if cancel then openAfterFight:UnregisterEvent("PLAYER_REGEN_ENABLED") end
+	return waiting
+end
 
 -- Opens the settings, at a sub-page by name if given (else the main page).
 -- In combat Settings.OpenToCategory is blocked for addons ("Interface action
@@ -20104,9 +20111,13 @@ function ns.OpenOptions(page)
 	if page and not subpages[page] and subpages[L[page]] then page = L[page] end
 	-- (A hub's icon: opened on its own line in the left list, lit there.)
 	local line = hubName and menu.lineNow[hubName]
-	if InCombatLockdown() then
+	-- (ns.testFakeFight: BlockedLineTest.lua takes the fight path out of one.)
+	if InCombatLockdown() or ns.testFakeFight then
 		local panel = category and SettingsPanel
-		if panel and panel.SelectCategory and not panel:IsProtected() then
+		-- (Not with Forever's gamepad UI: SelectCategory redraws the left list,
+		-- whose lines set the gamepad cursor's anchor with SetAttribute, blocked
+		-- in a fight: "Interface action failed" once a line.)
+		if panel and panel.SelectCategory and not panel:IsProtected() and not _G.SmartNavigation then
 			panel:Show()
 			panel:SelectCategory(line or subpages[page] or category)
 		elseif not (panel and panel:IsShown()) then
