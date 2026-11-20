@@ -833,7 +833,7 @@ function ns.GridRow(kit, parent, labelWidth, layout, spec)
 		hover:SetSize(16, 16)
 		hover:SetPoint("CENTER", live, "CENTER")
 		hover:EnableMouse(true)
-		Tooltip(hover, L["Green: it would show in CineMode now; grey: hidden; none: rule not finished."])
+		Tooltip(hover, L["Green: it would show in CineMode now; gray: hidden; none: rule not finished."])
 	end
 
 	local always

@@ -397,11 +397,11 @@ function ns.CreateCombatTextStylePanel(kit)
 		if RestartPending() then
 			xpNote:SetTextColor(1, 0.55, 0.25)
 			xpNote:SetText(XpHidden()
-				and L["Restart the game to apply. With it hidden the game draws none of its numbers, so The game's is greyed in the rows above."]
+				and L["Restart the game to apply. With it hidden the game draws none of its numbers, so The game's is grayed out in the rows above."]
 				or L["Restart the game to apply: until then the game's floating text stays hidden."])
 		else
 			xpNote:SetTextColor(0.62, 0.62, 0.62)
-			xpNote:SetText(XpHidden() and L["With it hidden the game draws none of its numbers, so The game's is greyed in the rows above."]
+			xpNote:SetText(XpHidden() and L["With it hidden the game draws none of its numbers, so The game's is grayed out in the rows above."]
 				or L["None hides all of the game's floating text, its numbers too, and takes a game restart."])
 		end
 	end

@@ -265,7 +265,7 @@ function ns.ReportError(message, stack, caught)
 			Alert(("error: %s (/cine log for the stack)"):format(Shorten(message:match("^[^\n]*"))))
 		elseif not told and ns.Print then
 			told = true
-			ns.Print("hit a Lua error. Type /cine log to copy the details for a bug report.")
+			ns.Print(ns.L["hit a Lua error. Type /cine log to copy the details for a bug report."])
 		end
 	end
 	entry.count = entry.count + 1
