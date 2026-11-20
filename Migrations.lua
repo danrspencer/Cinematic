@@ -4950,6 +4950,84 @@ STEPS[#STEPS + 1] = function()
 	end
 end
 
+-- (Step: Cooldown Manager situations to lines, 2026-11-20.)
+STEPS[#STEPS + 1] = function()
+	-- The Cooldown Manager page's situations are gone: each row has numbered
+	-- lines of its own now (CooldownRules.lua). Each situation's own spell,
+	-- buff and bar modes become a line on that row, in the situations' order,
+	-- where the situation was used: one place as the dropdowns, more as a
+	-- rule ("(dungeon or raid) and (combat or calm)"). A situation with no
+	-- places was never used and adds nothing. Its When ready parts and Flash
+	-- go (a line's When ready uses the row's own). Here, in saved profiles and
+	-- reset points. Once.
+	if ns.db.cooldownLinesV1 then return end
+	local PLACE_ORDER = { "world", "city", "inn", "dungeon", "raid", "bg" }
+	local OWN = { { "cooldownReadyOnly", "ready" }, { "cooldownRechargeOnly", "recharge" },
+		{ "cooldownProcOnly", "proc" }, { "cooldownAlwaysShow", "always" }, { "cooldownNeverShow", "never" } }
+	local function Convert(t)
+		if type(t) ~= "table" then return end
+		local list = t.cooldownSituations
+		t.cooldownSituations = nil
+		if type(list) ~= "table" then return end
+		local function Add(name, key, show, where)
+			if key == nil or type(show) ~= "string" then return end
+			if type(t[name]) ~= "table" then t[name] = {} end
+			if type(t[name][key]) ~= "table" then t[name][key] = {} end
+			local line = { show = show }
+			for k, v in pairs(where) do line[k] = v end
+			table.insert(t[name][key], line)
+		end
+		for _, sit in ipairs(list) do
+			if type(sit) == "table" then
+				-- (A test build's situations kept their places in when.)
+				local places = type(sit.places) == "table" and sit.places or type(sit.when) == "table" and sit.when or {}
+				local combat = sit.combat
+				if combat ~= "in" and combat ~= "out" then
+					local when = type(sit.when) == "table" and sit.when or {}
+					combat = when.combat and not when.nocombat and "in" or when.nocombat and not when.combat and "out"
+						or "any"
+				end
+				local picked = {}
+				for _, place in ipairs(PLACE_ORDER) do
+					if places[place] then picked[#picked + 1] = place end
+				end
+				local where
+				if #picked == 1 then
+					where = { place = picked[1], combat = combat }
+				elseif #picked > 1 then
+					local text = "(" .. table.concat(picked, " or ") .. ")"
+					if combat == "in" then text = text .. " and (combat or calm)"
+					elseif combat == "out" then text = text .. " and nocombat" end
+					where = { cql = text }
+				end
+				local set = type(sit.set) == "table" and sit.set or {}
+				if where then
+					for _, own in ipairs(OWN) do
+						for id, on in pairs(type(set[own[1]]) == "table" and set[own[1]] or {}) do
+							if on then Add("cooldownSpellRules", id, own[2], where) end
+						end
+					end
+					for id, mode in pairs(type(set.cooldownBuffMode) == "table" and set.cooldownBuffMode or {}) do
+						Add("cooldownBuffRules", id, mode, where)
+					end
+					for group, own in pairs(type(set.cooldownGroupDefaults) == "table" and set.cooldownGroupDefaults or {}) do
+						if type(own) == "table" then Add("cooldownGroupRules", group, own.mode, where) end
+					end
+				end
+			end
+		end
+	end
+	Convert(ns.db)
+	for _, saved in pairs(ns.db.profiles or {}) do
+		if type(saved) == "table" then
+			Convert(saved)
+			Convert(saved.settings)
+		end
+	end
+	for _, point in pairs(ns.db.profileResetPoints or {}) do Convert(point) end
+	ns.db.cooldownLinesV1 = true
+end
+
 -- Runs them all, each on its own: an error is logged and reported (the
 -- addon's error net, Diagnostics.lua), and the steps after it still run.
 function ns.RunMigrations()

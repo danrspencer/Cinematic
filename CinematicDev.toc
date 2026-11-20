@@ -70,7 +70,7 @@ Support\ShamanPower.lua
 Frames.lua
 UI\QuestStandIn.lua
 UI\CooldownStacks.lua
-UI\CooldownSituations.lua
+UI\CooldownRules.lua
 Visions\HealVisionFrames.lua
 UI\Chat.lua
 UI\ChatCopy.lua
@@ -255,6 +255,7 @@ Dev\OffscreenProbe.lua
 Dev\OffscreenHoldTest.lua
 Dev\NpcNamesTest.lua
 Dev\ReadyAnyTimeTest.lua
+Dev\CdmLinesTest.lua
 Dev\DotNumbersTest.lua
 Dev\FollowHudTest.lua
 Dev\ResetTest.lua

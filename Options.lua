@@ -15999,7 +15999,9 @@ local function CreateCooldownPanel()
 	RecordKey(icons, "cooldownBuffMode")
 	RecordKey(icons, "cooldownSmartDefaults")
 	RecordKey(icons, "cooldownFlashReady")
-	RecordKey(icons, "cooldownSituations")
+	RecordKey(icons, "cooldownSpellRules")
+	RecordKey(icons, "cooldownBuffRules")
+	RecordKey(icons, "cooldownGroupRules")
 	RecordKey(icons, "cooldownRowSettings") -- (the rows' own settings, opened by their + buttons)
 	for _, key in ipairs({ "cooldownKeybinds", "cooldownFollowNumbers", "cooldownShowNumbers", "cooldownSpellNotBuff" }) do
 		RecordKey(icons, key) -- (what a bar's row has until set)
@@ -16012,7 +16014,9 @@ local function CreateCooldownPanel()
 	-- Columns: the spell, when it shows, (When ready only) its Resources, how
 	-- early it's back and Out of fights, and Flash.
 	-- (Narrower than before Out of fights came: all of it fits the page's width.)
-	local MODE_X, POWER_X, EARLY_X, ANY_X, FLASH_X, ROW_HEIGHT = 180, 324, 384, 480, 556, 26
+	-- (Two columns since 2026-11-20: When ready's Resources, Show early and Out
+	-- of fights, and Flash, went into each row's own settings, opened by its name.)
+	local MODE_X, ROW_HEIGHT = 180, 26
 	local MODE_WIDTH, GROUP_HEIGHT, GROUP_WIDTH = 135, 36, 610
 	-- Each group a tab of its own, in Heal Vision's folder look (ns.FolderTabs,
 	-- made below), only those with spells now: the picked one's spells on the
@@ -16029,14 +16033,6 @@ local function CreateCooldownPanel()
 	spellHeading:SetPoint("TOPLEFT", panelTop, "TOPLEFT", 12, -10)
 	local modeHeading = Label(icons, "GameFontNormalSmall", L["Icon shows"])
 	modeHeading:SetPoint("TOPLEFT", panelTop, "TOPLEFT", 12 + MODE_X, -10)
-	local powerHeading = Label(icons, "GameFontNormalSmall", L["Resources"])
-	powerHeading:SetPoint("TOPLEFT", panelTop, "TOPLEFT", 12 + POWER_X - 4, -10)
-	local earlyHeading = Label(icons, "GameFontNormalSmall", L["Show early"] .. " (" .. L["sec"] .. ")")
-	earlyHeading:SetPoint("TOPLEFT", panelTop, "TOPLEFT", 12 + EARLY_X, -10)
-	local anyHeading = Label(icons, "GameFontNormalSmall", L["Out of fights"])
-	anyHeading:SetPoint("TOPLEFT", panelTop, "TOPLEFT", 12 + ANY_X - 4, -10)
-	local flashHeading = Label(icons, "GameFontNormalSmall", L["Flash"])
-	flashHeading:SetPoint("TOPLEFT", panelTop, "TOPLEFT", 12 + FLASH_X - 4, -10)
 	local noSpells = Label(icons, "GameFontDisable", L["Nothing in the Cooldown Manager right now."])
 	-- (Where the spell list goes: placed under the Flash style, once it's made.)
 
@@ -16071,17 +16067,9 @@ local function CreateCooldownPanel()
 	local groupOf, groupSpells = {}, {} -- spell ID -> its group; group -> its spells (as last listed)
 	local buffGroupOf = {} -- (the same for tracked buffs and bars: a spell can be a cooldown and a buff)
 
-	-- The situation the grid shows (CooldownSituations.lua's chips, made
-	-- below): false for Default. Store: where its settings are kept, the
-	-- profile's own for Default, else the situation's (the same tables).
-	-- In a situation a row can also follow: "inherit", Same as group or Same
-	-- as Default, not set there.
-	local sits
-	local function View() return sits and sits.View() or false end
-	local function Store()
-		local sit = View()
-		return sit and sit.set or ns.GetDB()
-	end
+	-- Where the rows' settings are kept: the profile's. (Each row's numbered
+	-- lines, CooldownRules.lua, come before its own dropdown: ns.CooldownRuleLines.)
+	local function Store() return ns.GetDB() end
 
 	-- Each group's settings (db.cooldownGroupDefaults[group]: mode, power,
 	-- early = seconds or nil for the default share; a mode not set: the
@@ -16095,21 +16083,9 @@ local function CreateCooldownPanel()
 		return all[group]
 	end
 
-	-- (A row following, in a situation: its group's there, or Default's, and
-	-- what that is now.)
-	local function ModeText(mode) return ns.COOLDOWN_MODE_TEXT[mode] or tostring(mode) end
-	local function SameAs(fromGroup, mode)
-		return (fromGroup and L["Group's (%s)"] or L["Default's (%s)"]):format(ModeText(mode))
-	end
-
 	local OWN_MODES = { ready = "cooldownReadyOnly", recharge = "cooldownRechargeOnly", proc = "cooldownProcOnly",
 		always = "cooldownAlwaysShow", never = "cooldownNeverShow" }
 	local function ModeOf(spell)
-		local sit = View()
-		if sit then
-			local mode, from = ns.CooldownSitSpellMode(sit, spell, groupOf[spell])
-			return from == "spell" and mode or "inherit"
-		end
 		return (ns.CooldownSpellMode(spell, groupOf[spell], false))
 	end
 	-- (nil or "inherit": back to following its group)
@@ -16121,10 +16097,10 @@ local function CreateCooldownPanel()
 			-- group's Resources, Show early and Out of fights; the seconds box empty, the
 			-- default share, unless the group says.)
 			local group = groupOf[spell] or "other"
-			local was, _, power, earlyOn, early, anyTime = ns.CooldownSpellMode(spell, group, View())
+			local was, _, power, earlyOn, early, anyTime = ns.CooldownSpellMode(spell, group, false)
 			if was ~= "ready" then
 				earlyOn = true
-				power, early, anyTime = select(2, ns.CooldownGroupSettings(group, View()))
+				power, early, anyTime = select(2, ns.CooldownGroupSettings(group, false))
 			end
 			store.cooldownEarlyOn[spell], store.cooldownReadyEarly[spell] = earlyOn and true or nil, early
 			store.cooldownNeedsPower[spell] = power or nil
@@ -16148,13 +16124,13 @@ local function CreateCooldownPanel()
 	local SPELL = {
 		Mode = ModeOf,
 		SetMode = SetSpellMode,
-		Power = function(spell) return select(3, ns.CooldownSpellMode(spell, groupOf[spell], View())) end,
+		Power = function(spell) return select(3, ns.CooldownSpellMode(spell, groupOf[spell], false)) end,
 		SetPower = function(spell, value)
 			OwnReady(spell)
 			Store().cooldownNeedsPower[spell] = value or nil
 		end,
 		Early = function(spell)
-			local _, _, _, earlyOn, seconds = ns.CooldownSpellMode(spell, groupOf[spell], View())
+			local _, _, _, earlyOn, seconds = ns.CooldownSpellMode(spell, groupOf[spell], false)
 			return EarlyText(earlyOn, seconds)
 		end,
 		SetEarly = function(spell, seconds)
@@ -16162,28 +16138,18 @@ local function CreateCooldownPanel()
 			local store = Store()
 			store.cooldownEarlyOn[spell], store.cooldownReadyEarly[spell] = true, seconds
 		end,
-		AnyTime = function(spell) return select(6, ns.CooldownSpellMode(spell, groupOf[spell], View())) end,
+		AnyTime = function(spell) return select(6, ns.CooldownSpellMode(spell, groupOf[spell], false)) end,
 		SetAnyTime = function(spell, value)
 			OwnReady(spell)
 			Store().cooldownReadyAnyTime[spell] = value or nil
 		end,
 		Length = function(spell) return ns.CooldownLength(spell) end,
-		Flash = function(spell) return ns.CooldownSpellFlash(spell, groupOf[spell], View()) end,
+		Flash = function(spell) return ns.CooldownSpellFlash(spell, groupOf[spell]) end,
 		SetFlash = function(spell, value) Store().cooldownFlashReady[spell] = value end,
-		Inherit = function(spell)
-			local sit, group = View(), groupOf[spell]
-			local _, from = ns.CooldownSitSpellMode(sit, spell, group)
-			return SameAs(from == "group", (ns.CooldownSpellMode(spell, group, sit)))
-		end,
-		modes = MODES,
+		modes = MODES, lineKind = "spell",
 		tip = L["When this spell's icon shows in the Cooldown Manager."],
 	}
-	local function GroupMode(group)
-		local sit = View()
-		if sit then return ns.CooldownSitGroup(sit, group) or "inherit" end
-		return (ns.CooldownGroupSettings(group, false))
-	end
-	local function GroupInherit(group) return SameAs(false, (ns.CooldownGroupSettings(group, false))) end
+	local function GroupMode(group) return (ns.CooldownGroupSettings(group, false)) end
 	local GROUP = {
 		Mode = GroupMode,
 		SetMode = function(group, mode)
@@ -16214,7 +16180,7 @@ local function CreateCooldownPanel()
 			end
 		end,
 		Length = function() return nil end,
-		Flash = function(group) return ns.CooldownGroupFlash(group, View()) end,
+		Flash = function(group) return ns.CooldownGroupFlash(group) end,
 		SetFlash = function(group, value)
 			-- (Kept even when off: Smart set turns some groups' on until they're set.)
 			GroupDefaults(group).flash = value and true or false
@@ -16222,31 +16188,18 @@ local function CreateCooldownPanel()
 				Store().cooldownFlashReady[spell] = nil
 			end
 		end,
-		Inherit = GroupInherit,
-		modes = MODES,
+		modes = MODES, lineKind = "group",
 		tip = L["Sets every spell in this group to this."],
 	}
 	-- A tracked buff or bar (db.cooldownBuffMode), and their groups' settings.
 	-- (No Resources, Show early or Flash: those are for spells.)
 	local function NoValue() return nil end
 	local BUFF = {
-		Mode = function(spell)
-			local sit = View()
-			if sit then
-				local mode, from = ns.CooldownSitBuffMode(sit, spell, buffGroupOf[spell])
-				return from == "spell" and mode or "inherit"
-			end
-			return (ns.CooldownBuffMode(spell, buffGroupOf[spell], false))
-		end,
+		Mode = function(spell) return (ns.CooldownBuffMode(spell, buffGroupOf[spell], false)) end,
 		SetMode = function(spell, mode) Store().cooldownBuffMode[spell] = mode ~= "inherit" and mode or nil end,
 		Power = NoValue, SetPower = NoValue, Early = NoValue, SetEarly = NoValue, Length = NoValue,
 		AnyTime = NoValue, SetAnyTime = NoValue,
-		Inherit = function(spell)
-			local sit, group = View(), buffGroupOf[spell]
-			local _, from = ns.CooldownSitBuffMode(sit, spell, group)
-			return SameAs(from == "group", (ns.CooldownBuffMode(spell, group, sit)))
-		end,
-		modes = BUFF_MODES,
+		modes = BUFF_MODES, lineKind = "buff",
 		tip = L["When this buff's icon or bar shows."],
 	}
 	local BUFF_GROUP_ACCESS = {
@@ -16259,18 +16212,13 @@ local function CreateCooldownPanel()
 		end,
 		Power = NoValue, SetPower = NoValue, Early = NoValue, SetEarly = NoValue, Length = NoValue,
 		AnyTime = NoValue, SetAnyTime = NoValue,
-		Inherit = GroupInherit,
-		modes = BUFF_MODES,
+		modes = BUFF_MODES, lineKind = "group",
 		tip = L["Sets every buff in this group that you haven't set on its own."],
 	}
-	-- A row's choices: in a situation, following (Same as...) first.
-	local function ModesFor(access, key)
-		if not View() or key == nil then return access.modes end
-		local list = { { value = "inherit", text = access.Inherit(key) } }
-		for _, choice in ipairs(access.modes) do list[#list + 1] = choice end
-		return list
-	end
+	-- A row's choices.
+	local function ModesFor(access) return access.modes end
 
+	local ListSpells -- (made below: the rows' numbered lines list the spells again after a change)
 	local GetName = (C_Spell and C_Spell.GetSpellName) or function(id) return (GetSpellInfo(id)) end
 	local GetIcon = (C_Spell and C_Spell.GetSpellTexture) or GetSpellTexture
 	local rows, buffRows, groupRows = {}, {}, {}
@@ -16288,7 +16236,11 @@ local function CreateCooldownPanel()
 		local function Pick(mode)
 			if row.key == nil then return end
 			access.SetMode(row.key, mode)
-			Refresh() -- (a group's change shows on its spells' rows too)
+			-- (Listed again: its settings' When ready part comes and goes with
+			-- the mode; a group's change shows on its spells' rows too.)
+			ListSpells()
+			Refresh()
+			FitContentHeight(content)
 		end
 		local ok, dropdown = ns.MenuDropdown(icons)
 		if ok and dropdown and dropdown.SetupMenu then
@@ -16321,15 +16273,14 @@ local function CreateCooldownPanel()
 
 		-- Resources (When ready only): ticked, ready also means you have the
 		-- power to cast it (Maelstrom, mana...).
-		local power = Check(icons, nil, "", L["The icon also waits until you have the resources to cast it."], function(value)
+		local power = Check(icons, nil, L["Resources"], L["The icon also waits until you have the resources to cast it."], function(value)
 			if row.key ~= nil then
 				access.SetPower(row.key, value)
 				Refresh()
 			end
 		end)
 		power.Refresh = function() end -- (set by its row's)
-		power:SetPoint("LEFT", row.mode, "LEFT", POWER_X - MODE_X, 0)
-		row.power = power
+		row.power = power -- (placed in its settings: drawer.Make)
 
 		-- Seconds before it's ready that it comes back: empty for the default,
 		-- 0 for once it's ready. (Stored as before: Show early on or off, and
@@ -16339,7 +16290,6 @@ local function CreateCooldownPanel()
 		early:SetAutoFocus(false)
 		early:SetNumeric(true)
 		early:SetMaxLetters(4)
-		early:SetPoint("LEFT", row.mode, "LEFT", EARLY_X - MODE_X + 6, 0)
 		Tooltip(early, L["Seconds before it's ready that the icon comes back; empty means %d%% of its cooldown."]:format(ns.READY_EARLY * 100))
 		local function Save(self)
 			self:ClearFocus()
@@ -16371,20 +16321,19 @@ local function CreateCooldownPanel()
 
 		-- Out of fights (When ready only): ticked, out of fights it shows once
 		-- it's ready too, as in one, instead of fading.
-		local anyTime = Check(icons, nil, "", L["Out of fights, the icon also shows once it's ready."], function(value)
+		local anyTime = Check(icons, nil, L["Out of fights"], L["Out of fights, the icon also shows once it's ready."], function(value)
 			if row.key ~= nil then
 				access.SetAnyTime(row.key, value)
 				Refresh()
 			end
 		end)
 		anyTime.Refresh = function() end -- (set by its row's)
-		anyTime:SetPoint("LEFT", row.mode, "LEFT", ANY_X - MODE_X, 0)
 		row.anyTime = anyTime
 
 		-- Flash (any mode): its icon flashes for a few seconds as its cooldown
 		-- ends, shown for it even if its mode has it faded.
 		if access.SetFlash then
-			local flash = Check(icons, nil, "", L["Flashes the icon for a few seconds when the spell's " ..
+			local flash = Check(icons, nil, L["Flash"], L["Flashes the icon for a few seconds when the spell's " ..
 				"cooldown ends."], function(value)
 				if row.key ~= nil then
 					access.SetFlash(row.key, value)
@@ -16392,8 +16341,19 @@ local function CreateCooldownPanel()
 				end
 			end)
 			flash.Refresh = function() end -- (set by its row's)
-			flash:SetPoint("LEFT", row.mode, "LEFT", FLASH_X - MODE_X, 0)
-			row.flash = flash
+			row.flash = flash -- (placed in its settings: drawer.Make)
+		end
+
+		-- Whether its When ready parts count: its own dropdown When ready, or a
+		-- numbered line of its own that is.
+		function row.ReadyUsed()
+			local key = row.key
+			if key == nil then return false end
+			if access.Mode(key) == "ready" then return true end
+			for _, line in ipairs(ns.CooldownRules(access.lineKind, key) or {}) do
+				if line.show == "ready" then return true end
+			end
+			return false
 		end
 
 		-- (The page's Refresh greys the mode with the page switch, after this.)
@@ -16411,9 +16371,11 @@ local function CreateCooldownPanel()
 			end
 			local handled = Handled()
 			SetLabelFont(row.name, handled and row.font or "GameFontDisable")
-			local ready = mode == "ready" and row.shown
+			-- (In its settings: a row with none, Other's, shows neither.)
+			local inDrawer = row.shown and row.drawer ~= nil
+			local ready = inDrawer and row.ReadyUsed()
 			if row.flash then
-				row.flash:SetShown(row.shown)
+				row.flash:SetShown(inDrawer)
 				row.flash:SetChecked(access.Flash(key) and true or false)
 				row.flash:SetEnabled(handled)
 			end
@@ -16440,16 +16402,41 @@ local function CreateCooldownPanel()
 		return row
 	end
 
-	-- Puts a row at y (below the column headings) and shows it (its name x across).
-	local function PlaceRow(row, key, text, y, x)
+	-- Puts a row at y (below the column headings) and shows it (its name x
+	-- across). With numbered lines of its own (CooldownRules.lua), they go
+	-- under its name from below (y less that), and its own dropdown moves down
+	-- to the last, Everywhere else: gives the height they add.
+	local function PlaceRow(row, key, text, y, x, below)
 		row.key, row.shown = key, true
 		row.name:ClearAllPoints()
 		row.name:SetPoint("TOPLEFT", spellHeading, "BOTTOMLEFT", (x or 0) + 18, y - 5)
-		row.mode:ClearAllPoints()
-		row.mode:SetPoint("TOPLEFT", spellHeading, "BOTTOMLEFT", MODE_X, y)
 		row.name:SetText(text)
 		row.name:Show()
 		row.mode:Show()
+		if not row.lines then
+			row.lines = ns.CooldownRuleLines(icons, {
+				Tooltip = Tooltip,
+				Enabled = function() return Handled() and true or false end,
+				Changed = function()
+					ListSpells()
+					Refresh()
+					FitContentHeight(content)
+				end,
+			})
+		end
+		row.lines.Set(row.access.lineKind, key, (text:gsub("|T.-|t%s*", "")), row.access.modes)
+		local added = row.lines.Layout()
+		local top = y - (below or ROW_HEIGHT)
+		row.lines:ClearAllPoints()
+		row.lines:SetPoint("TOPLEFT", spellHeading, "BOTTOMLEFT", 0, top)
+		row.lines:SetShown(added > 0)
+		row.mode:ClearAllPoints()
+		if added > 0 then
+			row.mode:SetPoint("TOPLEFT", spellHeading, "BOTTOMLEFT", MODE_X, top - added + ns.COOLDOWN_LINE_H - 2)
+			return added
+		end
+		row.mode:SetPoint("TOPLEFT", spellHeading, "BOTTOMLEFT", MODE_X, y)
+		return 0
 	end
 
 	local function HideRow(row)
@@ -16461,6 +16448,7 @@ local function CreateCooldownPanel()
 		row.power:Hide()
 		row.anyTime:Hide()
 		if row.flash then row.flash:Hide() end
+		if row.lines then row.lines:Hide() end
 		if row.line then row.line:Hide() end
 		if row.toggle then
 			row.toggle:Hide()
@@ -16471,7 +16459,6 @@ local function CreateCooldownPanel()
 	-- A group's heading row: its name in gold, its defaults beside it, and a
 	-- rule under it across the columns; for a bar, its Close the gaps under
 	-- that (db.cooldownGroupDefaults[group].center; not set: ns.COOLDOWN_GROUP_CENTER).
-	local ListSpells
 
 	-- Each row opens (its + button, 2026-11-19) on settings of its own for its
 	-- icons (Frames.lua's ns.CooldownRowSetting): a bar's row for the whole
@@ -16479,7 +16466,8 @@ local function CreateCooldownPanel()
 	-- situation is picked (they're the same in every one), nor for spells not
 	-- in the Cooldown Manager now. (One table: this function's locals are many.)
 	-- (open: the Essential and Buffs bars' rows open to start with, 2026-11-19.)
-	local drawer = { open = { essential = true, buffs = true }, LINE = 42, COL = 290 }
+	-- (TOP: under its Add a line button, first in it since 2026-11-20.)
+	local drawer = { open = { essential = true, buffs = true }, LINE = 42, COL = 290, TOP = 40 }
 	local function GameNumbersText()
 		local ok, on = pcall(GetCVarBool, "countdownForCooldowns")
 		return (ok and on) and L["Game's option (on)"] or L["Game's option (off)"]
@@ -16521,7 +16509,7 @@ local function CreateCooldownPanel()
 		local ok, dropdown = ns.MenuDropdown(parent)
 		local control
 		if ok and dropdown and dropdown.SetupMenu then
-			dropdown:SetWidth(180)
+			dropdown:SetWidth(250) -- (wide enough for "Same as bar (Game's option (off))")
 			dropdown:SetupMenu(function(_, rootDescription)
 				for _, choice in ipairs(List()) do
 					rootDescription:CreateRadio(choice.text, function() return Get() == choice.value end,
@@ -16531,7 +16519,7 @@ local function CreateCooldownPanel()
 			control = dropdown
 		else
 			control = ns.PanelButton(parent)
-			control:SetSize(180, 22)
+			control:SetSize(250, 22)
 			control:SetScript("OnClick", function()
 				local list, now = List(), Get()
 				for i, choice in ipairs(list) do
@@ -16578,7 +16566,7 @@ local function CreateCooldownPanel()
 		local function Add(label, tip, List, Get, Set)
 			local text = Label(frame, "GameFontNormalSmall", label)
 			text:SetPoint("TOPLEFT", frame, "TOPLEFT", 12 + (count % 2) * drawer.COL,
-				-8 - math.floor(count / 2) * drawer.LINE)
+				-drawer.TOP - math.floor(count / 2) * drawer.LINE)
 			local pick = drawer.Pick(frame, List, Get, function(value)
 				Set(value)
 				drawer.Changed()
@@ -16663,7 +16651,57 @@ local function CreateCooldownPanel()
 				ns.ApplyCooldownStacks()
 			end)
 		end
-		frame:SetHeight(12 + math.ceil(count / 2) * drawer.LINE)
+		-- Add a line: a numbered line of its own above its dropdown (CooldownRules.lua).
+		local addLine = ns.PanelButton(frame)
+		addLine:SetHeight(22)
+		addLine:SetText("+ " .. L["Add a line"])
+		addLine:SetWidth((addLine:GetFontString() and addLine:GetFontString():GetStringWidth() or 80) + 24)
+		addLine.searchSkip, addLine.cdmAddLine = true, true -- (cdmAddLine: for tests)
+		addLine:SetPoint("TOPLEFT", frame, "TOPLEFT", 10, -8) -- (first: the lines go just above it)
+		Tooltip(addLine, group and L["Adds a line that sets this bar's icons in some places or fights."]
+			or L["Adds a line that sets this icon in some places or fights. Lines are read top to bottom."])
+		addLine:SetScript("OnClick", function()
+			if row.lines and row.key ~= nil then row.lines.Add() end
+		end)
+		row.addLine = addLine
+
+		-- Under its parts: Flash (a spell bar's and its spells'), then When
+		-- ready's Resources, Out of fights and Show early, only while its own
+		-- dropdown or a line of its own is When ready (row.ReadyUsed). They
+		-- were columns across the page till 2026-11-20, mostly empty.
+		local partsBottom = -drawer.TOP - math.ceil(count / 2) * drawer.LINE
+		local readyHeading = Label(frame, "GameFontNormalSmall", L["When ready"])
+		local earlyLabel = Label(frame, "GameFontHighlightSmall", L["Show early"] .. " (" .. L["sec"] .. ")")
+		for _, part in ipairs({ row.flash or false, row.power, row.anyTime, row.early }) do
+			if part then part:SetParent(frame) end
+		end
+		function row.DrawerLayout()
+			local y = partsBottom
+			if row.flash then
+				row.flash:ClearAllPoints()
+				row.flash:SetPoint("TOPLEFT", frame, "TOPLEFT", 10, y)
+				y = y - 28
+			end
+			local ready = row.ReadyUsed()
+			readyHeading:SetShown(ready)
+			earlyLabel:SetShown(ready)
+			if ready then
+				readyHeading:ClearAllPoints()
+				readyHeading:SetPoint("TOPLEFT", frame, "TOPLEFT", 12, y - 4)
+				y = y - 20
+				row.power:ClearAllPoints()
+				row.power:SetPoint("TOPLEFT", frame, "TOPLEFT", 10, y)
+				row.anyTime:ClearAllPoints()
+				row.anyTime:SetPoint("TOPLEFT", frame, "TOPLEFT", 140, y)
+				earlyLabel:ClearAllPoints()
+				earlyLabel:SetPoint("TOPLEFT", frame, "TOPLEFT", 12 + drawer.COL, y - 6)
+				row.early:ClearAllPoints()
+				row.early:SetPoint("LEFT", earlyLabel, "RIGHT", 10, 0)
+				y = y - 28
+			end
+			frame:SetHeight(-y + 6)
+		end
+		row.DrawerLayout()
 		frame:Hide()
 		row.drawer = frame
 
@@ -16723,13 +16761,13 @@ local function CreateCooldownPanel()
 	function drawer.Place(row, top, below, canOpen)
 		local toggle, frame = row.toggle, row.drawer
 		if not toggle then return 0 end
-		canOpen = canOpen and not View()
 		toggle:SetShown(canOpen and true or false)
 		if canOpen then
 			toggle:ClearAllPoints()
 			toggle:SetPoint("TOPLEFT", spellHeading, "BOTTOMLEFT", 0, top)
 			toggle.Show_()
 			if drawer.open[row.key] then
+				row.DrawerLayout() -- (its When ready part as its mode is now)
 				frame:ClearAllPoints()
 				frame:SetPoint("TOPLEFT", spellHeading, "BOTTOMLEFT", 12, below)
 				frame:Show()
@@ -16767,8 +16805,8 @@ local function CreateCooldownPanel()
 		for _, set in ipairs({
 			{ "other", "spell", { db.cooldownReadyOnly, db.cooldownRechargeOnly, db.cooldownProcOnly, db.cooldownNeverShow,
 				store.cooldownReadyOnly, store.cooldownRechargeOnly, store.cooldownProcOnly, store.cooldownAlwaysShow,
-				store.cooldownNeverShow } },
-			{ "otherbuffs", "buff", { db.cooldownBuffMode, store.cooldownBuffMode } },
+				store.cooldownNeverShow, db.cooldownSpellRules } },
+			{ "otherbuffs", "buff", { db.cooldownBuffMode, store.cooldownBuffMode, db.cooldownBuffRules } },
 		}) do
 			local group, seen, missing = set[1], listed[set[2]], {}
 			for _, own in ipairs(set[3]) do
@@ -16807,11 +16845,11 @@ local function CreateCooldownPanel()
 			ShowTab(shown)
 			local row = GroupRow(group)
 			local top = y - 4
-			PlaceRow(row, group, GROUP_NAMES[group], top)
+			local added = PlaceRow(row, group, GROUP_NAMES[group], top, nil, GROUP_HEIGHT - 2)
 			row.line:ClearAllPoints()
 			row.line:SetPoint("TOPLEFT", spellHeading, "BOTTOMLEFT", 0, y - 30)
 			row.line:Show()
-			y = y - GROUP_HEIGHT
+			y = y - GROUP_HEIGHT - added
 			y = y - drawer.Place(row, top, y + 2, true) -- (open: its settings under the rule)
 			-- (Spells not in the Cooldown Manager now have no settings of their own to open.)
 			local canOpen = group ~= "other" and group ~= "otherbuffs"
@@ -16825,9 +16863,10 @@ local function CreateCooldownPanel()
 				local okName, name = pcall(GetName, id)
 				local okIcon, icon = pcall(GetIcon, id)
 				local top = y
-				PlaceRow(spellRow, id, ("|T%s:16|t %s"):format(okIcon and icon or 134400,
-					okName and name or L["Spell %d"]:format(id)), top)
-				y = y - ROW_HEIGHT
+				local added = PlaceRow(spellRow, id, ("|T%s:16|t %s"):format(
+					okIcon and (type(icon) == "number" or type(icon) == "string") and icon or 134400,
+					okName and type(name) == "string" and name or L["Spell %d"]:format(id)), top)
+				y = y - ROW_HEIGHT - added
 				y = y - drawer.Place(spellRow, top, y + 2, canOpen)
 			end
 		end
@@ -16842,10 +16881,6 @@ local function CreateCooldownPanel()
 		noSpells:SetShown(group == nil)
 		spellHeading:SetShown(group ~= nil)
 		modeHeading:SetShown(group ~= nil)
-		earlyHeading:SetShown(group ~= nil)
-		powerHeading:SetShown(group ~= nil)
-		anyHeading:SetShown(group ~= nil)
-		flashHeading:SetShown(group ~= nil and not BUFF_GROUP[group])
 	end
 	-- The tabs (their full names their tips).
 	local tabList = {}
@@ -16867,7 +16902,7 @@ local function CreateCooldownPanel()
 	end
 	-- (Under Smart set and the Flash style: placed below, once they're made.)
 	panel:SetPoint("TOPLEFT", panelTop, "TOPLEFT")
-	panel:SetWidth(FLASH_X + 64) -- (room for Flash's tick)
+	panel:SetWidth(620) -- (room for a numbered line's delete: CooldownRules.lua)
 	base:SetPoint("TOPLEFT", panelTop, "TOPLEFT")
 
 	-- Smart set (db.cooldownSmartDefaults): until you set a bar's mode, its
@@ -16888,7 +16923,8 @@ local function CreateCooldownPanel()
 	local SPELL_ICON_KEYS = { cooldownReadyOnly = true, cooldownReadyEarly = true, cooldownEarlyOn = true,
 		cooldownRechargeOnly = true, cooldownNeedsPower = true, cooldownReadyAnyTime = true, cooldownGroupDefaults = true,
 		cooldownProcOnly = true, cooldownAlwaysShow = true, cooldownNeverShow = true, cooldownBuffMode = true, cooldownSmartDefaults = true,
-		cooldownFlashReady = true, cooldownSituations = true, cooldownRowSettings = true }
+		cooldownFlashReady = true, cooldownSpellRules = true, cooldownBuffRules = true, cooldownGroupRules = true,
+		cooldownRowSettings = true }
 	local iconsReset = ns.PanelButton(settings)
 	iconsReset:SetSize(60, 20)
 	iconsReset:SetPoint("LEFT", smartSet.Text or smartSet.text or smartSet, "RIGHT", 16, 0)
@@ -16955,22 +16991,9 @@ local function CreateCooldownPanel()
 	for _, control in ipairs({ flashGlow, flashGrow, flashBorder, flashTime }) do
 		GreyUnless(control, function(db) return db.handleCooldowns end)
 	end
-	-- The situations (CooldownSituations.lua): Default and each of yours, the
-	-- picked one's When under them; the spells' tabs show the picked one's settings.
-	sits = ns.BuildCooldownSituations(icons, {
-		width = GROUP_WIDTH,
-		Tooltip = Tooltip,
-		Enabled = function() return Handled() end,
-		Changed = function()
-			ListSpells()
-			Refresh()
-			FitContentHeight(content)
-		end,
-	})
-	sits:SetPoint("TOPLEFT", readyHeader, "BOTTOMLEFT", 0, -12)
-	controls[#controls + 1] = sits
-	panelTop:SetPoint("TOPLEFT", sits, "BOTTOMLEFT", 0, -12 - height)
-	noSpells:SetPoint("TOPLEFT", sits, "BOTTOMLEFT", 0, -16)
+	-- (Situations gone, 2026-11-20: each row has numbered lines of its own.)
+	panelTop:SetPoint("TOPLEFT", readyHeader, "BOTTOMLEFT", 0, -12 - height)
+	noSpells:SetPoint("TOPLEFT", readyHeader, "BOTTOMLEFT", 0, -16)
 
 	-- The game's Cooldown Manager turned on while the page is open (the hub's
 	-- off card, ns.GAME_OPTION_PAGES, had it hidden): its spells read again,
@@ -16990,6 +17013,17 @@ local function CreateCooldownPanel()
 			end)
 		end
 	end)
+
+	-- (For Dev/CdmLinesTest.lua: the CDM part, on a bar's tab, its spells listed.)
+	ns.CdmShowSpells = function(group)
+		PickPart(1)
+		if group then SectionState.Save(picked, group) end
+		ListSpells()
+		Refresh()
+		FitContentHeight(content)
+	end
+	-- (For tests: the spell rows and the bars' rows, and the open settings.)
+	ns.CdmPageRows = function() return rows, groupRows, drawer.open end
 
 	local shown = PageShown(Refresh, content)
 	canvas:SetScript("OnShow", function()

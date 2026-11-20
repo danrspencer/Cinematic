@@ -47,7 +47,9 @@ def compiler():
 
 def lua_files():
     out = subprocess.run(["git", "ls-files", "*.lua"], cwd=ROOT, capture_output=True, text=True).stdout.split()
-    return [f for f in out if not f.startswith(("Tools/", "Locales/", ".claude/"))]
+    # (A file deleted but not committed yet is still listed: skipped.)
+    return [f for f in out if not f.startswith(("Tools/", "Locales/", ".claude/"))
+            and os.path.exists(os.path.join(ROOT, f))]
 
 
 def room(compiles, source):

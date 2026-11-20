@@ -45,6 +45,7 @@ OFFLINE_TESTS = [
     ("loops off with their page off; page building waits for /cine debug loops", "Tools/offline/loopsoff.lua"),
     ("tooltip Location row (zone apart from class)", "Tools/offline/tooltiplocation.lua"),
     ("You level up card: Cheer, Congratulate, Commend", "Tools/offline/youlevelemotes.lua"),
+    ("Cooldown Manager numbered lines (in place of situations)", "Tools/offline/cooldownlines.lua"),
     ("cast bar other kind's look, forever", "Tools/offline/castlook.lua", "forever"),
     ("cast bar other kind's look, retail", "Tools/offline/castlook.lua", "retail"),
     ("Mac notch covers, forever", "Tools/offline/notchgap.lua", "forever"),

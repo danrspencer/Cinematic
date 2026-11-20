@@ -9176,19 +9176,15 @@ function ns.CooldownGroupCentered(group)
 	return ns.COOLDOWN_GROUP_CENTER[group] or false
 end
 
--- Each of these asks the Cooldown Manager page's situation in use first
--- (CooldownSituations.lua): sit nil for that one (ns.cooldownSitNow), a
--- situation for its own (the page's grid), false for Default's alone. What
--- the situation doesn't set goes by Default's.
+-- Each of these asks the row's numbered lines first (CooldownRules.lua: the
+-- first that fits where you are now), then its own dropdown. own false: the
+-- dropdown alone, as the page shows it, no lines.
 
 -- A group's mode, and its Resources and Show early seconds (nil: the default share).
-function ns.CooldownGroupSettings(group, sit)
-	if sit == nil then sit = ns.cooldownSitNow end
-	if sit then
-		local mode, power, early, anyTime = ns.CooldownSitGroup(sit, group)
-		if mode then return mode, power, early, anyTime end
-	end
+function ns.CooldownGroupSettings(group, own)
 	local set = ns.db.cooldownGroupDefaults[group] or NO_DEFAULTS
+	local ruled = own ~= false and ns.CooldownRuleMode("group", group)
+	if ruled then return ruled, set.power, set.early, set.anyTime end
 	-- (The built-in mode stands aside for an addon placing the icons itself,
 	-- EllesmereUI: a faded icon left an empty slot in its bar.)
 	local builtIn = not set.mode and not ns.FeatureYieldedTo("cooldownDefaults") and ns.COOLDOWN_GROUP_MODES[group]
@@ -9213,17 +9209,23 @@ function ns.CdmTabOff(group)
 	local key = group and ns.CDM_TABS[group]
 	return key ~= nil and not ns.PageOn(key)
 end
-function ns.CooldownSpellMode(id, group, sit)
+function ns.CooldownSpellMode(id, group, own)
 	if ns.CdmTabOff(group) then return "always", false end
-	if sit == nil then sit = ns.cooldownSitNow end
-	if sit then
-		local mode, from, power, earlyOn, seconds, anyTime = ns.CooldownSitSpellMode(sit, id, group)
-		if mode then return mode, from == "spell", power, earlyOn, seconds, anyTime end
-	end
 	local db = ns.db
+	-- (A line of its own that fits: When ready with its own When ready parts
+	-- if it has them, else its bar's.)
+	local ruled = own ~= false and ns.CooldownRuleMode("spell", id)
 	if not (db.cooldownReadyOnly[id] or db.cooldownRechargeOnly[id] or db.cooldownProcOnly[id]
 		or db.cooldownAlwaysShow[id] or db.cooldownNeverShow[id]) then
 		id = ns.BaseSpell(id)
+	end
+	if ruled then
+		if ruled == "ready" and not db.cooldownReadyOnly[id] then
+			local set = db.cooldownGroupDefaults[group or "other"] or NO_DEFAULTS
+			return "ready", true, set.power, true, set.early, set.anyTime
+		end
+		return ruled, true, db.cooldownNeedsPower[id], db.cooldownEarlyOn[id], db.cooldownReadyEarly[id],
+			db.cooldownReadyAnyTime[id]
 	end
 	if db.cooldownReadyOnly[id] then
 		return "ready", true, db.cooldownNeedsPower[id], db.cooldownEarlyOn[id], db.cooldownReadyEarly[id],
@@ -9237,9 +9239,14 @@ function ns.CooldownSpellMode(id, group, sit)
 	elseif db.cooldownNeverShow[id] then
 		return "never", true
 	end
+	-- (Its bar's lines next: one that fits decides for it.)
+	local set = db.cooldownGroupDefaults[group or "other"]
+	local barRuled = own ~= false and ns.CooldownRuleMode("group", group or "other")
+	if barRuled then
+		return barRuled, false, set and set.power, true, set and set.early, set and set.anyTime
+	end
 	-- (Its group's mode not set: the Smart set pick, if it has one and Smart
 	-- set's ticked, and no addon places the icons itself: see CooldownGroupSettings.)
-	local set = db.cooldownGroupDefaults[group or "other"]
 	if db.cooldownSmartDefaults and not (set and set.mode) and ns.COOLDOWN_SMART_GROUPS[group]
 		and not ns.FeatureYieldedTo("cooldownDefaults") then
 		local pick = ns.SmartCooldownMode(id)
@@ -9257,28 +9264,20 @@ end
 -- out of fights, "hidden"), and whether it's its own (db.cooldownBuffMode,
 -- by spell ID), else its group's. Each goes by whether you're in a fight
 -- only: the game keeps your buffs secret in fights.
-function ns.CooldownBuffMode(id, group, sit)
+function ns.CooldownBuffMode(id, group, ownOnly)
 	if ns.CdmTabOff(group) then return "always", false end
-	if sit == nil then sit = ns.cooldownSitNow end
-	if sit then
-		local mode, from = ns.CooldownSitBuffMode(sit, id, group)
-		if mode then return mode, from == "spell" end
-	end
+	local ruled = ownOnly ~= false and ns.CooldownRuleMode("buff", id)
+	if ruled then return ruled, true end
 	local own = ns.db.cooldownBuffMode[id] or ns.db.cooldownBuffMode[ns.BaseSpell(id)]
 	if own then return own, true end
-	return (ns.CooldownGroupSettings(group or "buffs", false)), false
+	return (ns.CooldownGroupSettings(group or "buffs", ownOnly)), false
 end
 
 -- The bars whose Flash is on with Smart set ticked, until their group's Flash is set.
 ns.COOLDOWN_SMART_FLASH = { utility = true }
 
 -- Whether a group's Flash is on: set (true or false), else Smart set's pick.
-function ns.CooldownGroupFlash(group, sit)
-	if sit == nil then sit = ns.cooldownSitNow end
-	if sit then
-		local flash = ns.CooldownSitGroupFlash(sit, group)
-		if flash ~= nil then return flash end
-	end
+function ns.CooldownGroupFlash(group)
 	local set = ns.db.cooldownGroupDefaults[group or "other"]
 	if set and set.flash ~= nil then return set.flash end
 	return (ns.db.cooldownSmartDefaults and ns.COOLDOWN_SMART_FLASH[group]) or false
@@ -9286,17 +9285,12 @@ end
 
 -- Whether a spell's icon flashes as its cooldown ends (the page's Flash):
 -- set on its own (db.cooldownFlashReady, true or false), else its group's.
-function ns.CooldownSpellFlash(id, group, sit)
-	if sit == nil then sit = ns.cooldownSitNow end
-	if sit then
-		local flash = ns.CooldownSitSpellFlash(sit, id, group)
-		if flash ~= nil then return flash end
-	end
+function ns.CooldownSpellFlash(id, group)
 	local own = ns.db.cooldownFlashReady
 	local value = own[id]
 	if value == nil then value = own[ns.BaseSpell(id)] end
 	if value ~= nil then return value end
-	return ns.CooldownGroupFlash(group, false)
+	return ns.CooldownGroupFlash(group)
 end
 
 -- Whether a tracked buff's or bar's icon shows in a mode.
@@ -10824,11 +10818,9 @@ function UpdateReadyOnly(elapsed, now)
 		pace.due, pace.fight = nil, fight
 		readyCheckedAt = now
 		wipe(readyTargets)
-		-- (The page's situation in use, looked at again each pass: CooldownSituations.lua.)
-		ns.UpdateCooldownSituation()
 		local db = ns.db
 		local any = next(db.cooldownReadyOnly) or next(db.cooldownRechargeOnly) or next(db.cooldownProcOnly)
-			or next(db.cooldownNeverShow) or next(db.cooldownBuffMode) or ns.CooldownRowAny("notBuff") or ns.cooldownSitNow
+			or next(db.cooldownNeverShow) or next(db.cooldownBuffMode) or ns.CooldownRowAny("notBuff") or ns.CooldownRulesAny()
 		for _, group in pairs(ns.COOLDOWN_BAR_GROUPS) do
 			any = any or ns.CooldownGroupSettings(group) ~= "always"
 		end
@@ -11138,7 +11130,7 @@ function ns.ReportCooldowns()
 		if Secret(value) then return "secret" end
 		return type(value) == "number" and ("%.1f"):format(value) or tostring(value)
 	end
-	ns.ReportCooldownSituations()
+	ns.ReportCooldownRules()
 	EachCooldownFrame(function(entry, frame)
 		any = true
 		local ok, shown = pcall(frame.IsShown, frame)

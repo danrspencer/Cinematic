@@ -176,12 +176,12 @@ local function LogOurSettings()
 		table.sort(out)
 		return #out > 0 and table.concat(out, ",") or "none"
 	end
-	Log(("ours: page on %s (own switch %s, Timers %s), cooldowns row on %s, EUI CDM support %s, close the gaps left to %s, smart %s, situation %s")
+	Log(("ours: page on %s (own switch %s, Timers %s), cooldowns row on %s, EUI CDM support %s, close the gaps left to %s, smart %s, numbered lines %s")
 		:format(tostring(ns.PageOn("handleCooldowns") and true or false), tostring(db.handleCooldowns),
 			tostring(db.handleTimers), tostring(ns.IsCombatShowOn("cooldowns")),
 			tostring(ns.AddonSupportOn("EllesmereUICooldownManager")),
 			tostring(ns.FeatureYieldedTo("cooldownCenter") or "nobody"), tostring(db.cooldownSmartDefaults),
-			tostring(ns.cooldownSitNow or "Default")))
+			tostring(ns.CooldownRulesAny())))
 	for group in pairs({ essential = true, utility = true }) do
 		local mode, power, early, anyTime = ns.CooldownGroupSettings(group)
 		Log(("ours: %s group mode %s (power %s, early %s, out of fights %s)"):format(group, tostring(mode),

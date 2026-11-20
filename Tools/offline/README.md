@@ -31,6 +31,13 @@ looks for `lua5.1`. (Don't put a `lua5.1` stand-in on PATH: Windows asks what to
   `/cine debug loops` measures, so their time isn't counted as the loops'.
 - `cardwait.lua`: the Rested card waiting while DaylightUI's zone title shows (ns.AddCardWait), on a clock of its
   own: waits, shows once the title's gone, gives up after 8 s, no wait without the title or for other cards.
+- `cooldownnever.lua`: the Cooldown Manager page's Icon shows Never. The mode read back for a spell, its override, a
+  group and a numbered line; the dropdown and profiles carry it; and the ready pass fades a Never icon (a
+  flashing one too) while an Always one beside it stays.
+- `cooldownlines.lua`: the Cooldown Manager page's numbered lines (UI/CooldownRules.lua, in place of situations).
+  Fitting by Combat and Location or CQL, top to bottom with the row's own dropdown last, a spell's lines before its
+  bar's, buffs too; a typed rule back into the dropdowns; the page's block adding, moving, deleting and lighting the
+  line in use; the ready pass fading by a line; and the update turning saved situations into lines.
 - `notchgap.lua <forever|retail>`: full-screen effects (ns.CoverWorld: letterbox, tint edges, death screen, Focus,
   low health, teleport) reach up over a Mac's camera notch strip above UIParent, at UI scale 1 and 0.8, and come back
   down when it goes.

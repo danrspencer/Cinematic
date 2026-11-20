@@ -7,8 +7,8 @@
 --   1 When ready, Out of fights off: faded
 --   2 Out of fights ticked: shown
 --   3 the spell follows its group, the group When ready with Out of fights: shown
---   4 Default off, a situation for every place with it on: shown
---   5 a situation for every place but this one with it on: faded (Default's)
+--   4 its own off, a numbered line Always | Anywhere above it: shown
+--   5 a line Always for another place than this one: faded (its own dropdown's)
 --   6 the page opens on the spell icons: a screenshot of the new column
 --   7 you cast the spell: faded while it recharges, even with Out of fights
 -- The page's spell settings are put back at the end, and at the next login
@@ -19,7 +19,7 @@ local _, ns = ...
 local SETUP, STEP, WAIT = 8, 12, 4 -- seconds: the first step, each one's, before it acts
 local KEYS = { "cooldownReadyOnly", "cooldownReadyEarly", "cooldownEarlyOn", "cooldownRechargeOnly",
 	"cooldownNeedsPower", "cooldownReadyAnyTime", "cooldownProcOnly", "cooldownAlwaysShow", "cooldownNeverShow",
-	"cooldownGroupDefaults", "cooldownSituations" }
+	"cooldownGroupDefaults", "cooldownSpellRules" }
 local PLACES = { "world", "city", "inn", "dungeon", "raid", "bg" }
 
 local run -- { at, steps, step, notes, spell, group, name }
@@ -64,10 +64,10 @@ restorer:SetScript("OnEvent", function()
 	end
 end)
 
--- The spell on its own: When ready, Out of fights as asked; nothing in a situation.
+-- The spell on its own: When ready, Out of fights as asked; no numbered lines.
 local function OwnReady(anyTime)
 	local db, id = ns.db, run.spell
-	db.cooldownSituations = {}
+	db.cooldownSpellRules[id] = nil
 	db.cooldownRechargeOnly[id], db.cooldownProcOnly[id], db.cooldownAlwaysShow[id] = nil, nil, nil
 	db.cooldownNeverShow[id] = nil
 	db.cooldownReadyOnly[id] = true
@@ -76,21 +76,19 @@ local function OwnReady(anyTime)
 	db.cooldownReadyAnyTime[id] = anyTime or nil
 	ns.readyPace.due = true
 end
--- A situation with the spell When ready and Out of fights, in places.
-local function Situation(places)
+-- A numbered line on the spell, Always in place ("any": anywhere), its own
+-- dropdown When ready with Out of fights off under it.
+local function Line(place)
 	OwnReady(false)
-	local set = {}
-	for _, key in ipairs(ns.COOLDOWN_SIT_KEYS) do set[key] = {} end
-	set.cooldownReadyOnly[run.spell], set.cooldownEarlyOn[run.spell] = true, true
-	set.cooldownReadyAnyTime[run.spell] = true
-	ns.db.cooldownSituations = { { name = "Out of fights test", places = places, combat = "any", set = set } }
+	ns.db.cooldownSpellRules[run.spell] = { { show = "always", combat = "any", place = place } }
+	ns.CooldownRuleFactsStale()
 	ns.readyPace.due = true
 end
--- The place you're in now (the one a situation with it alone fits).
+-- The place you're in now (the one a line with it alone fits).
 local function PlaceNow()
 	local facts = ns.RuleFactsNow()
 	for _, place in ipairs(PLACES) do
-		if ns.CooldownSitFits({ places = { [place] = true }, combat = "any" }, facts) then return place end
+		if ns.CooldownRuleFits({ show = "always", place = place, combat = "any" }, facts) then return place end
 	end
 end
 
@@ -101,10 +99,10 @@ local function Look(expect)
 	local shown = probe.target ~= 0 and probe.alpha > 0.9
 	local faded = probe.target == 0 and probe.alpha < 0.5
 	local pass = (expect == "shown" and shown) or (expect == "faded" and faded)
-	return ("%s (want %s): alpha %.2f, target %s, left %s, mode %s, out of fights %s, situation %s, in combat %s"):format(
+	return ("%s (want %s): alpha %.2f, target %s, left %s, mode %s, out of fights %s, line %s, in combat %s"):format(
 		pass and "PASS" or "FAIL", expect, probe.alpha, tostring(probe.target),
 		probe.left and ("%.1f"):format(probe.left) or "can't tell", tostring(probe.mode), tostring(probe.anyTime),
-		ns.cooldownSitNow and ns.cooldownSitNow.name or "Default", tostring(InCombatLockdown()))
+		tostring(select(2, ns.CooldownRuleMode("spell", run.spell)) or "own"), tostring(InCombatLockdown()))
 end
 
 local STEPS = {
@@ -126,22 +124,17 @@ local STEPS = {
 			return "group " .. run.group .. " When ready, out of fights on"
 		end,
 		after = function() return Look("shown") end },
-	{ key = "sitOn", say = "%d/%d: A situation for every place has Out of fights on for %s (Default off). It should show.",
+	{ key = "lineOn", say = "%d/%d: %s gets a line 1, Always | Anywhere, over its own When ready. It should show.",
 		act = function()
-			local places = {}
-			for _, place in ipairs(PLACES) do places[place] = true end
-			Situation(places)
-			return "situation everywhere, Default off"
+			Line("any")
+			return "line Always anywhere, own When ready out of fights off"
 		end,
 		after = function() return Look("shown") end },
-	{ key = "sitOff", say = "%d/%d: The situation leaves out where you are now, so Default's (off) is used: %s fades.",
+	{ key = "lineOff", say = "%d/%d: The line is for another place than here, so its own dropdown decides: %s fades.",
 		act = function()
-			local now, places = PlaceNow(), {}
-			for _, place in ipairs(PLACES) do
-				if place ~= now then places[place] = true end
-			end
-			Situation(places)
-			return "situation everywhere but " .. tostring(now)
+			local now = PlaceNow()
+			Line(now == "city" and "raid" or "city")
+			return "line Always for another place than " .. tostring(now)
 		end,
 		after = function() return Look("faded") end },
 	{ key = "page", say = "%d/%d: The Cooldown Manager page opens on the spell icons, %s on When ready with Out of " ..

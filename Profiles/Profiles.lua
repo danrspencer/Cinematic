@@ -43,7 +43,7 @@ local PROFILE_TABLES = {
 	"cooldownReadyAnyTime",
 	"cooldownGroupDefaults", "cooldownProcOnly", "cooldownAlwaysShow", "cooldownNeverShow", "cooldownBuffMode",
 	"cooldownFlashReady",
-	"cooldownSituations", -- (the Cooldown Manager page's situations: CooldownSituations.lua)
+	"cooldownSpellRules", "cooldownBuffRules", "cooldownGroupRules", -- (the rows' numbered lines: CooldownRules.lua)
 	"frameRules", -- (none in any built-in profile: each starts with no Custom Visibility Rules)
 	"rowFollow", -- (the grids' Follow: which row each follows; Cinema's mana bar its resource bar)
 	"tankHide", "healerHide", "damageHide", -- (the old Roles column's: loaded to become rules, ns.MigrateRoleHides)

@@ -78,7 +78,7 @@ Support\ShamanPower.lua
 Frames.lua
 UI\QuestStandIn.lua
 UI\CooldownStacks.lua
-UI\CooldownSituations.lua
+UI\CooldownRules.lua
 Visions\HealVisionFrames.lua
 UI\Chat.lua
 UI\ChatCopy.lua

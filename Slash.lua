@@ -1959,6 +1959,10 @@ local function HandleSlash(msg)
 		-- (Dev copy: whether "Use the spell's cooldown, not its buff" hides DoT numbers, DotNumbersTest.lua.)
 		if ns.DotNumbersTest then ns.DotNumbersTest()
 		else ns.Print("/cine debug dotnumbers is in the dev copy only.") end
+	elseif cmd == "debug" and arg:find("^cdmlines") then
+		-- (Dev copy: one run checking the Cooldown Manager's numbered lines, CdmLinesTest.lua.)
+		if ns.CdmLinesTest then ns.CdmLinesTest(arg:match("^cdmlines%s*(.*)$"))
+		else ns.Print("/cine debug cdmlines is in the dev copy only.") end
 	elseif cmd == "debug" and arg:find("^anytime") then
 		-- (Dev copy: one run checking the Cooldown Manager's When ready > Out of fights, ReadyAnyTimeTest.lua.)
 		if ns.ReadyAnyTimeTest then ns.ReadyAnyTimeTest(arg:match("^anytime%s*(.*)$"))

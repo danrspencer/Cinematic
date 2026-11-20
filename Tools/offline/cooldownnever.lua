@@ -2,8 +2,8 @@
 --   python -I Tools/offline/run.py Tools/offline/cooldownnever.lua < /dev/null
 -- The Cooldown Manager page's Icon shows Never (2026-11-20: hide a spell's
 -- icon, Corruption): the mode read back for a spell on its own, under its
--- base spell, for a whole group and in a situation; the page's dropdown and
--- the profile and situation key lists have it; and on the stand-in game a
+-- base spell, for a whole group and on a numbered line; the page's dropdown and
+-- the profile key list have it; and on the stand-in game a
 -- Never icon in the Essential bar is faded by the ready pass, a flashing one
 -- too, while an Always one next to it isn't. Says PASS or FAIL per check.
 -- (Optional first argument: another .toc to load, to run it on older code.)
@@ -49,17 +49,12 @@ Check("group set Never: its spells read never",
 	(ns.CooldownSpellMode(NEVER, "utility", false)) == "never")
 db.cooldownGroupDefaults.utility = nil
 
--- In a situation.
-local sit = { name = "T", places = {}, combat = "any", set = {} }
-for _, key in ipairs(ns.COOLDOWN_SIT_KEYS) do sit.set[key] = {} end
-Check("situations keep cooldownNeverShow", sit.set.cooldownNeverShow ~= nil)
-if sit.set.cooldownNeverShow then
-	sit.set.cooldownNeverShow[NEVER] = true
-	local sitMode, from = ns.CooldownSitSpellMode(sit, NEVER, "essential")
-	Check("situation's Never reads never, from the spell", sitMode == "never" and from == "spell", sitMode)
-	Check("situation's Never used by CooldownSpellMode", (ns.CooldownSpellMode(NEVER, "essential", sit)) == "never")
-end
-Check("mode text Never", ns.COOLDOWN_MODE_TEXT.never == ns.L["Never"])
+-- On a numbered line (situations gone, 2026-11-20: CooldownRules.lua).
+db.cooldownSpellRules[NEVER] = { { show = "never", combat = "any", place = "any" } }
+ns.CooldownRuleFactsStale()
+Check("a line's Never used by CooldownSpellMode", (ns.CooldownSpellMode(NEVER, "essential")) == "never")
+Check("the page's own dropdown left as it was", (ns.CooldownSpellMode(NEVER, "essential", false)) ~= "never")
+db.cooldownSpellRules[NEVER] = nil
 
 -- The page's dropdown: the Options.lua MODES list (by its source, the page's locals).
 local src = io.open("Options.lua"):read("*a")
