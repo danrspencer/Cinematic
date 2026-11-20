@@ -1568,8 +1568,18 @@ markerWatcher:RegisterEvent("RAID_TARGET_UPDATE")
 -- (And plates given a unit: a stand-in shows on plates that are up, which
 -- otherwise aren't looked at.)
 markerWatcher:RegisterEvent("NAME_PLATE_UNIT_ADDED")
+-- (One refresh a frame however many plates came up in it: each walks them
+-- all. The flag is on our own frame: this file's main chunk is at Lua's
+-- 200-local cap.)
+function markerWatcher.RefreshOnce()
+	markerWatcher.pending = nil
+	RefreshKeptMarkers()
+end
 markerWatcher:SetScript("OnEvent", function(_, event)
-	C_Timer.After(0, RefreshKeptMarkers)
+	if not markerWatcher.pending then
+		markerWatcher.pending = true
+		C_Timer.After(0, markerWatcher.RefreshOnce)
+	end
 	-- (Markers of your own, out of a group: see MarkersHiddenOverFriends.)
 	if event == "RAID_TARGET_UPDATE" and not ns.InGroup() then
 		markerWatcher.solo = true
