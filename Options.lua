@@ -16366,19 +16366,7 @@ local function CreateCooldownPanel()
 		anyTime.Refresh = function() end -- (set by its row's)
 		row.anyTime = anyTime
 
-		-- Flash (any mode): its icon flashes for a few seconds as its cooldown
-		-- ends, shown for it even if its mode has it faded.
-		if access.SetFlash then
-			local flash = Check(icons, nil, L["Flash"], L["Flashes the icon for a few seconds when the spell's " ..
-				"cooldown ends."], function(value)
-				if row.key ~= nil then
-					access.SetFlash(row.key, value)
-					Refresh()
-				end
-			end)
-			flash.Refresh = function() end -- (set by its row's)
-			row.flash = flash -- (placed in its settings: drawer.Make)
-		end
+		-- (Flash: a dropdown in its settings, drawer.Make, since 2026-11-20.)
 
 		-- Whether its When ready parts count: its own dropdown When ready, or a
 		-- numbered line of its own that is.
@@ -16410,11 +16398,6 @@ local function CreateCooldownPanel()
 			-- (In its settings: a row with none, Other's, shows neither.)
 			local inDrawer = row.shown and row.drawer ~= nil
 			local ready = inDrawer and row.ReadyUsed()
-			if row.flash then
-				row.flash:SetShown(inDrawer)
-				row.flash:SetChecked(access.Flash(key) and true or false)
-				row.flash:SetEnabled(handled)
-			end
 			row.early:SetShown(ready)
 			row.power:SetShown(ready)
 			row.anyTime:SetShown(ready)
@@ -16485,7 +16468,6 @@ local function CreateCooldownPanel()
 		row.earlyText:Hide()
 		row.power:Hide()
 		row.anyTime:Hide()
-		if row.flash then row.flash:Hide() end
 		if row.lines then row.lines:Hide() end
 		if row.sep then row.sep:Hide() end
 		if row.line then row.line:Hide() end
@@ -16615,6 +16597,7 @@ local function CreateCooldownPanel()
 			pick:SetPoint("TOPLEFT", text, "BOTTOMLEFT", -2, -3)
 			Tooltip(pick, tip)
 			count = count + 1
+			return pick, count -- (its cell, from 1: odd ones on the left)
 		end
 		local function GroupOf()
 			if group then return group end
@@ -16692,6 +16675,32 @@ local function CreateCooldownPanel()
 				ns.ApplyCooldownStacks()
 			end)
 		end
+		-- Flash (a spell bar's and its spells'): its icon flashes for a few
+		-- seconds as its cooldown ends, shown even if its mode has it faded. A
+		-- dropdown in the grid like its neighbors (a tick till 2026-11-20, odd
+		-- among them); a spell's follows its bar's till set, and says so.
+		local access = row.access
+		if access.SetFlash then
+			local function OnOff(on) return on and L["On"] or L["Off"] end
+			row.flashPick, row.flashCell = Add(L["Flash"], L["Flashes the icon for a few seconds when the spell's cooldown ends."], function()
+				local list = {}
+				if not group then
+					list[1] = { value = "inherit", text = L["Same as bar (%s)"]:format(OnOff(ns.CooldownGroupFlash(GroupOf()))) }
+				end
+				list[#list + 1] = { value = true, text = L["On"] }
+				list[#list + 1] = { value = false, text = L["Off"] }
+				return list
+			end, function()
+				if group then return ns.CooldownGroupFlash(group) and true or false end
+				local own = row.key ~= nil and ns.GetDB().cooldownFlashReady[row.key]
+				if own == nil or row.key == nil then return "inherit" end
+				return own
+			end, function(value)
+				if row.key == nil then return end
+				if value == "inherit" then value = nil end
+				access.SetFlash(row.key, value)
+			end)
+		end
 		-- Add a line: a numbered line of its own above its dropdown (CooldownRules.lua).
 		local addLine = ns.PanelButton(frame)
 		addLine:SetHeight(22)
@@ -16713,16 +16722,9 @@ local function CreateCooldownPanel()
 		local partsBottom = -drawer.TOP - math.ceil(count / 2) * drawer.LINE
 		local readyHeading = Label(frame, "GameFontNormalSmall", L["When ready"])
 		local earlyLabel = Label(frame, "GameFontHighlightSmall", L["Show early"] .. " (" .. L["sec"] .. ")")
-		for _, part in ipairs({ row.flash or false, row.power, row.anyTime, row.early }) do
-			if part then part:SetParent(frame) end
-		end
+		for _, part in ipairs({ row.power, row.anyTime, row.early }) do part:SetParent(frame) end
 		function row.DrawerLayout()
 			local y = partsBottom
-			if row.flash then
-				row.flash:ClearAllPoints()
-				row.flash:SetPoint("TOPLEFT", frame, "TOPLEFT", 10, y)
-				y = y - 28
-			end
 			local ready = row.ReadyUsed()
 			readyHeading:SetShown(ready)
 			earlyLabel:SetShown(ready)

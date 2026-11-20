@@ -239,7 +239,22 @@ do
 	if row then
 		Check("its When ready parts and Flash sit in its settings", row.power:GetParent() == row.drawer
 			and row.anyTime:GetParent() == row.drawer and row.early:GetParent() == row.drawer
-			and row.flash and row.flash:GetParent() == row.drawer)
+			and row.flashPick and row.flashPick:GetParent() == row.drawer)
+		-- (Flash a dropdown in the grid like its neighbors, the fourth: the bottom right.)
+		Check("Flash is a dropdown, no tick", row.flash == nil and row.flashPick.cdmRowPick == true)
+		Check("Flash in the bottom-right cell", row.flashCell == 4, tostring(row.flashCell))
+		-- (Its choices step round on the stand-in, which has no menu dropdown: Same as bar, On, Off.)
+		local click = not row.flashPick.SetupMenu and row.flashPick:GetScript("OnClick")
+		if click then
+			db.cooldownFlashReady[IMMOLATE] = nil
+			local seen = {}
+			for i = 1, 3 do
+				click(row.flashPick)
+				seen[i] = tostring(db.cooldownFlashReady[IMMOLATE])
+			end
+			Check("Flash steps Same as bar -> On -> Off -> Same as bar", table.concat(seen, " ") == "true false nil",
+				table.concat(seen, " "))
+		end
 		local src = io.open("Options.lua"):read("*a")
 		Check("no column headings left", not src:find("powerHeading") and not src:find("flashHeading"))
 		-- (The stand-in keeps no sizes or points: they're caught as set.)
@@ -258,7 +273,7 @@ do
 		db.cooldownAlwaysShow[IMMOLATE] = true
 		Show()
 		local short, plainTop = height, modeTop
-		Check("Always: no When ready part", not row.power:IsShown() and row.flash:IsShown(), tostring(row.power:IsShown()))
+		Check("Always: no When ready part", not row.power:IsShown(), tostring(row.power:IsShown()))
 		db.cooldownAlwaysShow[IMMOLATE] = nil
 		db.cooldownReadyOnly[IMMOLATE] = true
 		Show()

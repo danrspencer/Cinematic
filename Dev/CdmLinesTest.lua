@@ -188,9 +188,9 @@ local STEPS = {
 			local rows = ns.CdmPageRows and ns.CdmPageRows() or {}
 			for _, row in ipairs(rows) do
 				if row.key == run.spell then
-					local inside = row.power:GetParent() == row.drawer and row.flash and row.flash:GetParent() == row.drawer
+					local inside = row.power:GetParent() == row.drawer and row.flashPick and row.flashPick:GetParent() == row.drawer
 					local seen = row.drawer:IsVisible() and row.power:IsVisible() and row.early:IsVisible()
-						and row.anyTime:IsVisible() and row.flash:IsVisible()
+						and row.anyTime:IsVisible() and row.flashPick:IsVisible()
 					return ("%s: settings open %s, Flash and When ready parts inside %s and shown %s, height %d"):format(
 						(inside and seen) and "PASS" or "FAIL", tostring(row.drawer:IsVisible()), tostring(inside),
 						tostring(seen), math.floor(row.drawer:GetHeight() + 0.5))
