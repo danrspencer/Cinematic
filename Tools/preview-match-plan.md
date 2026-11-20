@@ -1,7 +1,33 @@
 # Preview Match plan (2026-11-19)
 
 Goal: every Style preview looks like the frame it stands for, on the client the player is on, and a test proves it
-before every release. Status: plan only, nothing built.
+before every release.
+
+## Status (2026-11-20): cast bars done, the rest to go
+
+Done and committed (ee3d51f, b86a5bf, 5c584c6, d17755a2, 289d3821; in v2.1.17 up to 5c584c6):
+- Step 0 on both clients (`/cine debug templates`, results below).
+- The match test, `/cine debug previewmatch` (Dev/PreviewMatch.lua): runs itself, never opens Settings (on Forever
+  that prints the gamepad "Interface action failed" line), builds its own preview bars with the pages' code
+  (`ns.MakeCastLookSample`), reads your bar, your target's (target yourself) and a nameplate's (it turns nameplates on
+  for those steps, out of fights only; your pet's casts count), compares part by part incl. colors, verdicts, screenshots.
+  `python Tools/preview-match/build.py [forever|retail]` makes the side-by-side page.
+- Cast bar previews built from the game's templates (PlateCastStyle.lua `MakeSample`, SAMPLE_KINDS). Forever scores:
+  63/62/53 before, 100/100/100 after (your bar / target / nameplate).
+- Your cast bar has its own tab, Unit Frames > Your Cast Bar (`playerCastStyle`), user's pick.
+- The "other kind's game look" pick (GameAs/DressAs): our own copy of name and icon, the game's faded (moving the
+  game's failed where their place is secret). Offline: Tools/offline/castlook.lua (42 checks, in prerelease).
+- Your bar's preview tinted by Interface Recolor's irCast like the real one (`ns.RecolorLike`).
+
+Known gaps on cast bars:
+- The can't-be-interrupted shield stays the game's in the other look (not moved with our copied icon).
+- The nameplate preview's icon and name are placed by client (retail under the bar, Forever on it); the game decides
+  by the player's nameplate style. Plate anchors read in game would settle it.
+- Retail: no match test run yet.
+
+Next (the order of work below, step 4): unit frames (copy, B), nameplates, action bars (A), raid (B), tooltip (A),
+personal resource, roll window, quest item, combat text. Each: add pairs to the match test first, get a baseline,
+then fix.
 
 ## What's wrong today
 
