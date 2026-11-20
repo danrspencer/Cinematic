@@ -11,6 +11,8 @@
 --   5 the page opens on the spell's bar: its lines drawn under it (a screenshot)
 --   6 its own settings open, its dropdown When ready: Flash, then When ready's
 --     Resources, Out of fights and Show early in them (no columns across the page)
+--   7 Open CDM clicked: the game's Cooldown Manager window opens and the button
+--     says Close CDM; clicked again, it shuts and says Open CDM
 -- CineMode is off while it runs (back after). Stand still out of a fight; nothing to press. Its settings are put back at
 -- the end, and at the next login if a /reload cuts it short. Into
 -- CinematicDB.cdmLinesLog. Dev copy only (CinematicDev.toc).
@@ -193,6 +195,39 @@ local STEPS = {
 				end
 			end
 			return "FAIL: the spell's row isn't on the page"
+		end },
+	{ key = "button", say = "%d/%d: Open CDM is clicked: the game's Cooldown Manager opens and the button says " ..
+		"Close CDM. Then it's clicked again: it shuts and says Open CDM. Just watch.",
+		act = function()
+			if InCombatLockdown() then return "in a fight: not opened" end
+			local ok, err = pcall(ns.OpenOptionsAt, "Cooldown Manager")
+			if not ok then return "couldn't open: " .. tostring(err) end
+			C_Timer.After(0.3, function()
+				if not (run and ns.CdmPageRows) then return end
+				pcall(ns.CdmShowSpells, run.group)
+				local button = select(4, ns.CdmPageRows())
+				if not button then return end
+				button:Click()
+				local window = _G.CooldownViewerSettings
+				run.buttonOpen = ("%s, window %s"):format(tostring(button:GetText()),
+					tostring(window and window:IsShown()))
+			end)
+			return "page opened, Open CDM clicked"
+		end,
+		after = function()
+			local button = ns.CdmPageRows and select(4, ns.CdmPageRows())
+			if not button then return "FAIL: no Open CDM button" end
+			local opened = run.buttonOpen or "not clicked"
+			local openOk = opened:find("^" .. ns.L["Close CDM"] .. ", window true") ~= nil
+			-- (Clicked again a moment later: the screenshot, taken now, shows Close CDM.)
+			C_Timer.After(1, function()
+				button:Click()
+				local window = _G.CooldownViewerSettings
+				local shutOk = button:GetText() == ns.L["Open CDM"] and not (window and window:IsShown())
+				Say(("  %s: clicked again: %s, window %s"):format(shutOk and "PASS" or "FAIL",
+					tostring(button:GetText()), tostring(window and window:IsShown())))
+			end)
+			return ("%s: after the click: %s"):format(openOk and "PASS" or "FAIL", opened)
 		end },
 }
 

@@ -198,6 +198,18 @@ Check("Edit opens the editor on the line", opened ~= nil and opened.Text() == ""
 if opened then
 	opened.Close("raid and not group")
 	Check("closing it keeps the CQL on the line", db.cooldownSpellRules[CORRUPTION][1].cql == "raid and not group")
+	-- (A rule line: its words in a box in place of the two dropdowns; clicking the box edits it.)
+	block.Layout()
+	local line1
+	for _, child in ipairs({ block:GetChildren() }) do
+		if child.n == 1 then line1 = child end
+	end
+	Check("rule shown in its box, dropdowns hidden", line1 and line1.cqlBox:IsShown() and not line1.combat:IsShown())
+	opened = nil
+	ns.OpenRuleEditor = function(target) opened = target end
+	if line1 then line1.cqlBox:GetScript("OnClick")(line1.cqlBox) end
+	ns.OpenRuleEditor = openEditor
+	Check("clicking the box opens the editor on its rule", opened ~= nil and opened.Text() == "raid and not group")
 end
 db.cooldownSpellRules[CORRUPTION] = nil
 
@@ -210,6 +222,7 @@ do
 	local okShow, err = pcall(ns.CdmShowSpells, "essential")
 	Check("page lists the Essential bar", okShow, err)
 	local rows, groupRows, open = ns.CdmPageRows()
+	Check("every row's settings start shut", next(open) == nil)
 	local row = rows[1]
 	Check("Immolate's row made", row ~= nil and row.key == IMMOLATE, row and row.key)
 	if row then
@@ -255,6 +268,31 @@ do
 		open[IMMOLATE] = nil
 	end
 	Check("bar row has its settings", groupRows.essential and groupRows.essential.drawer ~= nil)
+	-- Open CDM: says Close CDM while the game's Cooldown Manager window is
+	-- open, however it was opened, and Open CDM once it's shut (2026-11-20).
+	local button = select(4, ns.CdmPageRows())
+	Check("Open CDM button found", button ~= nil)
+	if button then
+		local window = CreateFrame("Frame", "CooldownViewerSettings")
+		window:Hide()
+		button:GetScript("OnShow")(button)
+		Check("shut: Open CDM", button:GetText() == ns.L["Open CDM"], button:GetText())
+		button:GetScript("OnClick")(button) -- (no Click on the stand-in)
+		Check("clicked: window open, Close CDM", window:IsShown() and button:GetText() == ns.L["Close CDM"],
+			button:GetText())
+		button:GetScript("OnClick")(button) -- (no Click on the stand-in)
+		Check("clicked again: shut, Open CDM", not window:IsShown() and button:GetText() == ns.L["Open CDM"],
+			button:GetText())
+		window:Show()
+		local onShow = window:GetScript("OnShow")
+		if onShow then onShow(window) end
+		Check("opened elsewhere: Close CDM", button:GetText() == ns.L["Close CDM"], button:GetText())
+		window:Hide()
+		local onHide = window:GetScript("OnHide")
+		if onHide then onHide(window) end
+		Check("closed elsewhere: Open CDM", button:GetText() == ns.L["Open CDM"], button:GetText())
+		_G.CooldownViewerSettings = nil
+	end
 	ns.CooldownManagerSpells = cdmSpells
 end
 

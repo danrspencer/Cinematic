@@ -15878,8 +15878,17 @@ local function CreateCooldownPanel()
 	-- level with the heading. Made to stand out, 2026-11-19: the Cooldown
 	-- Manager's own icon before its name, a gold edge all round, brighter
 	-- under the pointer; plain, it read as a label.)
+	-- (As wide as the longer of its two names, Open CDM and Close CDM, so it
+	-- doesn't jump as it changes.)
 	local gameText = gameCDM.GetFontString and gameCDM:GetFontString()
-	local gameWidth = gameText and gameText:GetStringWidth() or 0
+	local function TextWidth()
+		local width = gameText and gameText:GetStringWidth()
+		return type(width) == "number" and width or 0
+	end
+	local gameWidth = TextWidth()
+	gameCDM:SetText(L["Close CDM"])
+	gameWidth = math.max(gameWidth, TextWidth())
+	gameCDM:SetText(L["Open CDM"])
 	gameCDM:SetSize(math.max(gameWidth + 52, 100), 26)
 	gameCDM:SetPoint("RIGHT", icons, "TOPLEFT", 618, -6)
 	do
@@ -15982,8 +15991,30 @@ local function CreateCooldownPanel()
 		gameCDMOpened = false
 		if frame and frame:IsShown() then pcall(frame.Hide, frame) end
 	end)
+	-- Its name as the game's window is: Close CDM while it's open, however it
+	-- was opened (here, the game's own button, a key), Open CDM once it's shut
+	-- (2026-11-20, the user's ask: the Running button rule).
+	local labelHooked = false
+	local function GameCDMLabel()
+		local frame = GameCDMFrame()
+		local open = frame and frame:IsShown() and true or false
+		gameCDM:SetText(open and L["Close CDM"] or L["Open CDM"])
+		gameCDM.liveTip = open and L["Closes the game's own Cooldown Manager settings."]
+			or L["Opens the game's own Cooldown Manager settings."]
+		gameCDM.cdmOpen = open -- (for tests)
+		if frame and not labelHooked then
+			labelHooked = true
+			frame:HookScript("OnShow", GameCDMLabel)
+			frame:HookScript("OnHide", GameCDMLabel)
+		end
+	end
+	gameCDM:HookScript("OnClick", GameCDMLabel)
 	gameCDM:SetScript("OnShow", function(self)
-		if not GameCDMFrame() then self:Hide() end
+		if not GameCDMFrame() then
+			self:Hide()
+			return
+		end
+		GameCDMLabel()
 	end)
 	RecordKey(icons, "cooldownReadyOnly") -- (for the page's Reset)
 	RecordKey(icons, "cooldownReadyEarly")
@@ -16466,7 +16497,9 @@ local function CreateCooldownPanel()
 	-- in the Cooldown Manager now. (One table: this function's locals are many.)
 	-- (open: the Essential and Buffs bars' rows open to start with, 2026-11-19.)
 	-- (TOP: under its Add a line button, first in it since 2026-11-20.)
-	local drawer = { open = { essential = true, buffs = true }, LINE = 42, COL = 290, TOP = 40 }
+	-- (Every row's settings start shut: the Essential and Buffs bars' started
+	-- open, 2026-11-19, till the user asked otherwise, 2026-11-20.)
+	local drawer = { open = {}, LINE = 42, COL = 290, TOP = 40 }
 	local function GameNumbersText()
 		local ok, on = pcall(GetCVarBool, "countdownForCooldowns")
 		return (ok and on) and L["Game's option (on)"] or L["Game's option (off)"]
@@ -16785,7 +16818,8 @@ local function CreateCooldownPanel()
 			end
 			row.line = icons:CreateTexture(nil, "ARTWORK")
 			row.line:SetColorTexture(1, 0.82, 0, 0.4)
-			row.line:SetSize(GROUP_WIDTH, 1)
+			-- (Inside the panel: as wide as the bar, it ran past its right edge, 2026-11-20.)
+			row.line:SetSize(GROUP_WIDTH - 14, 1)
 			-- (Its Close the gaps: in its settings, opened by its name, since 2026-11-19.)
 			groupRows[group] = row
 		end
@@ -16862,7 +16896,9 @@ local function CreateCooldownPanel()
 				local okName, name = pcall(GetName, id)
 				local okIcon, icon = pcall(GetIcon, id)
 				local top = y
-				local added = PlaceRow(spellRow, id, ("|T%s:16|t %s"):format(
+				-- (Its icon cropped to its picture, 5..59 of 64: whole, a spell icon
+				-- shows the frame drawn into its texture, 2026-11-20.)
+				local added = PlaceRow(spellRow, id, ("|T%s:16:16:0:0:64:64:5:59:5:59|t %s"):format(
 					okIcon and (type(icon) == "number" or type(icon) == "string") and icon or 134400,
 					okName and type(name) == "string" and name or L["Spell %d"]:format(id)), top)
 				y = y - ROW_HEIGHT - added
@@ -17022,7 +17058,7 @@ local function CreateCooldownPanel()
 		FitContentHeight(content)
 	end
 	-- (For tests: the spell rows and the bars' rows, and the open settings.)
-	ns.CdmPageRows = function() return rows, groupRows, drawer.open end
+	ns.CdmPageRows = function() return rows, groupRows, drawer.open, gameCDM end
 
 	local shown = PageShown(Refresh, content)
 	canvas:SetScript("OnShow", function()

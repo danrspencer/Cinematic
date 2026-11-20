@@ -220,7 +220,10 @@ local LINE_H = ns.COOLDOWN_LINE_H
 -- (Icon shows under the row's own dropdown, the page's Icon shows column, so
 -- every line's reads down one column; its where to the right, where the
 -- Everywhere else line has the row's When ready parts.)
-local NUM_X, ELSE_X, SHOW_X, SHOW_W, BAR_X = 18, 38, 180, 135, 318
+local SHOW_X, SHOW_W, BAR_X = 180, 135, 318
+-- (Each number right beside its dropdown, its lit band from there: under the
+-- spell's name, 160 px off, they read as loose, 2026-11-20.)
+local NUM_R, LIT_X = SHOW_X - 6, SHOW_X - 26
 -- (Move up and down stacked in one column, and the delete inside the panel:
 -- side by side the arrows were hard to tell apart and pushed the delete past
 -- the panel's edge, cut off, in the first game test, 2026-11-20.)
@@ -299,11 +302,12 @@ function ns.CooldownRuleLines(parent, opts)
 		local function Rule() return List()[line.n] end
 		-- (The one that fits where you are now: lit gold, as the mockup had it.)
 		line.lit = line:CreateTexture(nil, "BACKGROUND")
-		line.lit:SetPoint("TOPLEFT", NUM_X - 4, -1)
+		line.lit:SetPoint("TOPLEFT", LIT_X, -1)
 		line.lit:SetPoint("BOTTOMRIGHT", 0, 1)
 		line.lit:SetColorTexture(1, 0.82, 0, 0.14)
 		line.number = line:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-		line.number:SetPoint("LEFT", line, "LEFT", NUM_X, 0)
+		line.number:SetPoint("RIGHT", line, "LEFT", NUM_R, 0)
+		line.number:SetJustifyH("RIGHT")
 		line.show = Pick(line, SHOW_W, function() return modes end,
 			function() local rule = Rule() return rule and rule.show end,
 			function(value)
@@ -335,11 +339,36 @@ function ns.CooldownRuleLines(parent, opts)
 		line.place:SetPoint("LEFT", line, "LEFT", PLACE_X, 0)
 		Tip(line.place, L["Where this line fits."])
 		-- (A rule of its own: its words, colored as the editor has them, in place of the two.)
-		line.cql = line:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-		line.cql:SetPoint("LEFT", line, "LEFT", COMBAT_X + 4, 0)
-		line.cql:SetWidth(PLACE_X + PLACE_W - COMBAT_X - 4)
+		-- (In a box as wide as the two, so the line reads as even as the
+		-- others; clicked, it edits, as Edit does. Loose small text, it looked
+		-- unfinished, 2026-11-20.)
+		line.cqlBox = CreateFrame("Button", nil, line)
+		line.cqlBox:SetSize(PLACE_X + PLACE_W - COMBAT_X, 22)
+		line.cqlBox:SetPoint("LEFT", line, "LEFT", COMBAT_X, 0)
+		local fill = line.cqlBox:CreateTexture(nil, "BACKGROUND")
+		fill:SetAllPoints()
+		fill:SetColorTexture(0.06, 0.05, 0.04, 0.9)
+		for _, side in ipairs({ { "TOPLEFT", "TOPRIGHT", false }, { "BOTTOMLEFT", "BOTTOMRIGHT", false },
+			{ "TOPLEFT", "BOTTOMLEFT", true }, { "TOPRIGHT", "BOTTOMRIGHT", true } }) do
+			local edge = line.cqlBox:CreateTexture(nil, "BORDER")
+			edge:SetPoint(side[1])
+			edge:SetPoint(side[2])
+			if side[3] then edge:SetWidth(1) else edge:SetHeight(1) end
+			edge:SetColorTexture(0.45, 0.38, 0.2, 1)
+		end
+		local glow = line.cqlBox:CreateTexture(nil, "HIGHLIGHT")
+		glow:SetAllPoints()
+		glow:SetColorTexture(1, 1, 1, 0.06)
+		line.cql = line.cqlBox:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+		line.cql:SetPoint("LEFT", line.cqlBox, "LEFT", 8, 0)
+		line.cql:SetPoint("RIGHT", line.cqlBox, "RIGHT", -6, 0)
 		line.cql:SetJustifyH("LEFT")
 		line.cql:SetWordWrap(false)
+		Tip(line.cqlBox, L["This line's rule (CQL). Click to edit it."])
+		line.cqlBox:SetScript("OnClick", function()
+			local click = line.edit and line.edit:GetScript("OnClick")
+			if click then click(line.edit) end
+		end)
 
 		line.edit = ns.PanelButton(line)
 		line.edit:SetSize(EDIT_W, 20)
@@ -385,9 +414,19 @@ function ns.CooldownRuleLines(parent, opts)
 			button:SetScript("OnClick", function() Move(which[2]) end)
 			line[which[1]] = button
 		end
-		line.delete = CreateFrame("Button", nil, line, "UIPanelCloseButton")
-		line.delete:SetSize(22, 22)
-		line.delete:SetPoint("LEFT", line, "LEFT", DELETE_X, 0)
+		-- (A plain grey X, red under the pointer: the game's red close
+		-- buttons were the loudest thing on the page, 2026-11-20.)
+		line.delete = CreateFrame("Button", nil, line)
+		line.delete:SetSize(18, 20)
+		line.delete:SetPoint("LEFT", line, "LEFT", DELETE_X + 2, 0)
+		local cross = line.delete:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+		cross:SetPoint("CENTER")
+		cross:SetText("X")
+		cross:SetTextColor(0.6, 0.6, 0.6)
+		line.delete:HookScript("OnEnter", function() cross:SetTextColor(1, 0.3, 0.25) end)
+		line.delete:HookScript("OnLeave", function() cross:SetTextColor(0.6, 0.6, 0.6) end)
+		line.delete:HookScript("OnDisable", function(self) self:SetAlpha(0.3) end)
+		line.delete:HookScript("OnEnable", function(self) self:SetAlpha(1) end)
 		Tip(line.delete, L["Deletes this line."])
 		line.delete:SetScript("OnClick", function()
 			local list = List()
@@ -401,8 +440,14 @@ function ns.CooldownRuleLines(parent, opts)
 
 	-- The Everywhere else line: its number and words; the page puts the
 	-- row's own dropdown beside them.
+	-- (Its words where a line's where goes, after a bar as theirs, full size
+	-- in a soft color: small and grey, it was the faintest thing on the page.)
 	local elseNumber = block:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-	local elseText = block:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+	elseNumber:SetJustifyH("RIGHT")
+	local elseBar = block:CreateFontString(nil, "OVERLAY", "GameFontDisable")
+	elseBar:SetText("|")
+	local elseText = block:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+	elseText:SetTextColor(0.78, 0.74, 0.64)
 	elseText:SetText(L["Everywhere else"])
 	local elseLit = block:CreateTexture(nil, "BACKGROUND")
 	elseLit:SetColorTexture(1, 0.82, 0, 0.14)
@@ -447,14 +492,14 @@ function ns.CooldownRuleLines(parent, opts)
 			local own = rule.cql ~= nil
 			line.combat:SetShown(not own)
 			line.place:SetShown(not own)
-			line.cql:SetShown(own)
+			line.cqlBox:SetShown(own)
 			if own then
 				line.cql:SetText(ns.ColoredRule and ns.ColoredRule(rule.cql) or rule.cql)
 			else
 				line.combat.Show_()
 				line.place.Show_()
 			end
-			for _, control in ipairs({ line.show, line.combat, line.place, line.edit, line.delete }) do
+			for _, control in ipairs({ line.show, line.combat, line.place, line.edit, line.delete, line.cqlBox }) do
 				if control.SetEnabled then control:SetEnabled(enabled) end
 			end
 			line.up:SetEnabled(enabled and i > 1)
@@ -463,6 +508,7 @@ function ns.CooldownRuleLines(parent, opts)
 		for i = count + 1, #lines do lines[i]:Hide() end
 		if count == 0 then
 			elseNumber:Hide()
+			elseBar:Hide()
 			elseText:Hide()
 			elseLit:Hide()
 			block:SetHeight(1)
@@ -470,14 +516,17 @@ function ns.CooldownRuleLines(parent, opts)
 		end
 		local y = -count * LINE_H
 		elseNumber:ClearAllPoints()
-		elseNumber:SetPoint("LEFT", block, "TOPLEFT", NUM_X, y - LINE_H / 2)
+		elseNumber:SetPoint("RIGHT", block, "TOPLEFT", NUM_R, y - LINE_H / 2)
 		elseNumber:SetText(tostring(count + 1))
 		elseNumber:Show()
 		elseText:ClearAllPoints()
-		elseText:SetPoint("LEFT", block, "TOPLEFT", ELSE_X, y - LINE_H / 2)
+		elseBar:ClearAllPoints()
+		elseBar:SetPoint("LEFT", block, "TOPLEFT", BAR_X, y - LINE_H / 2)
+		elseBar:Show()
+		elseText:SetPoint("LEFT", block, "TOPLEFT", COMBAT_X + 8, y - LINE_H / 2)
 		elseText:Show()
 		elseLit:ClearAllPoints()
-		elseLit:SetPoint("TOPLEFT", block, "TOPLEFT", NUM_X - 4, y - 1)
+		elseLit:SetPoint("TOPLEFT", block, "TOPLEFT", LIT_X, y - 1)
 		elseLit:SetPoint("BOTTOMRIGHT", block, "TOPLEFT", DELETE_X + 24, y - LINE_H + 1)
 		elseLit:SetShown(hit == nil)
 		block:SetHeight((count + 1) * LINE_H)
