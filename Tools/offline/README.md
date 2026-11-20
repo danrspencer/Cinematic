@@ -26,6 +26,9 @@ looks for `lua5.1`. (Don't put a `lua5.1` stand-in on PATH: Windows asks what to
 - `tooltiplocation.lua`: the Tooltips page's Location row. A party member's zone on their short tooltip goes
   by it, apart from Spec and class, and a full tooltip's faction line under the class isn't taken for the zone; the
   update starts Location as Spec was set.
+- `loopsoff.lua`: a feature loop runs no update loop with its page off, even with the page's rows ticked, and
+  starts again with the page (Heal Vision's kept going every frame). And the settings pages made ahead wait while
+  `/cine debug loops` measures, so their time isn't counted as the loops'.
 - `cardwait.lua`: the Rested card waiting while DaylightUI's zone title shows (ns.AddCardWait), on a clock of its
   own: waits, shows once the title's gone, gives up after 8 s, no wait without the title or for other cards.
 - `notchgap.lua <forever|retail>`: full-screen effects (ns.CoverWorld: letterbox, tint edges, death screen, Focus,

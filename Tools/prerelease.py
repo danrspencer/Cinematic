@@ -42,6 +42,7 @@ HOME = os.path.expanduser("~")
 OFFLINE_TESTS = [
     ("party flicker (DaylightUI range fade)", "Tools/offline/partyflicker.lua"),
     ("card wait (Rested card behind DaylightUI's zone title)", "Tools/offline/cardwait.lua"),
+    ("loops off with their page off; page building waits for /cine debug loops", "Tools/offline/loopsoff.lua"),
     ("tooltip Location row (zone apart from class)", "Tools/offline/tooltiplocation.lua"),
     ("You level up card: Cheer, Congratulate, Commend", "Tools/offline/youlevelemotes.lua"),
     ("cast bar other kind's look, forever", "Tools/offline/castlook.lua", "forever"),

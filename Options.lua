@@ -1791,8 +1791,10 @@ function lazyPages.Start(name, build, why)
 	lazyPages.stepper = lazyPages.stepper or CreateFrame("Frame")
 	-- (Its own section in a profile: the timed calls stopped inside it stay
 	-- under it, Profiler.lua.)
+	-- (Waits while /cine debug loops measures: its own time, 0.25 ms a frame
+	-- over the 20 seconds, swamped the loops it was measuring, 2026-11-20.)
 	local function Step()
-		if InCombatLockdown() then return end
+		if InCombatLockdown() or ns.loopAudit then return end
 		lazyPages.Run(job)
 	end
 	ns.SetOnUpdate(lazyPages.stepper, ns.Profiled and ns.Profiled("Settings page made ahead", Step) or Step)
@@ -1839,7 +1841,8 @@ end
 -- Made ahead, one at a quiet moment each (2026-11-16: the HUD's alone till
 -- then; Nameplates, Nameplate Style and Hover Groups took 100-200 ms on
 -- their first opening). Checked each second: out of combat, the settings
--- closed, not casting, on no flight path, standing still these last 5
+-- closed, not casting, on no flight path, /cine debug loops not measuring,
+-- standing still these last 5
 -- seconds; then the next page not made yet is, and 3 more quiet seconds
 -- before the one after. All made: the checks stop. (One opened before its
 -- turn: made then, as before.)
@@ -1849,7 +1852,7 @@ function lazyPages.StartAhead()
 	lazyPages.ticker = C_Timer.NewTicker(1, function()
 		local settings = _G.SettingsPanel or _G.InterfaceOptionsFrame
 		local casting = (UnitCastingInfo and UnitCastingInfo("player")) or (UnitChannelInfo and UnitChannelInfo("player"))
-		local busy = InCombatLockdown() or (settings and settings:IsShown()) or casting
+		local busy = InCombatLockdown() or ns.loopAudit or (settings and settings:IsShown()) or casting
 			or (UnitOnTaxi and UnitOnTaxi("player")) or (GetUnitSpeed and GetUnitSpeed("player") or 0) > 0
 		still = (busy or lazyPages.job) and 0 or still + 1
 		if still < 5 then return end

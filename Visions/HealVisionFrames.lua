@@ -769,6 +769,8 @@ function ns.ApplyHealVisionFrames()
 	sinceScan = RESCAN_EVERY
 	Scan()
 	UpdateAll()
+	-- (Its loop on or off at once: the page's switch, CineMode's start.)
+	if ns.WakeHealVisionLoop then ns.WakeHealVisionLoop() end
 	if ns.ApplyHealVisionPlates then ns.ApplyHealVisionPlates() end -- (the plates go by the same settings: below)
 end
 
@@ -804,10 +806,16 @@ watcher:SetScript("OnEvent", function(_, event, unit)
 		end
 	end
 end)
+-- A Heal Vision row ticked, with its page on (ns.HealVisionAny reads only
+-- the rows and its rule: with the page off it kept this loop going every
+-- frame, 2026-11-20).
+local function VisionWanted()
+	return ns.Setting("handleHealVision") and ns.HealVisionAny() and true or false
+end
 -- (Runs only while a Heal Vision is on or still has frames: no loop at all
 -- otherwise.)
-ns.FeatureLoop(watcher, function(_, elapsed)
-	if not next(members) and not next(touched) and not ns.HealVisionAny() then
+ns.WakeHealVisionLoop = ns.FeatureLoop(watcher, function(_, elapsed)
+	if not next(members) and not next(touched) and not VisionWanted() then
 		return
 	end
 	-- The mouse over the frames: everyone fades in (as fast as CineMode's
@@ -849,7 +857,7 @@ ns.FeatureLoop(watcher, function(_, elapsed)
 	end
 	UpdateAll()
 end, function()
-	return next(members) ~= nil or next(touched) ~= nil or ns.HealVisionAny()
+	return next(members) ~= nil or next(touched) ~= nil or VisionWanted()
 end)
 
 -- /cine debug healwatch [seconds]: logs every frame, for a while, each raid
