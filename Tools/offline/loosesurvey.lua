@@ -4,7 +4,8 @@
 -- on the dev copy: a faded frame with a region and a child that ignore its
 -- alpha, one two levels down, one that follows it, a frame with a row of its
 -- own inside it (not walked into), our own detached part and a secret answer.
--- It must find exactly the loose ones, change no alpha, and print its summary.
+-- It must find exactly the loose ones, count secret answers per frame, change
+-- no alpha, and print its summary once.
 -- Says PASS or FAIL per check.
 -- luacheck: push ignore 111 112 113 121 122 212
 local function Alpha(frame, ignore)
@@ -64,6 +65,8 @@ Check("a loose part under that frame listed once, under its own row",
 	found[made.underOwnRow] and found[made.underOwnRow].entry.frame == made.ownRow)
 Check("our own detached part not listed", found[made.ours] == nil and skipped.own == 1, skipped.own)
 Check("a secret answer counted apart", found[made.secret] == nil and skipped.secret == 1, skipped.secret)
+Check("the secret answer counted under its frame", skipped.secretBy and skipped.secretBy.LooseTestBar == 1
+	and skipped.secretBy.LooseTestOwnRow == nil, skipped.secretBy and skipped.secretBy.LooseTestBar)
 Check("frames with a row skipped while walking", skipped.managed == 1, skipped.managed)
 local count = 0
 for _ in pairs(found) do count = count + 1 end
@@ -80,6 +83,18 @@ local changed = false
 for key, object in pairs(made) do if object:GetAlpha() ~= before[key] then changed = key end end
 Check("the survey changes no alpha", not changed, changed)
 Check("chat summary counts the parts", printed[1] and printed[1]:find("loose parts: 4 under 2 frames") ~= nil, printed[1])
+local summaries, secretLine = 0, nil
+for _, line in ipairs(printed) do
+	if line:find("^loose parts:") then summaries = summaries + 1 end
+	if line:find("^secret answers under") then secretLine = line end
+end
+Check("the summary printed once", summaries == 1, summaries)
+Check("chat says which frames had secret answers", secretLine and secretLine:find("under 1 frames, most: LooseTestBar 1", 1, true) ~= nil, secretLine)
+local logged = 0
+for _, line in ipairs(ns.db.log or {}) do
+	if tostring(line):find("loose: LooseTestBar: 1 parts answered secret", 1, true) then logged = logged + 1 end
+end
+Check("the log has the frame's secret count", logged == 1, logged)
 ns.IsManagedFrame, ns.IsOwnDetached = IsManagedFrame, IsOwnDetached
 
 print(fails == 0 and "ALL PASS" or (fails .. " FAILED"))

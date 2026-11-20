@@ -7,7 +7,8 @@
 -- how many parts, at which depths, under which frames, and how long the walk
 -- took (what a rescan would cost). Not counted as loose: frames with a row of
 -- their own (they fade by it) and our own detached parts (DetachWhileFading).
--- Secret answers are counted apart, never compared. Dev copy only.
+-- Secret answers are counted apart, never compared, and per frame (which
+-- frames a walk can't see into). Dev copy only.
 local _, ns = ...
 
 local MAX_DEPTH = 6
@@ -75,19 +76,42 @@ local function Walk(frame, depth, found, skipped)
 	for _, child in ipairs({ frame:GetChildren() }) do Look(child, true) end
 end
 
--- Returns parts (list of { entry, part, depth }), skipped counts, ms taken.
+-- The frame's name for the report: its row's name, else its own.
+local function KeyOf(entry) return tostring(entry.name or Label(entry.frame)) end
+
+-- Returns parts (list of { entry, part, depth }), skipped counts (with
+-- secretBy: frame name -> parts under it whose answer read back secret), ms.
 function ns.SurveyLooseParts()
-	local parts, skipped = {}, { forbidden = 0, managed = 0, secret = 0, own = 0, visited = {} }
+	local parts = {}
+	local skipped = { forbidden = 0, managed = 0, secret = 0, own = 0, visited = {}, secretBy = {} }
 	local started = debugprofilestop()
 	for _, entry in ipairs(ns.managed or {}) do
 		local frame = entry.frame
 		if type(frame) == "table" and frame.GetChildren and not (frame.IsForbidden and frame:IsForbidden()) then
+			local before = skipped.secret
 			Walk(frame, 1, function(part, depth)
 				parts[#parts + 1] = { entry = entry, part = part, depth = depth }
 			end, skipped)
+			if skipped.secret > before then
+				local key = KeyOf(entry)
+				skipped.secretBy[key] = (skipped.secretBy[key] or 0) + skipped.secret - before
+			end
 		end
 	end
 	return parts, skipped, debugprofilestop() - started
+end
+
+-- "name count, ..." for the counts' top few, biggest first.
+local function Top(counts, few)
+	local list = {}
+	for name, count in pairs(counts) do list[#list + 1] = { name = name, count = count } end
+	table.sort(list, function(a, b)
+		if a.count ~= b.count then return a.count > b.count end
+		return a.name < b.name
+	end)
+	local names = {}
+	for i = 1, math.min(few, #list) do names[i] = ("%s %d"):format(list[i].name, list[i].count) end
+	return table.concat(names, ", "), #list
 end
 
 function ns.LoosePartsSurvey()
@@ -99,7 +123,7 @@ function ns.LoosePartsSurvey()
 	for _, found in ipairs(parts) do
 		local entry, part = found.entry, found.part
 		byDepth[found.depth] = (byDepth[found.depth] or 0) + 1
-		local key = tostring(entry.name or Label(entry.frame))
+		local key = KeyOf(entry)
 		if not byFrame[key] then frames = frames + 1 end
 		byFrame[key] = (byFrame[key] or 0) + 1
 		local okW, w = pcall(part.GetWidth, part)
@@ -113,17 +137,18 @@ function ns.LoosePartsSurvey()
 	for depth = 1, MAX_DEPTH do
 		if byDepth[depth] then depths[#depths + 1] = ("d%d %d"):format(depth, byDepth[depth]) end
 	end
-	local top = {}
-	for name, count in pairs(byFrame) do top[#top + 1] = { name = name, count = count } end
-	table.sort(top, function(a, b) return a.count > b.count end)
-	local names = {}
-	for i = 1, math.min(6, #top) do names[i] = ("%s %d"):format(top[i].name, top[i].count) end
+	local most = Top(byFrame, 6)
+	local secretMost, secretFrames = Top(skipped.secretBy, 8)
 	local summary = ("loose parts: %d under %d frames (%s); skipped %d with a row, %d ours, %d secret, %d forbidden; "
 		.. "walk %.2f ms"):format(#parts, frames, #depths > 0 and table.concat(depths, ", ") or "none",
 		skipped.managed, skipped.own, skipped.secret, skipped.forbidden, ms)
-	ns.Log("loose", summary)
-	if #names > 0 then ns.Log("loose", "most: " .. table.concat(names, ", ")) end
+	-- (ns.Print logs it too: printed only, or the report has it twice.)
 	ns.Print(summary)
-	if #names > 0 then ns.Print("most: " .. table.concat(names, ", ")) end
+	if most ~= "" then ns.Print("most: " .. most) end
+	-- (Parts a walk can't tell about: only a hook on SetIgnoreParentAlpha would catch them.)
+	if secretMost ~= "" then ns.Print(("secret answers under %d frames, most: %s"):format(secretFrames, secretMost)) end
+	for name, count in pairs(skipped.secretBy) do
+		ns.Log("loose", ("%s: %d parts answered secret"):format(name, count))
+	end
 	ns.Print("Each part is in the log (/cine log, \"loose\" lines).")
 end
