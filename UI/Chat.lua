@@ -751,8 +751,25 @@ local function ShowCopy(chatFrame, line, r, g, b, text)
 end
 
 -- Whether a peek shows just its line (the setting, with the Chat page on).
+-- Whether chat is just the game's own windows: no other addon draws the
+-- window (a "chatwindow" link claim: EllesmereUI, ElvUI, Glass) or replaces it
+-- (Chattynator). Lines-only peeks only then: over another addon's window the
+-- copy showed next to its own line, two lines (EllesmereUI, 2026-11-20).
+local OTHER_CHAT_ADDONS = { "Chattynator" }
+function ns.ChatIsDefault()
+	if ns.LinkClaimants and ns.LinkClaimants("chatwindow") then return false end
+	local IsLoaded = (C_AddOns and C_AddOns.IsAddOnLoaded) or IsAddOnLoaded
+	if IsLoaded then
+		for _, name in ipairs(OTHER_CHAT_ADDONS) do
+			if IsLoaded(name) then return false end
+		end
+	end
+	return true
+end
+
 function ns.ChatPeekLinesOnly()
-	return ns.db and ns.db.chatPeekLinesOnly and ns.PageOn("handleChat") and true or false
+	return ns.db and ns.db.chatPeekLinesOnly and ns.PageOn("handleChat") and ns.ChatIsDefault()
+		and true or false
 end
 
 -- A peek in lines-only mode. formatted: text is the window's line already

@@ -29,6 +29,8 @@ looks for `lua5.1`. (Don't put a `lua5.1` stand-in on PATH: Windows asks what to
 - `loopsoff.lua`: a feature loop runs no update loop with its page off, even with the page's rows ticked, and
   starts again with the page (Heal Vision's kept going every frame). And the settings pages made ahead wait while
   `/cine debug loops` measures, so their time isn't counted as the loops'.
+- `chatdefault.lua`: the Chat page's Show just those messages copies lines only with the game's own chat; with
+  EllesmereUI's, ElvUI's or Glass's window (a chat window link claim) or Chattynator a message shows the window.
 - `cardwait.lua`: the Rested card waiting while DaylightUI's zone title shows (ns.AddCardWait), on a clock of its
   own: waits, shows once the title's gone, gives up after 8 s, no wait without the title or for other cards.
 - `cooldownnever.lua`: the Cooldown Manager page's Icon shows Never. The mode read back for a spell, its override, a

@@ -14462,6 +14462,12 @@ do
 			L["Shows just the new messages, without the chat window around them."])
 		linesOnly:SetPoint("TOPLEFT", chatPeek, "BOTTOMLEFT", 20, -2)
 		GreyUnless(linesOnly, IfPeek)
+		-- (Only with the game's own chat: hidden while another addon draws it.)
+		local linesOnlyRefresh = linesOnly.Refresh
+		linesOnly.Refresh = function(self)
+			linesOnlyRefresh(self)
+			self:SetShown(ns.ChatIsDefault())
+		end
 
 		-- On top: how long chat stays up, in place of the mouseover time (all the way left: off).
 		local peekTime = Slider(chatPanel, "chatPeekTime", L["Override Default Reveal Time"], 0, 60, 1,
