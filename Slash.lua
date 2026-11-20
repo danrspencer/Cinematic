@@ -1881,6 +1881,9 @@ local function HandleSlash(msg)
 		-- (Dev copy: does anything tell your hits from strangers' with no log lines, WhoseHitTest.lua.)
 		if ns.WhoseHitTest then ns.WhoseHitTest()
 		else ns.Print("/cine debug whosehit is in the dev copy only.") end
+	elseif cmd == "debug" and arg == "corpse" then
+		-- (Dev copy: what addons can read about a dead mob, its name above all, CorpseTest.lua.)
+		if ns.CorpseTest then ns.CorpseTest() else ns.Print("/cine debug corpse is in the dev copy only.") end
 	elseif cmd == "debug" and arg == "checks" then
 		-- (Dev copy: which checks this client has to replace pcalls, ChecksProbe.lua, Tools/pcall-plan.md.)
 		if ns.ChecksProbe then ns.ChecksProbe()
