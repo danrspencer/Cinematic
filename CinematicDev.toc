@@ -246,6 +246,7 @@ Dev\TurnLagTest.lua
 Dev\PlateCostTest.lua
 Dev\FriendPlatesTest.lua
 Dev\HealPlatesTest.lua
+Dev\HealIconsCastTest.lua
 Dev\OffscreenProbe.lua
 Dev\OffscreenHoldTest.lua
 Dev\NpcNamesTest.lua

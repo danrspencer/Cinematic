@@ -906,7 +906,14 @@ local function ApplyPlate(plate, personal)
 		else
 			level = level * body
 		end
-		EachPartFrame(unitFrame, part, Fade, level)
+		-- (The cast bar's container on a plate Heal Vision holds: its, the fade
+		-- going on it, HealVisionFrames.lua's PlateLayersOf; let go of here
+		-- without touching its alpha, or the keeper put ours back over it.)
+		if healHeld and part == "CastBar" then
+			EachPartFrame(unitFrame, part, function(frame) held[frame], own[frame] = nil, nil end)
+		else
+			EachPartFrame(unitFrame, part, Fade, level)
+		end
 	end
 	-- (And the guild line under a name shown alone: PlateGuild.lua. It sits
 	-- under our text, so it fades in with its new look.)
@@ -1069,6 +1076,8 @@ local ROLES = {
 }
 local plateRole = {} -- [plate] = an entry of ROLES, or false for no icon
 local roleIcons = {} -- [plate] = icon frame
+-- (A plate's class and role icon frames, if made: Heal Vision's tests.)
+function ns.PlateIconFrames(plate) return icons[plate], roleIcons[plate] end
 
 -- A plate's unit's role in your group, if it's a player with one.
 local function ReadRole(plate)

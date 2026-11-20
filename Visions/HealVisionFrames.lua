@@ -976,8 +976,11 @@ end
 ns.DEFAULTS.healVisionPlates = false
 -- The parts it can fade (as the Plate parts grid names them). Which stay up:
 -- KeptPart, by the picker (no menu of its own since 2026-11-19).
+-- (Icons: Cinematic's own class and role icons, PlateParts.lua's: their
+-- pictures, the frames' own alpha left to the Icons rows. They stayed up on
+-- hidden plates, a player's report, tested 2026-11-20.)
 ns.HEAL_PLATE_PARTS = { "Health", "Name", "CastBar", "Buffs", "Debuffs", "RaidMarker", "Level", "Highlight",
-	"Widgets" }
+	"Widgets", "Icons" }
 -- Show only while hurt (2026-11-19: one picker in place of the tick): "off",
 -- "names" (the name alone comes and goes, the rest as CineMode has it) or
 -- "plates" (the whole plate comes and goes, as the nameplate style has it).
@@ -1048,9 +1051,23 @@ local function PlateLayersOf(unitFrame, keptToo)
 	end
 	for _, part in ipairs(ns.HEAL_PLATE_PARTS) do
 		keeping = KeptPart(part)
-		if keptToo or not keeping then
+		if part == "Icons" then
+			if (keptToo or not keeping) and ns.PlateIconFrames and unitFrame.GetParent then
+				local class, role = ns.PlateIconFrames(unitFrame:GetParent())
+				for _, icon in ipairs({ class or false, role or false }) do
+					if icon and icon.texture then Add(icon.texture, part) end
+				end
+			end
+		elseif keptToo or not keeping then
 			for _, frame in ipairs(ns.PlatePartFrames(unitFrame, part)) do
-				if frame.IsObjectType and frame:IsObjectType("Frame") then
+				-- (The cast bar: its part frame itself, the game's container, not
+				-- the bar inside: the game plays the bar's own fade and its
+				-- "Interrupted" flash on it, over any alpha set there. Seen in a
+				-- player's fights; Forever's container: CastBarsContainer, 2026-11-20.
+				-- PlateParts.lua leaves this container to Heal Vision on its plates.)
+				if part == "CastBar" then
+					Add(frame, part)
+				elseif frame.IsObjectType and frame:IsObjectType("Frame") then
 					for _, region in ipairs({ frame:GetRegions() }) do Add(region, part) end
 					for _, child in ipairs({ frame:GetChildren() }) do Add(child, part) end
 				else
@@ -1301,6 +1318,13 @@ plateWatch:SetScript("OnEvent", function(_, event, unit)
 		end
 	end
 end)
+
+-- (A plate event as the game sends it, for the dev copy's tests: a cast
+-- ended the test played on a plate itself.)
+function ns.HealVisionTestEvent(event, unit)
+	local handler = plateWatch:GetScript("OnEvent")
+	if handler then handler(plateWatch, event, unit) end
+end
 
 ns.SetOnUpdate(castHolder, function(self)
 	-- (The mouse off the plate it was on: that plate goes back to its fade.)

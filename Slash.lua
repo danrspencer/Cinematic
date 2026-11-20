@@ -1910,6 +1910,9 @@ local function HandleSlash(msg)
 	elseif cmd == "debug" and arg == "offscreen" then
 		-- (Dev copy: can an edge-pinned plate be told from one in view, OffscreenProbe.lua.)
 		if ns.OffscreenProbe then ns.OffscreenProbe() else ns.Print("/cine debug offscreen is in the dev copy only.") end
+	elseif cmd == "debug" and arg == "hvicons" then
+		-- (Dev copy: class icons and the Interrupted cast bar on Heal Vision's plates, HealIconsCastTest.lua.)
+		if ns.HealIconsCastTest then ns.HealIconsCastTest() else ns.Print("/cine debug hvicons is in the dev copy only.") end
 	elseif cmd == "debug" and arg == "hvplates" then
 		-- (Dev copy: Heal Vision's Nameplates tick in CineMode and cities, HealPlatesTest.lua.)
 		if ns.HealPlatesTest then ns.HealPlatesTest() else ns.Print("/cine debug hvplates is in the dev copy only.") end
