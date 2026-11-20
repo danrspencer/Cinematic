@@ -4,6 +4,8 @@
 -- own verdicts:
 --   size:    the window's height closed and open (open = closed + the
 --            shelf), and the biggest UI scale it fits the screen at;
+--   hover:   another level's card hovered, then straight onto a feature:
+--            the tags and its words are your level's again;
 --   groups:  each group clicked, the tiles it shows (All: every one);
 --   search:  "roll" (Roll Vision's tile), "zzz" (none, the empty line);
 --   tiles:   each tile clicked in turn (not the Shoulder Cam's: trying it is
@@ -451,7 +453,7 @@ end
 -- list: what to test, words apart ("questCam duel search"): tiles by their
 -- keys, and the parts groups, search, turnon. None: everything. The size
 -- and the closing again always run (a second, and they open the shelf).
-local PARTS = { groups = true, search = true, turnon = true, tour = true, links = true }
+local PARTS = { groups = true, search = true, turnon = true, tour = true, links = true, hover = true }
 function ns.ShelfTest(list)
 	-- (Never the Ctrl+C copy window over the game: the user's rule; its lines
 	-- are in chat and the log. Set first: the start's lines opened it.)
@@ -490,7 +492,7 @@ function ns.ShelfTest(list)
 		end
 		for word in pairs(only) do
 			if not (known[word] or PARTS[word]) then
-				ns.Print(("Shelf test: no \"%s\". Tiles: %s. Parts: groups, search, turnon."):format(word,
+				ns.Print(("Shelf test: no \"%s\". Tiles: %s. Parts: hover, groups, search, turnon, tour, links."):format(word,
 					table.concat(keys, ", ")))
 				run = nil
 				return
@@ -538,6 +540,55 @@ function ns.ShelfTest(list)
 			Verdict(#bad == 0, "every tile shown can play here")
 		end
 		Next()
+	end
+	-- Hover: another level's card hovered (its tags on the row), then the
+	-- mouse straight from it onto a feature button (OnLeave, OnEnter, the same
+	-- frame): the tags are the picked level's again, and so is the feature's
+	-- "In <level>" line. 2026-11-20: Shoulder Cam's tags stayed on.
+	steps[#steps + 1] = Want("hover") and function(Next)
+		local cards = ns.WelcomeCards and ns.WelcomeCards() or {}
+		local mine = ns.ActiveProfile()
+		local other
+		for i, each in ipairs(ns.WELCOME_LEVELS) do
+			if (each.profile or ns.DEFAULT_PROFILE) ~= mine and not each.noCustomize and cards[i] then
+				other = { card = cards[i], level = each }
+			end
+		end
+		local tiles = Each(window, function(f) return f.demo ~= nil and f.tag ~= nil and f:IsVisible() end)
+		local function Tags()
+			local out = {}
+			for _, b in ipairs(tiles) do out[#out + 1] = b.demo.key .. "=" .. tostring(b.tag:GetText()) end
+			return table.concat(out, ", ")
+		end
+		if not other or not tiles[1] then
+			Log(("hover: skipped (another level's card %s, feature buttons %d)"):format(tostring(other ~= nil), #tiles))
+			return Next()
+		end
+		local before = Tags()
+		other.card:GetScript("OnEnter")(other.card)
+		local hovered = Tags()
+		other.card:GetScript("OnLeave")(other.card)
+		local tile = tiles[#tiles]
+		tile:GetScript("OnEnter")(tile)
+		local after = Tags()
+		-- (the box's words: the visible text holding the feature's tip)
+		local about = ""
+		for _, f in ipairs(Each(window, function() return true end)) do
+			for _, r in ipairs({ f:GetRegions() }) do
+				local text = r.GetObjectType and r:GetObjectType() == "FontString" and r:IsVisible() and r:GetText()
+				if text and text:find(ns.L[tile.demo.tip], 1, true) then about = text end
+			end
+		end
+		tile:GetScript("OnLeave")(tile)
+		Log(("hover: picked %s, hovered %s\n  before:  %s\n  hovered: %s\n  after:   %s\n  box: %s"):format(
+			tostring(mine), other.level.label, before, hovered, after, about))
+		-- (the same tags for both levels: nothing to tell apart, so no proof)
+		if hovered == before then Log("hover: the two levels' tags are the same; the check below proves nothing") end
+		Verdict(after == before, ("from %s's card onto a feature: the tags are %s's again"):format(
+			other.level.label, tostring(mine)))
+		Verdict(about ~= "" and not about:find((ns.L["In %s"]):format(other.level.label), 1, true),
+			("the feature's words aren't %s's"):format(other.level.label))
+		C_Timer.After(0.5, function() if run then Next() end end)
 	end
 	steps[#steps + 1] = Want("groups") and function(Next)
 		local groupButtons = Each(window, function(f) return f.group ~= nil and f.GetObjectType and f:IsShown() end)

@@ -378,6 +378,10 @@ local function Card(parent, profile, level)
 	end)
 	card:SetScript("OnLeave", function(self)
 		if not self.active then self:SetBackdropBorderColor(unpack(EDGE)) end
+		-- (The feature tags go back to the picked level at once: from a card
+		-- straight onto a feature, that feature's words put theirs up first,
+		-- so DescribeSoon left the hovered level's tags on, 2026-11-20.)
+		if demoRow then demoRow:Update(levelOf[Active()]) end
 		DescribeSoon()
 	end)
 	card:SetScript("OnClick", function() Pick(profile.name, level) end)
