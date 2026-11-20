@@ -40,6 +40,8 @@
       line: "Camera, menu, marker and vision wheels, and wheels of your own." },
     { section: "guides", path: "guides/nameplates.html", title: "Nameplates and names",
       line: "What shows for each kind of unit and place, plate parts and the target arrow." },
+    { section: "guides", path: "guides/style.html", title: "Style",
+      line: "Themes (your own too), Quick Settings, Interface Recolor, overrides and a look page for each kind of frame." },
     { section: "guides", path: "guides/frames.html", title: "Frames",
       line: "Standard and unit frames, personal resources, the Cooldown Manager, swing timer and buffs." },
     { section: "guides", path: "guides/chat-and-quests.html", title: "Chat and quests",

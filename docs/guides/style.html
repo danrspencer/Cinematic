@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Cinematic Style</title>
+<meta name="description" content="The Style hub: themes, Quick Settings, overrides, Interface Recolor and a look page for each kind of frame.">
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="../assets/site.css">
+<script src="../assets/site.js" defer></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Marcellus+SC&family=Barlow:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a letterboxed opening frame, then one reading column: the hub's General pages first, then a short section per look page. */
+:root {
+  --bg: #eef1f4; --surface: #ffffff; --fg: #1b2129; --muted: #58626e; --line: #d2d8df;
+  --accent: #8a6400; --accent-soft: #f2e6c2;
+  --bar: #0b0d10; --bar-fg: #e9e4d8; --gold: #e2b53f;
+  --font-display: "Marcellus SC", Georgia, serif;
+  --font-body: "Barlow", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #13171c; --surface: #1b2026; --fg: #e3e6ea; --muted: #9aa3ad; --line: #2e353d;
+  --accent: #e2b53f; --accent-soft: #3a3120; --bar: #050607; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #13171c; --surface: #1b2026; --fg: #e3e6ea; --muted: #9aa3ad; --line: #2e353d;
+  --accent: #e2b53f; --accent-soft: #3a3120; --bar: #050607; color-scheme: dark }
+* { box-sizing: border-box }
+html { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px) }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 17px/1.6 var(--font-body); padding-block: 0 }
+.gutter { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)) }
+.col { max-width: 760px; margin: 0 auto; display: grid; gap: 56px }
+.col > *, section > * { min-width: 0 }
+h1, h2 { font-family: var(--font-display); font-weight: 400; text-wrap: balance; margin: 0 }
+h1 { font-size: clamp(34px, 7vw, 58px); line-height: 1.05; letter-spacing: .01em }
+h2 { font-size: 28px; line-height: 1.2 }
+h3 { font: 600 18px/1.3 var(--font-body); margin: 0 }
+p { margin: 0 }
+a { color: var(--accent); text-underline-offset: 2px }
+a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px }
+.muted { color: var(--muted) }
+code { font-family: var(--font-mono); font-size: .86em; background: var(--accent-soft); padding: 1px 5px; border-radius: 3px }
+section { display: grid; gap: 14px }
+.eyebrow { font: 600 13px/1 var(--font-body); letter-spacing: .14em; text-transform: uppercase; color: var(--accent) }
+
+/* Opening: the letterbox itself */
+.hero { background: var(--bar); color: var(--bar-fg) }
+.hero .band { height: clamp(28px, 6vw, 56px); background: #000 }
+.hero .frame { padding-block: clamp(36px, 7vw, 72px); background:
+  radial-gradient(120% 90% at 50% 40%, #2b3240 0%, #151a22 55%, #0b0d10 100%) }
+.hero .inner { max-width: 760px; margin: 0 auto; display: grid; gap: 14px }
+.hero .eyebrow { color: var(--gold) }
+.hero p { font-size: 19px; max-width: 58ch; color: #cfcabe }
+.hero code { background: #2a2d33; color: var(--bar-fg) }
+
+/* Where each is */
+.where { display: flex; flex-wrap: wrap; gap: 6px }
+.client { font: 600 12px/1 var(--font-body); letter-spacing: .04em; color: var(--accent); border: 1px solid currentColor; border-radius: 4px; padding: 4px 7px }
+.client.no { color: var(--muted); border-style: dashed }
+
+/* Settings, as the pages list them */
+.opts { display: grid; gap: 0; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); overflow: hidden }
+.opt { padding: 11px 16px; border-top: 1px solid var(--line); display: grid; gap: 2px }
+.opt:first-child { border-top: 0 }
+.opt .l { font-weight: 600 }
+.opt .d { color: var(--muted); font-size: 15.5px }
+.note { border-left: 3px solid var(--accent); padding: 4px 0 4px 14px; color: var(--muted) }
+.steps { display: grid; gap: 10px; list-style: none; margin: 0; padding: 0; counter-reset: s }
+.steps li { counter-increment: s; display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 8px }
+.steps li::before { content: counter(s); font: 400 22px/1.2 var(--font-display); color: var(--accent) }
+
+/* The built-in themes */
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; display: grid; gap: 4px; align-content: start }
+.card .name { font: 400 20px/1.15 var(--font-display) }
+.card .d { color: var(--muted); font-size: 15px }
+dl.faq { display: grid; gap: 16px; margin: 0 }
+dl.faq dt { font-weight: 600 }
+dl.faq dd { margin: 2px 0 0; color: var(--muted) }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="band"></div>
+  <div class="frame gutter">
+    <div class="inner">
+      <div class="eyebrow">Cinematic · Style</div>
+      <h1>One look for the whole interface</h1>
+      <p>The other hubs say <i>when</i> things show. The <b>Style</b> hub says how they look: your unit frames, nameplates, names, cast bars, tooltips, bubbles, the Visions' cards and the letterbox, all in one theme you can pick in a click and change as much as you like.</p>
+    </div>
+  </div>
+  <div class="band"></div>
+</header>
+
+<main class="gutter" style="padding-block:48px 40px">
+<div class="col">
+
+  <section id="about">
+    <div class="eyebrow">Finding it</div>
+    <h2>How the hub is laid out</h2>
+    <p>Open Cinematic's settings (<code>/cine config</code>) and pick <b>Style</b>. At the top is <b>General</b>, with its tabs. Below it the look pages come in three bands, each named after the hub whose frames it dresses:</p>
+    <div class="opts">
+      <div class="opt"><span class="l">Interface</span><span class="d"><b>Combat</b>: Unit Frames (with its Cast Bars tab), Personal Resources, Raid Frames, Action Bars and Combat Text. <b>Nameplates</b>: Nameplates (with its Cast Bars tab) and Names. <b>Info</b>: Chat Bubbles and Tooltips.</span></div>
+      <div class="opt"><span class="l">Visions</span><span class="d">All Visions, then <b>Combat</b>: Damage and Vitals; <b>World</b>: Quest (Dialogue and Quest Item Button) and Roll; <b>RP</b>: Emote and Card Types.</span></div>
+      <div class="opt"><span class="l">Atmosphere</span><span class="d">Tint and Letterbox.</span></div>
+    </div>
+    <p>Each look page is also a tab on its own frame's icon in the other hubs: the Interface hub's Unit Frames icon has its <b>Style</b> tab, a Vision's page has a <b>Style</b> tab beside it, and a small palette by a page's switch takes you to its look. Change it from either place: it's the same page.</p>
+    <p class="muted">Most look pages work the same way: an <b>Enable Page</b> switch (off: the game's own look, your settings kept), a preview at the top drawn by the same code as the real thing, and rows (a <b>Default</b> row, then one per frame or kind) whose <b>Look</b> button opens a panel with that row's settings. A row follows Default until you give it its own look. A setting the theme picked says <b>Set by theme</b>; one that follows General says <b>General's</b>.</p>
+  </section>
+
+  <section id="general">
+    <div class="eyebrow">The master switch</div>
+    <h2>General</h2>
+    <div class="where"><span class="client">Every game version</span></div>
+    <p>Style's <b>General</b> page holds <b>Enable Style</b>, one switch for every Style page at once: off, everything goes back to the game's look, and every page keeps its settings for when you turn it on. Under it, a large preview of a unit frame, nameplates and panels in your current look, and a strip with the theme you're using (click it to go to Themes).</p>
+    <p>Then the list of pages, a tab for each band, showing what each one goes by:</p>
+    <div class="opts">
+      <div class="opt"><span class="l">Theme tick</span><span class="d">When ticked, picking a theme changes this part (frames, panels, action bars, nameplates, names, cast bars or Visions). Untick it to keep a part as it is whatever theme you pick.</span></div>
+      <div class="opt"><span class="l">Follows General / From the theme / Its own</span><span class="d">Whether the page's font, bar texture, outline, shadow and border follow Quick Settings, come from the theme, or have been set on the page itself (<b>Its own:</b> names which). Visions follow <b>All Visions</b> instead.</span></div>
+      <div class="opt"><span class="l">Use General</span><span class="d">Puts a page's shared settings back on General, or as the theme set them. The page's name opens it.</span></div>
+    </div>
+  </section>
+
+  <section id="themes">
+    <div class="eyebrow">A whole look in one pick</div>
+    <h2>Themes</h2>
+    <div class="where"><span class="client">Every game version</span></div>
+    <p>The <b>Themes</b> tab (General's second tab) has its own row of tabs: <b>Themes</b>, <b>Quick Settings</b>, <b>Interface Recolor</b> and <b>Overrides</b>. A theme is a whole look for the addon: unit frames, bars, fonts, panels, nameplates and names, cast bars, Visions, and even the colors and art of Cinematic's own menus. A theme only fills in settings, so anything it sets you can still change by hand afterwards; the theme then shows as <i>with your changes</i>. Switching themes with changes made asks first: <b>Save as a new theme</b>, or <b>Switch anyway</b>.</p>
+    <h3>Built in</h3>
+    <div class="cards">
+      <div class="card"><span class="name">The game's</span><span class="d">Everything as the game draws it. Each Style page's own defaults.</span></div>
+      <div class="card"><span class="name">Silver Screen</span><span class="d">Black and silver, like an old film print. Thin lines, narrow lettering.</span></div>
+      <div class="card"><span class="name">Gilded Codex</span><span class="d">An illuminated book: dark vellum, gold leaf and filigree in every corner.</span></div>
+      <div class="card"><span class="name">Emberforge</span><span class="d">Blackened iron, rivets and molten light. Heavy and loud.</span></div>
+      <div class="card"><span class="name">Moonlit Glade</span><span class="d">Night in an old forest: deep teal, soft silver and vines on the edges.</span></div>
+      <div class="card"><span class="name">Frostbound</span><span class="d">Cut ice over cold slate. Crisp lines.</span></div>
+      <div class="card"><span class="name">Crimson Vanguard</span><span class="d">A war banner: blades, cut bars and diamonds in crimson and ivory.</span></div>
+      <div class="card"><span class="name">Hearthside</span><span class="d">A warm inn: soft round panels, capsule bars and honey light.</span></div>
+      <div class="card"><span class="name">Adventurer</span><span class="d">Just the hero: a gold-ringed portrait, the name over two slim bars.</span></div>
+      <div class="card"><span class="name">Cathedral</span><span class="d">Stained glass at dusk: jewel colors, pointed bars and arched portraits.</span></div>
+      <div class="card"><span class="name">Runestone</span><span class="d">Heavy cut stone, hexagons and chiseled bars, a faint glow in the runes.</span></div>
+      <div class="card"><span class="name">Fel Pact</span><span class="d">A warlock's bargain: near black, lit by sickly fel green.</span></div>
+      <div class="card"><span class="name">Void Whisper</span><span class="d">Black, and something violet moving in it, watching from the frames.</span></div>
+      <div class="card"><span class="name">Slate</span><span class="d">Clean type on one flat bar in your class color. No portraits.</span></div>
+      <div class="card"><span class="name">Obsidian</span><span class="d">Black on black: flat dark bars and one thin line of cold light.</span></div>
+      <div class="card"><span class="name">Carbon</span><span class="d">Amber gauges on charcoal, a steel line under them, no portraits.</span></div>
+      <div class="card"><span class="name">Neon Coast</span><span class="d">A beach city at dusk: sunset health bars, clean modern lettering.</span></div>
+    </div>
+    <p><b>Neon Coast</b> goes further than most: its health bars are painted with a blue, magenta and gold sunset (nameplates keep the game's reaction color on a thin strip under the bar), names over heads are in sunset colors that still mean hostile, neutral and friendly, and it turns on <a href="#combat-text">Combat Text</a> with damage numbers in the same colors. It also picks the "wasted" Death card.</p>
+    <h3>Themes of your own</h3>
+    <p>Under <b>Yours</b>, <b>+ New theme</b> makes a theme from the one you're using, with your changes. Right-click any theme for more: <b>Use</b>, <b>Copy to yours</b>, and on yours <b>Save changes</b>, <b>Rename</b>, <b>Description</b>, <b>Share</b> and <b>Backups</b>.</p>
+    <ol class="steps">
+      <li><span>Pick the built-in theme closest to what you want and make it yours. <b>Started from</b> is the theme whose art, shapes and fonts it keeps.</span></li>
+      <li><span>Give it your <b>Colors</b>: Accent (titles, names, menu highlights), Panels, Lines, Rings (portrait rings and corner art), Health, Mana and Casts. Right-click a color to put it back.</span></li>
+      <li><span>Change fonts, bars and shapes on Quick Settings or any Style page, then <b>Save changes</b>.</span></li>
+    </ol>
+    <p>Your themes are kept for every profile on your account, up to 20 of them. <b>Share</b> gives a line of text for a friend, who adds it with <b>Import</b>; <b>Export</b> shares the theme you're using with your changes. <b>Backups</b> brings back an older copy of a theme of yours, or one you deleted. <b>Reapply theme</b> puts every setting back as the theme has it.</p>
+  </section>
+
+  <section id="quick">
+    <div class="eyebrow">Make it yours</div>
+    <h2>Quick Settings</h2>
+    <p>The shared look that every page following General uses, on top of whichever theme is picked:</p>
+    <div class="opts">
+      <div class="opt"><span class="l">Text font, Title font, Small names font</span><span class="d">The text font for most pages, the big title font on cards, and the font for names on unit and raid frames.</span></div>
+      <div class="opt"><span class="l">Bar texture</span><span class="d">The bars' fill, including textures other addons share.</span></div>
+      <div class="opt"><span class="l">Panel shape</span><span class="d">The outline of tooltips, chat bubbles, dialogue and roll panels: Square, Rounded, Chamfered, Blade, Notched, Sigil, Veil, Plate, Leaf, Faceted, Soft or Slightly rounded.</span></div>
+      <div class="opt"><span class="l">Bar shape and Button shape</span><span class="d">The ends of unit frame and resource bars (Square, Capsule, Chiseled, Soft, Beveled), and the action buttons (the game's, Square or Round).</span></div>
+      <div class="opt"><span class="l">Nameplate style</span><span class="d">The size and shape of the game's nameplates, as in the game's own Options. Retail only.</span></div>
+      <div class="opt"><span class="l">Outline and border</span><span class="d">A black outline round the letters, a shadow, and the border round bars, panels and buttons.</span></div>
+    </div>
+  </section>
+
+  <section id="recolor">
+    <div class="eyebrow">The game's own frames</div>
+    <h2>Interface Recolor</h2>
+    <p>Tints the rest of the game's interface in your theme's color: only the frames' borders, edges, tabs and headers, never icons, bars or what's inside a window. It needs a theme other than The game's. A tick for each part:</p>
+    <div class="opts">
+      <div class="opt"><span class="l">Minimap</span><span class="d">The ring in the theme's color, a little shade just inside it, the buttons' rings, and the zone bar in the theme's panel look.</span></div>
+      <div class="opt"><span class="l">Quest tracker</span><span class="d">Header bars in the panel look, General's font, quest names in the theme's color, and progress bars in General's bar texture.</span></div>
+      <div class="opt"><span class="l">Damage meter, Swing timer, XP and reputation bars</span><span class="d">Their frames in the theme's color, their bars in General's texture and their words in General's font. Swing timer rows on WoW Forever and Classic only; the damage meter where the game has one.</span></div>
+      <div class="opt"><span class="l">Raid frames</span><span class="d">Their borders, health bars and the dark behind them in the theme's color.</span></div>
+      <div class="opt"><span class="l">Recolor</span><span class="d">Action bar art (the gryphons or wyverns and the band), chat tabs and edit box, buff borders, the menu and bag buttons, your cast bar's frame, small windows (popups, loot, ready check, the game menu) and big windows (bags, map, character and the rest).</span></div>
+    </div>
+  </section>
+
+  <section id="overrides">
+    <div class="eyebrow">Over the Show rows</div>
+    <h2>Overrides</h2>
+    <p>Hide or show parts of unit frames, nameplates and action bars, whatever their rows on the Interface pages say. A tab each for <b>You</b>, <b>Target</b> (focus and target of target go with it), <b>Your pet</b>, <b>Nameplates</b> and <b>Action bars</b>; each part is <b>Interface page</b> (as its row says), <b>Hide</b> or <b>Show</b>. Drop the portrait, the name background or the button dividers in one place, and the Interface row shows <i>Overridden: hidden</i> while its own ticks wait underneath. Themes use this too. <b>Clear overrides</b> puts every part back on its row.</p>
+  </section>
+
+  <section id="unit-frames">
+    <div class="eyebrow">Interface · Combat</div>
+    <h2>Unit Frames</h2>
+    <p>How your player, target, focus, pet, target of target and party frames look. A <b>Default</b> row, then a row per frame set to <b>Default row's</b> or <b>Its own look</b>. The Look panel has the bars' fill, health color (the game's, class or reaction, custom, or <b>By health</b>, shifting through three colors as health drops), gradients, the name's font, size and color, the <b>Portrait</b> (their face or a class icon) and its <b>Shape</b>: the game's round frame, Circle, Square, Hexagon, Diamond, Arch, Cut square, Eye, Octagon, Shield, Leaf, Crystal, or none at all for just the name and bars. Which parts show at all is the Interface hub's <a href="frames.html">Unit Frames</a> page. When the game draws your party as raid frames, the Party row points to Raid Frames.</p>
+  </section>
+
+  <section id="cast-bars">
+    <div class="eyebrow">Interface · Combat and Nameplates</div>
+    <h2>Cast Bars</h2>
+    <p>Two pages: the <b>Cast Bars</b> tab of Unit Frames for your bar, your target's and focus's, and the bosses' and arena enemies'; and the <b>Cast Bars</b> tab of Nameplates for the plates'. The Default row on the Unit Frames tab is every cast bar's base look. Each row's <b>These bars</b> picks its look:</p>
+    <div class="opts">
+      <div class="opt"><span class="l">The game's</span><span class="d">Cinematic leaves these bars alone. Every row but the nameplates' starts here.</span></div>
+      <div class="opt"><span class="l">Nameplates' / Unit frames'</span><span class="d">The game's look from the other kind: your cast bar drawn like the nameplates', or the nameplates' drawn like the unit frames'.</span></div>
+      <div class="opt"><span class="l">Default's</span><span class="d">As the Default row says.</span></div>
+      <div class="opt"><span class="l">Unit frame's</span><span class="d">For yours and your target's: part of the unit frame, its fill, border and font, right under its bars.</span></div>
+      <div class="opt"><span class="l">Their own</span><span class="d">A look of their own: fill and a color each for casting, channeling, can't be interrupted and interrupted; the dark ground, size, spark, the spell's icon, shield and important-cast mark, who it's cast at, the spell's name and the seconds left.</span></div>
+    </div>
+  </section>
+
+  <section id="personal">
+    <div class="eyebrow">Interface · Combat</div>
+    <h2>Personal Resources</h2>
+    <p>The bars under your character: their fill, border and background, the health color (the game's, class or custom), gradients, each bar's width and height, and your class resource's size. On retail it also dresses the <b>Cine Mana Bar</b>, the mana bar Cinematic adds when mana isn't your shown power (turned on from the Interface hub's Personal Resources page). When the bars show: <a href="frames.html">Frames</a>.</p>
+  </section>
+
+  <section id="raid">
+    <div class="eyebrow">Interface · Combat</div>
+    <h2>Raid Frames</h2>
+    <p>The raid, party (raid-style) and arena frames: a Default row and a row per group with its own look, health fill and color (By health too), gradient, what's behind the bar, border, and the names' font, size and color. Raid frames keep their class colors in every theme, so you can tell your group apart. No Arena row on WoW Forever, which has no arena frames.</p>
+  </section>
+
+  <section id="action-bars">
+    <div class="eyebrow">Interface · Combat</div>
+    <h2>Action Bars</h2>
+    <p>The game's action buttons: <b>Shape</b> (the game's, Square with trimmed edges, or Round, the cooldown sweep and highlights round too), the empty slots' background, opacity, and an outline round each button (a color of your own or your class color).</p>
+  </section>
+
+  <section id="combat-text">
+    <div class="eyebrow">Interface · Combat</div>
+    <h2>Combat Text</h2>
+    <p>Damage and healing numbers of Cinematic's own over your target's nameplate, in place of the game's. Off to start with; Neon Coast turns it on. A preview plays sample hits on a plate (<b>Test</b>).</p>
+    <div class="opts">
+      <div class="opt"><span class="l">Who draws the numbers</span><span class="d">For your damage, your heals and your pet's damage: <b>Ours</b>, <b>The game's</b> or <b>None</b>. Your pet can be <b>Game's in groups</b>. <b>XP and other floating text</b> is the game's own; hiding it takes a game restart.</span></div>
+      <div class="opt"><span class="l">Quick settings</span><span class="d">Each sets many texts at once: <b>Spell colors</b> (All yellow, or By school), <b>Shows</b> (Everything, Crits and misses, No swings), <b>Placement</b> (Side by side, Stacked, On top, Make room), pet hits, size and duration (both can go <b>By hit kind</b>, longer casts bigger).</span></div>
+      <div class="opt"><span class="l">Look</span><span class="d">Every kind of text in one list, a switch and color each; each starts out as the one it's under. Font, size, crit size, edge, where it starts, how it moves (Up, Down, Arc left or right, Fan out, Stays), time on screen and pop-in. <b>Last hit stays on screen</b> lets a dying mob's last number finish above the middle of the screen.</span></div>
+      <div class="opt"><span class="l">Number style</span><span class="d">22,245 as 22.2K, 22K, or divided down. Retail only.</span></div>
+    </div>
+  </section>
+
+  <section id="nameplates">
+    <div class="eyebrow">Interface · Nameplates</div>
+    <h2>Nameplates</h2>
+    <p>The nameplates' look, in two parts. The first has a <b>Plate theme</b> strip: one made from each main theme, plus <b>Clean</b>, <b>Minimal</b> and <b>The game's</b>; <b>Follow General</b> (to start) takes Quick Settings' bar texture and border. A plate theme you pick here stays when you change the main theme. <b>Customize</b> changes the plates' basic look, and any Smart Style row can have a look of its own: the bar's texture, color and gradient, the name's font, size, outline and shadow, the border, and on WoW Forever and Classic the level box.</p>
+    <p><b>Smart Style</b> is a list of rows (your target, focus, mouseover, aggro on you, elite NPCs, players and the rest): each plate takes its look from the first row that fits it, top to bottom. Each row has a <b>Mark</b> over the plate, a <b>Look</b> for the plate itself (its color, size, opacity) and <b>When</b> it applies. In dungeons and raids the game doesn't let addons change friendly plates. The full tour of the rows is in <a href="nameplates.html">Nameplates and names</a>.</p>
+  </section>
+
+  <section id="names">
+    <div class="eyebrow">Interface · Nameplates</div>
+    <h2>Names</h2>
+    <p>How names look on plates that show just the name. A <b>name theme</b> strip first: one per main theme, plus <b>Bold</b>, <b>Subtle</b>, <b>Storybook</b>, <b>Subtitle</b> (white on a soft dark band, like film subtitles), <b>Lantern</b> and <b>The game's</b>. As with plate themes, one picked here stays when the main theme changes.</p>
+    <p>Then <b>names by kind</b>: a <b>Default</b> row every name starts from, and a row for your target, friendly players (group members and their minions under it), enemy players, hostile, neutral and friendly NPCs, and service NPCs, with a row for each kind of service (vendors, repair, trainers, flight masters, innkeepers, quest givers...). Each row follows the one it's under until you give it its own look:</p>
+    <div class="opts">
+      <div class="opt"><span class="l">Text and Color</span><span class="d">Font, size and opacity; color by how they see you, class, or one color; friendly players blue, in class colors or white.</span></div>
+      <div class="opt"><span class="l">Glow and Band</span><span class="d">A soft light behind the name, or a band of color with a line round it.</span></div>
+      <div class="opt"><span class="l">Letters and NPC titles</span><span class="d">The guild or title line under the name: its font, size and color. Service NPCs' titles can show as an icon (an anvil for repairs), with or without &lt; &gt;.</span></div>
+      <div class="opt"><span class="l">Distance and timing</span><span class="d">Hide delay, fade time, <b>Raise</b>, and their size close to and far from the camera (or one size at any distance).</span></div>
+    </div>
+  </section>
+
+  <section id="bubbles">
+    <div class="eyebrow">Interface · Info</div>
+    <h2>Chat Bubbles</h2>
+    <p>Two tabs. <b>Bubbles</b>: the font, size and outline, what's behind the words (the game's bubble, Dark, Custom, or just the words), its edge, opacity and the tail. <b>Behind Bubbles</b>: <b>Speech from behind you</b>, says and yells shown low on the screen when their bubble is off it, with who said it, which way the lines slide, their size and where they sit (<b>Move</b>). Where bubbles show at all: <a href="chat-and-quests.html#bubbles">Chat and quests</a>.</p>
+  </section>
+
+  <section id="tooltips">
+    <div class="eyebrow">Interface · Info</div>
+    <h2>Tooltips</h2>
+    <p>The game's tooltips: the health bar (texture, under the tooltip or along the top, color, gradient, height), the font and text size, names in class or reaction colors, the edge (plain or in the unit's or item's color), and the background's color and opacity.</p>
+  </section>
+
+  <section id="visions">
+    <div class="eyebrow">Visions</div>
+    <h2>The Visions' looks</h2>
+    <p><b>All Visions</b> is the look every Vision shares: font, outline, shadow, text size, bar texture and border, and which Visions follow it (<b>Use Visions Style</b> puts one back). Each Vision then has its own page:</p>
+    <div class="opts">
+      <div class="opt"><span class="l">Damage</span><span class="d">Damage Vision's bar: texture, colors (Behind and ahead, your class, or your own two), border and height. It reads the game's own damage meter, so only does something where the game has one. See <a href="visions.html#damage">Visions</a>.</span></div>
+      <div class="opt"><span class="l">Vitals</span><span class="d">Vitals Vision's edges: a theme (<b>Auto</b> picks one for your class and spec, <b>More themes</b> has the rest), its sound, strength, reach, darkness, colors and heartbeat. Make, copy, share and import themes of your own. The themes built from the game's own full-screen effects are retail only.</span></div>
+      <div class="opt"><span class="l">Quest: Dialogue</span><span class="d">How NPC dialogue looks: Parchment, Chat bubble, Dark or None; the NPC's portrait, scale, bubble height, where the quest card goes, the font, and number keys and Space to reply.</span></div>
+      <div class="opt"><span class="l">Quest: Quest Item Button</span><span class="d">The big quest item button: size, shape, frame, a glow when it's ready, how the cooldown shows, and its key binding in the corner.</span></div>
+      <div class="opt"><span class="l">Roll</span><span class="d">The roll window: cards on the game's frame, Flat or nothing, Roomy or Compact rows, the time-left bar, picks as icons or words (Need, Greed, Transmog in their colors), and how the winner's row is lit. Where the game keeps a loot history.</span></div>
+      <div class="opt"><span class="l">Emote</span><span class="d">Emote Vision's card: its style, words, frame, the portrait, its scale and where it sits.</span></div>
+      <div class="opt"><span class="l">Card Types</span><span class="d">The card types every card starts from: change one and every card using it changes. Each says which cards use it, and how many settings you've changed.</span></div>
+    </div>
+  </section>
+
+  <section id="atmosphere">
+    <div class="eyebrow">Atmosphere</div>
+    <h2>Tint and Letterbox</h2>
+    <p><b>Tint</b> is the color grading over the world: pick a look (zone moods and the time of day together, either alone, a single color, or none), make tints of your own, set the strength, the color of each part of the day, and each zone's or area's mood. <b>Letterbox</b> is the bars' look: their height as a share of the screen or the shape of a film's frame (2.39:1, 2:1, 1.85:1), color, opacity, a soft feathered edge, a line along it, and whether they slide or fade in. Where and when each shows, and the rest of the scene: <a href="look.html">Look and mood</a>.</p>
+  </section>
+
+  <section>
+    <div class="eyebrow">Questions</div>
+    <h2>Good to know</h2>
+    <dl class="faq">
+      <div><dt>I picked a theme and now I want the game's look back.</dt><dd>Pick <b>The game's</b> on Themes, or turn off <b>Enable Style</b> on General to set every page aside without losing anything.</dd></div>
+      <div><dt>Will picking a theme undo my nameplate or name theme?</dt><dd>No. A plate or name theme picked on its own page stays. To keep any other part as it is, untick its <b>Theme</b> tick on General.</dd></div>
+      <div><dt>I changed a few things. Are they lost if I switch themes?</dt><dd>You're asked first. <b>Save as a new theme</b> keeps them under Yours, for every profile on your account.</dd></div>
+      <div><dt>Interface Recolor does nothing.</dt><dd>It tints in the theme's color, so it needs a theme picked: with The game's, everything keeps the game's colors.</dd></div>
+      <div><dt>Can I share my look?</dt><dd>Share a theme of yours as a line of text, or share your whole profile: see <a href="../reference/sharing.html">Sharing profiles</a>.</dd></div>
+    </dl>
+  </section>
+
+</div>
+</main>
+</body>
+</html>
