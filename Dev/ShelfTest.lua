@@ -18,6 +18,11 @@
 --            things), the first tile offering Turn on clicked: its tag
 --            after, the button gone; then your level's card again and
 --            Subtle's saved changes put back as they were;
+--   tour:    Watch the tour clicked: the plan's order, the window faded the
+--            whole way, the notice's n of N, Emote held about 15 s; then
+--            Stop on the notice ends it;
+--   links:   each Also in Cinematic link opens its page; closing the
+--            settings brings the welcome window back;
 --   saved:   the shelf closed again, the window back to its height, the
 --            open state saved and cleared.
 -- Stand still (the camera tiles end when you move). CineMode off while it
@@ -339,7 +344,7 @@ end
 -- list: what to test, words apart ("questCam duel search"): tiles by their
 -- keys, and the parts groups, search, turnon. None: everything. The size
 -- and the closing again always run (a second, and they open the shelf).
-local PARTS = { groups = true, search = true, turnon = true }
+local PARTS = { groups = true, search = true, turnon = true, tour = true, links = true }
 function ns.ShelfTest(list)
 	-- (Never the Ctrl+C copy window over the game: the user's rule; its lines
 	-- are in chat and the log. Set first: the start's lines opened it.)
@@ -471,6 +476,105 @@ function ns.ShelfTest(list)
 	end
 	for _, b in ipairs(row.ShelfTiles()) do
 		if Want(b.demo.key) then steps[#steps + 1] = TileStep(b) end
+	end
+	-- The tour: Watch the tour clicked; every half second, what plays (its
+	-- place, n of N), the window's alpha and the notice; its order against
+	-- the plan's (the steps this level can play), the window faded all the
+	-- way, the notice up with "of" in it, Emote Vision held about 15 s; back
+	-- after. Then again, Stop on the notice after 3 s: it all ends.
+	steps[#steps + 1] = Want("tour") and function(Next)
+		local window = _G.CinematicWelcome
+		local expected = row.TourKeys()
+		local alphaWas = window:GetAlpha()
+		Log(("tour: expected %s (Shoulder Cam's yes %s)"):format(table.concat(expected, ", "),
+			tostring(ns.db.shoulderCamNoticed)))
+		ns.TestPrompt("Shelf test: the tour, about a minute and a half. Stand still and watch.", 6)
+		row.TourButton:Click()
+		local seen, faded, noticed, samples, emoteFrom, emoteFor = {}, true, true, 0, nil, nil
+		local began = GetTime()
+		local ticker
+		ticker = C_Timer.NewTicker(0.5, function()
+			if not run then ticker:Cancel() return end
+			local key, n, total = ns.ShowMeNow()
+			local touring = ns.ShowMeTouring()
+			if touring then
+				samples = samples + 1
+				local alpha = window:GetAlpha()
+				if alpha > 0.35 then faded = false end
+				local box = row.Notice()
+				local title = box and box:IsShown() and box.title:GetText() or nil
+				if key and not (title and title:find(tostring(total), 1, true)) then noticed = false end
+				if key and seen[#seen] ~= key then
+					seen[#seen + 1] = key
+					Log(("tour +%.1f: %s, %s of %s, window %.2f, notice \"%s\" / \"%s\""):format(GetTime() - began,
+						key, tostring(n), tostring(total), alpha, tostring(title),
+						tostring(box and box.line:GetText())))
+					if key == "emote" then emoteFrom = GetTime() elseif emoteFrom and not emoteFor then
+						emoteFor = GetTime() - emoteFrom
+					end
+				end
+				if GetTime() - began < 200 then return end
+			end
+			ticker:Cancel()
+			local ok = #seen == #expected
+			for i, key in ipairs(expected) do ok = ok and seen[i] == key end
+			Log(("tour: played %s in %.0f s"):format(table.concat(seen, ", "), GetTime() - began))
+			Verdict(ok, ("the tour played the plan's order (%d of %d)"):format(#seen, #expected))
+			Verdict(faded and samples > 0, "the window stayed faded the whole tour")
+			Verdict(noticed, "the notice showed each step with its n of N")
+			if emoteFor then Verdict(emoteFor <= 17, ("Emote Vision held about 15 s (%.0f)"):format(emoteFor)) end
+			Verdict(math.abs(window:GetAlpha() - alphaWas) < 0.01 and window:IsMouseEnabled(), "the window back after")
+			-- And Stop: the notice's, 3 s in.
+			row.TourButton:Click()
+			C_Timer.After(3, function()
+				if not run then return end
+				local box = row.Notice()
+				local stopWas = box and box:IsShown() and box.stop
+				if stopWas then stopWas:Click() end
+				C_Timer.After(0.5, function()
+					if not run then return end
+					Verdict(stopWas and not ns.ShowMeTouring() and not ns.ShowMeNow() and window:GetAlpha() > 0.9,
+						"the notice's Stop ends the tour")
+					Next()
+				end)
+			end)
+		end)
+	end
+	-- The links: each shown under All clicked: its settings page open (the
+	-- page shown), the Back button up; then the settings closed: the welcome
+	-- window back, the shelf open.
+	steps[#steps + 1] = Want("links") and function(Next)
+		local panel = SettingsPanel or InterfaceOptionsFrame
+		local shownLinks = {}
+		for _, a in ipairs(row.ShelfLinks) do
+			if a:IsShown() then shownLinks[#shownLinks + 1] = a end
+		end
+		Log("links shown: " .. #shownLinks)
+		local i = 0
+		local function One()
+			if not run then return end
+			i = i + 1
+			local a = shownLinks[i]
+			if not a then return Next() end
+			a:Click()
+			C_Timer.After(0.6, function()
+				if not run then return end
+				local page = ns.ShownOptionsPage and ns.ShownOptionsPage()
+				local open = panel and ns.Flag(panel:IsShown())
+				Log(("link %s: settings open %s, page shown %s"):format(a.link.page, tostring(open), tostring(page)))
+				Verdict(open and page ~= nil, a.link.page .. " opens its page")
+				if panel and open then
+					if panel.Close then panel:Close(true) else HideUIPanel(panel) end
+				end
+				C_Timer.After(0.6, function()
+					if not run then return end
+					local window = _G.CinematicWelcome
+					Verdict(window and window:IsShown() and row:IsVisible(), a.link.page .. ": closing it brings the welcome window back")
+					One()
+				end)
+			end)
+		end
+		One()
 	end
 	steps[#steps + 1] = Want("turnon") and function(Next)
 		-- Turn on needs a level missing something: Subtle (the user's OK,

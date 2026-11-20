@@ -309,6 +309,11 @@ end
 
 local current -- { key, def, untilAt, hidden, alpha, mice }
 local FADED_ALPHA = 0.3 -- the window's while a camera demo runs
+-- The tour (below): its steps one after another. advancing: the tour itself
+-- moving on (a demo's natural end, its next start), which doesn't end it.
+local tour -- { steps, i, hideFrame, hidden, alpha, mice, timer, holdKey }
+local advancing = false
+local TourNext, TourEnd
 
 -- A frame and every frame in it no longer taking the mouse (each one's
 -- setting kept in mice, to put back): a faded window still takes the clicks
@@ -686,31 +691,38 @@ if ns.SetProfile then
 	end
 end
 
+-- A frame faded and its mouse let through (MouseOff), and back.
+local function Unfade(frame, alpha, mice)
+	frame:SetAlpha(alpha)
+	for _, each in ipairs(mice) do
+		if each.click then each.frame:EnableMouse(true) end
+		if each.wheel then each.frame:EnableMouseWheel(true) end
+		if each.backdrop then each.frame:SetBackdropColor(unpack(each.backdrop)) end
+	end
+end
+
+-- (Anything but the tour moving on also ends the tour: a Stop, the window
+-- closing, a profile switched, a fight.)
 function ns.StopShowMe()
 	local run = current
-	if not run then return end
-	current = nil
-	if ticker then
-		ticker:Cancel()
-		ticker = nil
-	end
-	if run.def.effects then
-		ns.effectsDemo = nil
-		ns.letterboxDirty = true
-		if ns.RefreshTint then ns.RefreshTint() end
-	end
-	if run.def.camera then StopOrbit() end
-	if run.def.stop then pcall(run.def.stop) end
-	if run.switched then SwitchesBack() end
-	if run.hidden then
-		run.hidden:SetAlpha(run.alpha)
-		for _, each in ipairs(run.mice) do
-			if each.click then each.frame:EnableMouse(true) end
-			if each.wheel then each.frame:EnableMouseWheel(true) end
-			if each.backdrop then each.frame:SetBackdropColor(unpack(each.backdrop)) end
+	if run then
+		current = nil
+		if ticker then
+			ticker:Cancel()
+			ticker = nil
 		end
+		if run.def.effects then
+			ns.effectsDemo = nil
+			ns.letterboxDirty = true
+			if ns.RefreshTint then ns.RefreshTint() end
+		end
+		if run.def.camera then StopOrbit() end
+		if run.def.stop then pcall(run.def.stop) end
+		if run.switched then SwitchesBack() end
+		if run.hidden then Unfade(run.hidden, run.alpha, run.mice) end
 	end
-	Notify()
+	if not advancing and tour then TourEnd() end
+	if run then Notify() end
 end
 
 -- A demo running for at least seconds more (the welcome window's tint
@@ -725,20 +737,26 @@ local function Tick()
 	if not run then return end
 	if GetTime() >= run.untilAt or (run.def.camera and not orbit)
 		or (run.def.running and not run.def.running()) then
+		-- (Ended by itself, its time up or you moved: a tour goes on to its next.)
+		advancing = true
 		ns.StopShowMe()
+		advancing = false
+		if tour then TourNext() end
 	end
 end
 
-function ns.ShowMe(key, hideFrame, force)
+-- seconds: how long, in place of the demo's own (the tour's Emote Vision).
+-- True if it started (a once demo: shown).
+function ns.ShowMe(key, hideFrame, force, seconds)
 	if ns.ShowMeRunning(key) then
 		ns.StopShowMe()
-		return
+		return false
 	end
 	ns.StopShowMe()
 	local def = DEMOS[key]
-	if not def or ns.ShowMeBlocked(key, force) then return end
+	if not def or ns.ShowMeBlocked(key, force) then return false end
 	-- (Another camera of ours moving the view, or you: none.)
-	if def.camera and not StartOrbit(def.seconds) then return end
+	if def.camera and not StartOrbit(seconds or def.seconds) then return false end
 	-- (Not for a once demo: nothing's left running to put them back after.)
 	local switched = force and def.switches and not def.once and not InCombatLockdown()
 	if switched then SwitchesOn(def) end
@@ -747,15 +765,15 @@ function ns.ShowMe(key, hideFrame, force)
 	if not started then
 		ns.Log("showme", ("%s didn't start: %s"):format(key, tostring(err)))
 		if switched then SwitchesBack() end
-		return
+		return false
 	end
-	if def.once then return end
+	if def.once then return true end
 	if def.effects then
 		ns.effectsDemo = def.effects
 		ns.letterboxDirty = true
 		if ns.RefreshTint then ns.RefreshTint() end
 	end
-	current = { key = key, def = def, untilAt = GetTime() + def.seconds, switched = switched }
+	current = { key = key, def = def, untilAt = GetTime() + (seconds or def.seconds), switched = switched }
 	if (def.camera or def.fade) and hideFrame then
 		-- (Faded, the world showing through, and the mouse passing through
 		-- it to the world: Escape still closes it.)
@@ -766,4 +784,83 @@ function ns.ShowMe(key, hideFrame, force)
 	end
 	ticker = C_Timer.NewTicker(0.2, Tick)
 	Notify()
+	return true
 end
+
+-- The tour (the welcome window's Watch the tour, and the shelf's Play all):
+-- steps, each { key, seconds (nil: its own), skip (true: left out) }, played
+-- one after another, the window faded the whole way (the plan's open
+-- question, leaned yes). Each goes on as the last ends by itself, its time
+-- up or you moved (the AFK Cam stops on input): a step that can't play is
+-- passed over. A once demo (a card) is held TOUR_ONCE seconds. Stop, the
+-- window closing, a profile switched or a fight ends it.
+local TOUR_ONCE = 6
+function TourEnd()
+	local was = tour
+	if not was then return end
+	tour = nil
+	if was.timer then was.timer:Cancel() end
+	if was.hidden then Unfade(was.hidden, was.alpha, was.mice) end
+	Notify()
+end
+function TourNext()
+	local t = tour
+	if not t then return end
+	t.holdKey = nil
+	t.i = t.i + 1
+	local step = t.steps[t.i]
+	if not step then return TourEnd() end
+	advancing = true
+	local started = ns.ShowMe(step.key, t.hideFrame, true, step.seconds)
+	advancing = false
+	if tour ~= t or current then return end
+	if started then
+		-- (shown and done: held a moment, then on)
+		t.holdKey = step.key
+		t.timer = C_Timer.NewTimer(TOUR_ONCE, function()
+			t.timer = nil
+			if tour == t then TourNext() end
+		end)
+		Notify()
+	else
+		ns.Log("showme", "tour: passed over " .. step.key)
+		return TourNext()
+	end
+end
+-- Starts it (again: stops). False with nothing it can play now.
+function ns.ShowMeTour(steps, hideFrame)
+	if tour then
+		ns.StopShowMe()
+		return false
+	end
+	ns.StopShowMe()
+	if InCombatLockdown() then return false end
+	local list = {}
+	for _, step in ipairs(steps) do
+		if not step.skip and ns.ShowMeAvailable(step.key) and not ns.ShowMeBlocked(step.key, true) then
+			list[#list + 1] = step
+		end
+	end
+	if #list == 0 then return false end
+	tour = { steps = list, i = 0, hideFrame = hideFrame }
+	if hideFrame then
+		tour.hidden, tour.alpha, tour.mice = hideFrame, hideFrame:GetAlpha(), {}
+		hideFrame:SetAlpha(FADED_ALPHA)
+		MouseOff(hideFrame, tour.mice)
+		GameTooltip:Hide()
+	end
+	TourNext()
+	return true
+end
+function ns.ShowMeTouring() return tour ~= nil end
+-- What's playing now, for the notice: its key (a tour's held card too), and
+-- during a tour its place: n of N.
+function ns.ShowMeNow()
+	local key = current and current.key or (tour and tour.holdKey)
+	if not key then return nil end
+	return key, tour and tour.i, tour and #tour.steps
+end
+-- (A fight begins: the tour ends, before the lock.)
+local tourFrame = CreateFrame("Frame")
+tourFrame:RegisterEvent("PLAYER_REGEN_DISABLED")
+tourFrame:SetScript("OnEvent", function() if tour then ns.StopShowMe() end end)

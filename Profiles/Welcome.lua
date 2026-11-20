@@ -464,6 +464,121 @@ local SHELF_MORE = {
 	{ key = "speech", label = "Speech", icon = "Interface\\Icons\\Ability_Warrior_RallyingCry", group = "ui",
 		tip = "What's said behind you shows as a bubble, so you don't miss it." },
 }
+-- While one plays, the notice at the top of the screen says what it is in a
+-- line (the plan's, docs/design/welcome-shelf.md; others: their tip's first
+-- sentence).
+local NOTICE_LINES = {
+	fadeUI = "Your UI fades away between fights and comes back when you need it.",
+	bars = "Black bars at the top and bottom, as in a film.",
+	tint = "A color wash that follows the time of day, the zone and the weather.",
+	afk = "Go AFK and the camera sweeps slowly around you.",
+	shoulder = "The camera sits over your shoulder, with you to one side.",
+	vitals = "The screen's edges close in as your health drops.",
+	emote = "Other players' emotes show as film dialogue over their heads.",
+	cards = "Title cards for the moments of your day: a new zone, a level, a fight.",
+	tele = "A portal opens as you hearth or teleport, and the world fades out.",
+}
+-- The tour, in the plan's order: the highlights one after another. Emote
+-- Vision's card stays up till it goes (up to 60 s): 15 here. The Shoulder Cam
+-- only once you've said yes to its experimental setting: a tour mustn't say
+-- it for you. (Quest and Damage Vision left out on purpose: few use them.)
+local TOUR = { { key = "fadeUI" }, { key = "bars" }, { key = "tint" }, { key = "afk" }, { key = "shoulder" },
+	{ key = "vitals" }, { key = "emote", seconds = 15 }, { key = "cards" }, { key = "tele" } }
+-- The features with nothing to play: a line of links under the grid, "Also
+-- in Cinematic", each opening its settings page (by its English name, as
+-- ns.OpenOptions takes it) over the welcome window, closing back to it. The
+-- ones waiting for a demo of their own (Heal Vision, Mouseover, Nameplates,
+-- Chat Bubbles, Combat Text, Skyriding Cam) are here till they have one.
+local SHELF_LINKS = {
+	{ page = "Graphics+", label = "Graphics Boost", group = "atmo",
+		tip = "Raises the game's view distance and shadows in quiet moments, and lowers them for a fight." },
+	{ page = "Skyriding Cam", label = "Skyriding Cam", group = "cam",
+		tip = "Pulls the camera back and widens the view as you pick up speed skyriding." },
+	{ page = "Camera Scripts", label = "Camera Scripts", group = "cam",
+		tip = "Chains of camera moves you write and play back." },
+	{ page = "My Shots", label = "My Shots", group = "cam",
+		tip = "Your own saved camera shots, played from a key or a wheel." },
+	{ page = "Heal Vision", label = "Heal Vision", group = "vis",
+		tip = "Your group's health shows only for who needs healing, so a healer can keep the UI hidden." },
+	{ page = "Quest Vision", label = "Quest Vision", group = "vis",
+		tip = "Quest mobs keep their nameplates, with a quest mark." },
+	{ page = "Duel Vision", label = "Duel Vision", group = "vis",
+		tip = "In CineMode, the nameplates of two players dueling near you show." },
+	{ page = "Mouseover groups", label = "Mouseover", group = "ui",
+		tip = "Point at where a faded frame lives and it comes back, with its group." },
+	{ page = "Nameplates", label = "Nameplates", group = "ui",
+		tip = "Nameplates that show only for what matters: your target, a mob on you, a friend in need." },
+	{ page = "Chat bubbles", label = "Chat Bubbles", group = "ui",
+		tip = "Chat bubbles restyled, so talk stays readable with your UI gone." },
+	{ page = "Tooltips", label = "Tooltips", group = "ui", tip = "Which parts of a tooltip show, and where it sits." },
+	{ page = "Cursor Hide", label = "Cursor Hide", group = "ui", tip = "Hides the mouse cursor when you aren't using it." },
+	{ page = "Style Themes", label = "Themes", group = "style", tip = "One look for your whole UI: fonts, borders, colors." },
+	{ page = "Unit Style", label = "Unit Frames Style", group = "style",
+		tip = "Restyles your player, target and focus frames." },
+	{ page = "Nameplate Style", label = "Nameplate Style", group = "style",
+		tip = "Shapes, bars and cast bars for nameplates." },
+	{ page = "Combat Text Style", label = "Combat Text", group = "style",
+		tip = "Damage and heal numbers in a cleaner style." },
+	{ page = "Your wheels", label = "Wheels", group = "qol",
+		tip = "Radial menus on a key: cameras, menus, raid markers, Visions." },
+	{ page = "Keyboard Map", label = "Keyboard Map", group = "qol",
+		tip = "Your keybinds drawn on a keyboard, to see what's free." },
+	{ page = "Fishing", label = "Fishing", group = "qol", tip = "Fish with one key, with louder splashes." },
+	{ page = "Hunter", label = "Hunter", group = "qol", tip = "Pet and ammo reminders for hunters." },
+}
+-- Each demo by key (the notice's name and line).
+local DEMO_BY_KEY = {}
+for _, demo in ipairs(DEMO_ROW) do DEMO_BY_KEY[demo.key] = demo end
+for _, demo in ipairs(SHELF_MORE) do DEMO_BY_KEY[demo.key] = demo end
+-- The steps for keys (a tour), the Shoulder Cam left out until it's had its yes.
+local function TourSteps(steps)
+	local out = {}
+	for _, step in ipairs(steps) do
+		out[#out + 1] = { key = step.key, seconds = step.seconds,
+			skip = step.key == "shoulder" and not (ns.db and ns.db.shoulderCamNoticed) or nil }
+	end
+	return out
+end
+
+-- The notice: what's playing, at the top of the screen, over the faded window
+-- and the world: its name, "n of N" in a tour, its line, and Stop. Not a
+-- child of UIParent: the Fading UI demo fades all of that.
+local notice
+local function UpdateNotice()
+	-- (not "a and f()": that keeps only the first of its returns)
+	local key, n, total
+	if ns.ShowMeNow then key, n, total = ns.ShowMeNow() end
+	local demo = key and DEMO_BY_KEY[key]
+	if not (demo and window and window:IsShown()) then
+		if notice then notice:Hide() end
+		return
+	end
+	if not notice then
+		notice = CreateFrame("Frame", nil, nil, BackdropTemplateMixin and "BackdropTemplate")
+		notice:SetFrameStrata("FULLSCREEN_DIALOG")
+		notice:SetPoint("TOP", UIParent, "TOP", 0, -60)
+		Flat(notice, BG, GOLD)
+		notice.title = Text(notice, "GameFontNormal", "", WHITE)
+		notice.title:SetPoint("TOPLEFT", 14, -10)
+		notice.line = Text(notice, "GameFontHighlightSmall", "", SOFT)
+		notice.line:SetPoint("TOPLEFT", notice.title, "BOTTOMLEFT", 0, -5)
+		notice.stop = FlatButton(notice, L["Stop"], "box", function() ns.StopShowMe() end)
+		notice.stop:SetSize(72, 24)
+		notice.stop:SetPoint("RIGHT", -12, 0)
+	end
+	notice:SetScale(UIParent:GetEffectiveScale())
+	local name = "|cffffd100" .. L[demo.label] .. "|r"
+	notice.title:SetText(n and (L["Playing %s, %d of %d"]):format(name, n, total) or (L["Playing %s"]):format(name))
+	local line = NOTICE_LINES[key] and L[NOTICE_LINES[key]] or (L[demo.tip]:match("^(.-[%.!])%s") or L[demo.tip])
+	notice.line:SetWidth(0)
+	notice.line:SetText(line)
+	local w = math.max(notice.title:GetStringWidth(), math.min(460, notice.line:GetStringWidth()))
+	notice.line:SetWidth(w)
+	notice:SetSize(w + 14 + 12 + 72 + 16, notice.title:GetStringHeight() + notice.line:GetStringHeight() + 25)
+	notice:Show()
+end
+
+local OpenPageFromWelcome -- (below, with the window's close: a settings page over it, and back)
 local DEMO_ROW_H = 74
 local SHELF_H = 222   -- the shelf open: the grid scrolls inside it
 local TILE_H, TILE_GAP = 38, 6
@@ -478,6 +593,27 @@ local function BuildDemoRow(page, width)
 	local hint = Text(row, "GameFontHighlightSmall", "", DIM)
 	hint:SetJustifyH("RIGHT")
 	hint:SetPoint("TOPRIGHT", -12, -9)
+	-- Watch the tour, on the right of the header: there before the shelf's
+	-- open (Stop the tour while it plays; gone in a fight, the hint says why).
+	local tourButton = FlatButton(row, L["Watch the tour \194\183 1\194\189 min"], nil, function()
+		if ns.ShowMeTouring and ns.ShowMeTouring() then
+			ns.StopShowMe()
+		elseif ns.ShowMeTour then
+			ns.ShowMeTour(TourSteps(TOUR), window)
+		end
+	end)
+	tourButton:SetPoint("TOPRIGHT", -8, -4)
+	Color(tourButton.text, GOLD)
+	tourButton:SetScript("OnEnter", function(self)
+		Color(self.text, WHITE)
+		about:SetText("|cffffd100" .. L["Watch the tour"] .. "|r   " ..
+			L["The highlights one after another: your UI fading, the letterbox and tint, a camera, the Shoulder Cam if " ..
+			"you've said yes to it, Vitals, Emote and Card Visions, a teleport. Stop any time."])
+	end)
+	tourButton:SetScript("OnLeave", function(self)
+		Color(self.text, GOLD)
+		Describe(levelOf[Active()])
+	end)
 	local list, all = {}, {}
 	for _, demo in ipairs(DEMO_ROW) do
 		if ns.ShowMeAvailable and ns.ShowMeAvailable(demo.key) then
@@ -781,8 +917,14 @@ local function BuildDemoRow(page, width)
 	local gridX = NAV_W + 12
 	local gridW = width - 24 - gridX
 	-- (The search box: flat, a grey hint inside while empty.)
+	-- (Play all, on the search's right: the tour for All, the group's tiles in
+	-- turn for a group, or the ones found by a search. Stop the tour meanwhile.)
+	local PLAY_W = 168
+	local play = FlatButton(shelf, "", "box", function() end)
+	play:SetSize(PLAY_W, 22)
+	play:SetPoint("TOPRIGHT", 0, -10)
 	local search = CreateFrame("EditBox", nil, shelf, BackdropTemplateMixin and "BackdropTemplate")
-	search:SetSize(gridW, 22)
+	search:SetSize(gridW - PLAY_W - 8, 22)
 	search:SetPoint("TOPLEFT", gridX, -10)
 	Flat(search, RAISED, EDGE)
 	search:SetFontObject("GameFontHighlightSmall")
@@ -845,6 +987,29 @@ local function BuildDemoRow(page, width)
 	end
 	local empty = Text(grid, "GameFontHighlightSmall", "", DIM, gridW - 16)
 	empty:SetPoint("TOPLEFT", 4, -6)
+	-- Also in Cinematic: a link per page, flowed across the grid's width.
+	local alsoHead = Text(grid, "GameFontNormalSmall", L["Also in Cinematic:"], GOLD)
+	alsoHead:Hide()
+	local links = {}
+	for _, link in ipairs(SHELF_LINKS) do
+		local a = CreateFrame("Button", nil, grid)
+		a.text = Text(a, "GameFontHighlightSmall", L[link.label], SOFT)
+		a.text:SetPoint("LEFT")
+		a:SetSize(a.text:GetStringWidth() + 2, 16)
+		a:SetScript("OnClick", function() if OpenPageFromWelcome then OpenPageFromWelcome(link.page) end end)
+		a:SetScript("OnEnter", function(self)
+			Color(self.text, GOLD)
+			about:SetText("|cffffd100" .. L[link.label] .. "|r   " .. L[link.tip] .. "\n" ..
+				L["Nothing to play: click to open its settings. Closing them brings you back here."])
+		end)
+		a:SetScript("OnLeave", function(self)
+			Color(self.text, SOFT)
+			Describe(levelOf[Active()])
+		end)
+		a.link = link
+		a:Hide()
+		links[#links + 1] = a
+	end
 	-- (the words searched, in this language, against each tile's name and tip)
 	local function Matches(demo, words)
 		if words == "" then return saved.group == "all" or demo.group == saved.group end
@@ -885,11 +1050,65 @@ local function BuildDemoRow(page, width)
 				shown = shown + n
 			end
 		end
-		empty:SetText(shown == 0 and (L["Nothing called \"%s\" plays here."]):format(search:GetText() or "") or "")
+		-- (the links that match, after the tiles; pages this client has)
+		alsoHead:Hide()
+		local x, linkCount = 0, 0
+		for _, a in ipairs(links) do
+			local fits = Matches(a.link, words) and (not ns.HasOptionsPage or ns.HasOptionsPage(a.link.page))
+			a:SetShown(fits and true or false)
+			if fits then
+				if linkCount == 0 then
+					y = y + (shown > 0 and 6 or 24)
+					alsoHead:ClearAllPoints()
+					alsoHead:SetPoint("TOPLEFT", 2, -y)
+					alsoHead:Show()
+					x = alsoHead:GetStringWidth() + 10
+				end
+				if x + a:GetWidth() > gridW - 12 then
+					x, y = 2, y + 18
+				end
+				a:ClearAllPoints()
+				a:SetPoint("TOPLEFT", x, -y)
+				x = x + a:GetWidth() + 14
+				linkCount = linkCount + 1
+			end
+		end
+		if linkCount > 0 then y = y + 22 end
+		empty:SetText(shown > 0 and "" or linkCount > 0 and L["Nothing to play for that: it's a setting, below."]
+			or (L["Nothing called \"%s\" plays here."]):format(search:GetText() or ""))
 		grid:SetHeight(math.max(1, y))
 		ScrollTo(0)
 		if row.Update then row:Update(nil, true) end
 	end
+
+	-- (The notice follows every demo, the window's row shown or not.)
+	if ns.ShowMeListen then ns.ShowMeListen(UpdateNotice) end
+	play:SetScript("OnClick", function()
+		if ns.ShowMeTouring and ns.ShowMeTouring() then
+			ns.StopShowMe()
+			return
+		end
+		local words = (search:GetText() or ""):match("^%s*(.-)%s*$")
+		if words == "" and saved.group == "all" then
+			ns.ShowMeTour(TourSteps(TOUR), window)
+			return
+		end
+		local steps = {}
+		for _, b in ipairs(tiles) do
+			if b:IsShown() then steps[#steps + 1] = { key = b.demo.key } end
+		end
+		ns.ShowMeTour(TourSteps(steps), window)
+	end)
+	play:SetScript("OnEnter", function(self)
+		if self:IsEnabled() then self:SetBackdropBorderColor(unpack(LIT)) Color(self.text, WHITE) end
+		about:SetText("|cffffd100" .. self.text:GetText() .. "|r   " ..
+			L["Plays each in turn, a few seconds each. Stop any time."])
+	end)
+	play:SetScript("OnLeave", function(self)
+		self:SetBackdropBorderColor(unpack(EDGE))
+		Color(self.text, SOFT)
+		Describe(levelOf[Active()])
+	end)
 
 	local function Paint(b)
 		local key = b.demo.key
@@ -930,6 +1149,16 @@ local function BuildDemoRow(page, width)
 		hint:SetText(fight and L["In a fight: demos wait till it ends."] or "")
 		fightLine:SetShown(fight)
 		search:SetShown(not fight)
+		-- (the tour buttons: Stop the tour while one plays; none in a fight)
+		local touring = ns.ShowMeTouring and ns.ShowMeTouring()
+		tourButton:SetShown(not fight)
+		tourButton:SetLabel(touring and L["Stop the tour"] or L["Watch the tour \194\183 1\194\189 min"])
+		play:SetShown(not fight)
+		local words = (search:GetText() or ""):match("^%s*(.-)%s*$")
+		local group = groupOf[saved.group]
+		play:SetLabel(touring and L["Stop the tour"] or words ~= "" and L["Play these"]
+			or (not group or group.key == "all") and L["Watch the tour"] or (L["Play all in %s"]):format(L[group.label]))
+		UpdateNotice()
 		for _, b in ipairs(buttons) do
 			if b:IsShown() then Paint(b) end
 		end
@@ -960,6 +1189,18 @@ local function BuildDemoRow(page, width)
 	more:SetScript("OnClick", function() SetOpen(not shelf:IsShown()) end)
 	row.SetShelfOpen = SetOpen
 	row.ShelfTiles = function() return tiles end
+	-- (for Dev/ShelfTest.lua: the tour's buttons, its keys, the notice, the links)
+	row.TourButton, row.PlayButton, row.ShelfLinks = tourButton, play, links
+	row.TourKeys = function()
+		local keys = {}
+		for _, step in ipairs(TourSteps(TOUR)) do
+			if not step.skip and ns.ShowMeAvailable(step.key) and not ns.ShowMeBlocked(step.key, true) then
+				keys[#keys + 1] = step.key
+			end
+		end
+		return keys
+	end
+	row.Notice = function() return notice end
 	SetOpen(saved.open == true)
 
 	local function Recheck() if row:IsVisible() then row:Update(nil, true) end end
@@ -1431,6 +1672,40 @@ end
 -- Closed (the X, Escape, Done or Decide later): what's on now, in chat.
 -- (Not on the way to the settings: those say it.)
 local toSettings, afterClose
+
+-- The shelf's page links: the welcome window closes onto that settings page
+-- (no chat line, as for Settings), with a Back button over its top-left;
+-- Back, or closing the settings any way, brings the welcome window back.
+local backButton, backTo
+function OpenPageFromWelcome(page)
+	if InCombatLockdown() or not window then return end
+	local panel = SettingsPanel or InterfaceOptionsFrame
+	toSettings = true
+	window:Hide()
+	ns.OpenOptions(page)
+	if not (panel and ns.Flag(panel:IsShown())) then
+		ns.ShowWelcome() -- (it didn't open: straight back)
+		return
+	end
+	if not backButton then
+		backButton = FlatButton(nil, L["< Back to the welcome window"], "box", function()
+			if panel.Close then panel:Close(true) else HideUIPanel(panel) end
+		end)
+		backButton:SetFrameStrata("FULLSCREEN_DIALOG")
+		backButton:SetSize(backButton.text:GetStringWidth() + 28, 26)
+		panel:HookScript("OnHide", function()
+			if not backTo then return end
+			backTo = false
+			backButton:Hide()
+			C_Timer.After(0, function() if not InCombatLockdown() then ns.ShowWelcome() end end)
+		end)
+	end
+	backButton:SetScale(UIParent:GetEffectiveScale()) -- (no parent: the UI's scale, as the test box takes it)
+	backButton:ClearAllPoints()
+	backButton:SetPoint("BOTTOMLEFT", panel, "TOPLEFT", 0, 6)
+	backTo = true
+	backButton:Show()
+end
 local function OnHide()
 	-- (A window waiting its turn, the conflicts one: opened once this has
 	-- closed, a moment on so See Profile's settings open first.)
