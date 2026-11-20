@@ -3099,26 +3099,6 @@ do
 			end
 		end
 	end
-	-- A grouped page's folder tabs, its title moved under them (none when
-	-- this client has just the one page of its group).
-	function ns.GroupTabs(content, title, english)
-		PageGroups()
-		for _, group in ipairs(PAGE_GROUPS) do
-			if #group.have > 1 then
-				local list, picked = {}, nil
-				for i, each in ipairs(group.have) do
-					list[i] = { L[each[2]], each[1], L[each[3]] }
-					if each[1] == english then picked = i end
-				end
-				if picked then
-					local panel = ns.PageTabs(content, list, picked)
-					title:ClearAllPoints()
-					title:SetPoint("TOPLEFT", panel, "BOTTOMLEFT", 8, -14)
-					return panel
-				end
-			end
-		end
-	end
 	-- Pages still being worked on: "(WIP)" after the name on their icon's mouseover.
 	-- (dev = true on a page above: it's only in the dev copy (CinematicDev.toc), and
 	-- its icon has a red X over it and "(dev only)" on mouseover. Every dev-only
@@ -10680,7 +10660,7 @@ local function CreatePlatesPanel()
 			{ "Classification", L["Elite/rare icon"], L[" The elite, rare or boss icon."] },
 			{ "Level", L["Level"], L[" The level."] },
 			{ "Threat", L["Threat glow"], L[" The glow while a mob has you (or is about to) as its target."] },
-			{ "Highlight", L["Target highlight"], L[" The border round your target's or mouseover's plate."] },
+			{ "Highlight", L["Target highlight"], L[" The border around your target's or mouseover's plate."] },
 			{ "Widgets", L["Quest/widget icons"], L[" Quest objective icons and other widgets over the plate."] },
 		}
 		local function AddKindRows(top, kinds)
@@ -11547,7 +11527,7 @@ local function CreateNameStylePanel()
 		end
 		local WORDS = { blue = L["Blue"], class = L["Class colors"], white = L["White"], react = L["Hostile's color"],
 			game = L["The game's"], custom = L["Custom"], black = L["Black"], none = L["None"], soft = L["Soft glow"],
-			band = L["Band"], name = L["Name's"], grey = L["Grey"], gold = L["Gold"] }
+			band = L["Band"], name = L["Name's"], grey = L["Gray"], gold = L["Gold"] }
 		return WORDS[value] or tostring(value)
 	end
 	local function RowSource(row, setting)
@@ -11847,7 +11827,7 @@ local function CreateNameStylePanel()
 				-- (Past 100%: brighter, a second glow over the first. 2026-11-17.)
 				on.Pair(true)
 				on.Slider("GlowAlpha", L["Strength"], 10, 150, 5, "%d%%", 100, L["How strong the glow is."])
-				on.Slider("GlowSize", L["Size"], 50, 300, 10, "%d%%", 100, L["How far the glow spreads round the name."])
+				on.Slider("GlowSize", L["Size"], 50, 300, 10, "%d%%", 100, L["How far the glow spreads around the name."])
 				on.Pair(false)
 			end,
 			backColor = function(look)
@@ -11862,7 +11842,7 @@ local function CreateNameStylePanel()
 				on.Pair(false)
 				-- (A border round the band, 2026-11-16: its color and thickness.)
 				on.Segments(L["Border"], "BackBorder", { { "none", L["None"] },
-					{ "line", L["Line"], L["A line round the band."] } })
+					{ "line", L["Line"], L["A line around the band."] } })
 				local edged = on.Fold(function() return ns.NameLookValue(row, "BackBorder") == "line" end)
 				edged.Chips(L["Border color"], { "BackBorderR", "BackBorderG", "BackBorderB" })
 				edged.Pair(true)
@@ -11885,7 +11865,7 @@ local function CreateNameStylePanel()
 				look.Slider("Line2Alpha", L["Opacity"], 20, 100, 5, "%d%%", 100, L["How see-through the line under the name is."])
 				look.Pair(false)
 				look.Section(L["Color"])
-				look.Segments(L["Color"], "Line2Color", { { "name", L["Name's"] }, { "grey", L["Grey"] },
+				look.Segments(L["Color"], "Line2Color", { { "name", L["Name's"] }, { "grey", L["Gray"] },
 					{ "gold", L["Gold"] }, { "custom", L["Custom"] } })
 				look.Fold(function() return ns.NameLookValue(row, "Line2Color") == "custom" end)
 					.Chips(L["Its color"], { "Line2ColorR", "Line2ColorG", "Line2ColorB" })
@@ -12111,7 +12091,7 @@ do
 	local ALSO_PARTS = {
 		{ "Name", L["Name"], L["The unit's name in its mark's color, on its plate or shown alone."] },
 		{ "Bar", L["Health bar"], L["The unit's health bar in its mark's color."] },
-		{ "Border", L["Border"], L["The border the game puts round your target's health bar, in its mark's " ..
+		{ "Border", L["Border"], L["The border the game puts around your target's health bar, in its mark's " ..
 			"color."], targetOnly = true },
 	}
 	local ALSO_SHORT = { Name = L["Name"], Bar = L["Bar"], Border = L["Border"] }

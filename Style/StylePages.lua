@@ -636,7 +636,6 @@ function ns.ShowInIndex(key, page)
 	end
 	return 1
 end
-function ns.UnitFrameTabs() return ns.ShowInTabs("units") end
 
 -- A frame's own page as the rest of those tabs, after Show in (its parts:
 -- its settings' tabs): a hidden hub tile each under the icon (tabOf in
