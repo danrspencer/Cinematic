@@ -158,6 +158,7 @@ local function PrintDebugHelp()
 	print("  /cine debug themecheck - every theme after every other: the frames' parts must come back where the game had them")
 	print("  /cine debug bubbleshot | off - a real chat bubble in each style theme: run it four times, outdoors, it says a line each go")
 	print("  /cine debug chatreveal | off - dev copy: a revealed chat line, then you mouse over chat; logs the handoff (with and without a newer line under it)")
+	print("  /cine debug chatdefault | off - dev copy: Show just those messages only with the game's own chat; runs itself, two test lines (your chat, then the other way round)")
 	print("  /cine debug tintlayer | off - dev copy: a red wash in each place a frame can sit, a screenshot of each, to find one under the nameplates")
 	print("  /cine debug pageshots [first] [last] | [page words] | off - a screenshot of every settings page, top to bottom, and its layout checked (cut words, text over text)")
 	print("  /cine debug themeshots [unitframes] [theme] | off - screenshots of every style theme's frames; your settings come back after")
@@ -815,6 +816,12 @@ local function HandleSlash(msg)
 			ns.ChatRevealTest(arg:match("^chatreveal%s*(.-)$"))
 		else
 			ns.Print("/cine debug chatreveal is in the dev copy only.")
+		end
+	elseif cmd == "debug" and (arg == "chatdefault" or arg:match("^chatdefault ")) then
+		if ns.ChatDefaultTest then
+			ns.ChatDefaultTest(arg:match("^chatdefault%s*(.-)$"))
+		else
+			ns.Print("/cine debug chatdefault is in the dev copy only.")
 		end
 	elseif cmd == "debug" and (arg == "tintlayer" or arg:match("^tintlayer ")) then
 		if ns.TintLayerTest then

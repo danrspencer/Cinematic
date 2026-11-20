@@ -276,6 +276,7 @@ Dev\BuffFadeTest.lua
 Dev\BuffPeekDebuffTest.lua
 Dev\SpokenTest.lua
 Dev\ChatRevealTest.lua
+Dev\ChatDefaultTest.lua
 Dev\ChecksProbe.lua
 Dev\WhoseHitTest.lua
 Camera\CameraScriptsPage.lua
