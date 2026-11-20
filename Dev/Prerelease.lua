@@ -438,6 +438,37 @@ Smoke("scroll bar: hidden when the page fits", function(done)
 	end)
 end)
 
+-- A style theme's box (plate, bridge, shadow, ring) goes with its frame's Frame
+-- art: hidden while the Art part is, by its row or override (it stayed drawn
+-- with the row unticked, 2026-11-20). Read only: your settings as they are.
+-- (Full run, every case: /cine debug themeart.)
+Smoke("unit frames: a theme's box hidden with the frame art", function()
+	if not (ns.UnitThemeArt and ns.UnitPartsWhy) then return "skip", "no ns.UnitThemeArt" end
+	local seen, bad, checked = {}, {}, 0
+	for _, name in ipairs({ "PlayerFrame", "PetFrame", "TargetFrame", "FocusFrame" }) do
+		local frame = _G[name]
+		local pieces = frame and ns.UnitThemeArt(frame) or {}
+		local art
+		for _, part in ipairs(#pieces > 0 and ns.UnitPartsWhy(name) or {}) do
+			if part.part == "Art" then art = part end
+		end
+		-- (The mouse over it brings hidden parts up: not counted then.)
+		if art and art.hidden and not art.held and not frame:IsMouseOver() then
+			checked = checked + 1
+			for i, region in ipairs(pieces) do
+				local alpha = region:GetAlpha()
+				if region:IsShown() and not (issecretvalue and issecretvalue(alpha)) and alpha > 0.01 then
+					bad[#bad + 1] = ("%s piece %d alpha %.2f"):format(name, i, alpha)
+				end
+			end
+		end
+		seen[#seen + 1] = ("%s %d pieces, art %s"):format(name, #pieces, art and (art.hidden and "hidden" or "shown") or "-")
+	end
+	if checked == 0 then return "skip", "no themed frame with its art hidden now: " .. table.concat(seen, ", ") end
+	if #bad > 0 then return "fail", "drawn: " .. table.concat(bad, ", ") end
+	return "pass", table.concat(seen, ", ")
+end)
+
 ---------------------------------------------------------------------------
 -- Guided steps:{ name, say, wait = fn -> true once it's happening,
 -- hold = fn -> true while it lasts (or seconds), after = seconds once over }.

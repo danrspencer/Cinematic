@@ -1420,6 +1420,7 @@ local function FramePlate(frame, state, portrait, on, over, shape)
 		if not state.plate then
 			state.plate = MakePlate(frame)
 			state.plate:SetFrameLevel(frame:GetFrameLevel()) -- (under the name)
+			if ns.UnitThemeArtMade then ns.UnitThemeArtMade() end -- (hidden with the frame art)
 		end
 		local portraitX, healthX = portrait:GetCenter(), health:GetCenter()
 		state.flip = Readable(portraitX) and Readable(healthX) and portraitX > healthX
@@ -2259,6 +2260,7 @@ local function DressShape(frame, portrait, view, artOver)
 	-- (Ours round it. The game's frames are secure: made out of fights only.)
 	if own and shape ~= "none" and not state.holder and not InCombatLockdown() then
 		state.holder = CreateFrame("Frame", nil, frame)
+		if ns.UnitThemeArtMade then ns.UnitThemeArtMade() end -- (hidden with the frame art)
 		state.holder:SetAllPoints(portrait)
 		state.holder:SetFrameLevel(frame:GetFrameLevel() + 5)
 		state.ring = state.holder:CreateTexture(nil, "OVERLAY")
@@ -2314,6 +2316,7 @@ local function DressShape(frame, portrait, view, artOver)
 	end
 	if backFile and not state.back and not InCombatLockdown() then
 		state.back = CreateFrame("Frame", nil, frame)
+		if ns.UnitThemeArtMade then ns.UnitThemeArtMade() end -- (hidden with the frame art)
 		local lower = LOWER_STRATA[frame:GetFrameStrata()]
 		if lower then
 			state.back:SetFrameStrata(lower)

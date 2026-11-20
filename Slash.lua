@@ -1983,6 +1983,9 @@ local function HandleSlash(msg)
 	elseif cmd == "debug" and arg == "npctitle" then
 		-- (Dev copy: NPC titles going away up close, by plate settings, NpcTitleTest.lua.)
 		if ns.NpcTitleTest then ns.NpcTitleTest() else ns.Print("/cine debug npctitle is in the dev copy only.") end
+	elseif cmd == "debug" and arg == "themeart" then
+		-- (Dev copy: a style theme's box going with the Frame art rows and overrides, ThemeArtTest.lua.)
+		if ns.ThemeArtTest then ns.ThemeArtTest() else ns.Print("/cine debug themeart is in the dev copy only.") end
 	elseif cmd == "debug" and arg == "findtabs" then
 		-- (Dev copy: /cine find on ids in each Nameplates and Names tab, FindTabsTest.lua.)
 		if ns.FindTabsTest then ns.FindTabsTest() else ns.Print("/cine debug findtabs is in the dev copy only.") end

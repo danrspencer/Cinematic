@@ -14551,6 +14551,7 @@ do
 			local frame = _G[entry[1]]
 			if frame then
 				local held = FRAMES.held[entry[1]]
+				local artHide, artKeep, artRuled = false, false, false
 				for _, part in ipairs(ns.UNIT_PARTS) do
 					local key = FRAMES.Key(entry, part)
 					-- (The Style hub's Overrides tab over the row, with the HUD page on.)
@@ -14561,6 +14562,7 @@ do
 					-- snapped out while the rest of the UI faded, 2026-11-17.)
 					local ruled = key and not over and (ns.RuleTest(key) ~= nil or ns.db[key] == false)
 					local keep = not over and held and held[part] or false
+					if part == "Art" then artHide, artKeep, artRuled = hide or false, keep, ruled or false end
 					local paths = entry[2][part]
 					if type(paths) == "function" then
 						for _, region in ipairs(paths(frame)) do
@@ -14575,13 +14577,15 @@ do
 						end
 					end
 				end
-				-- (A style theme's ring and plate stand in for the frame art: held
-				-- with it. Asked only while that's so, and once more to let go.)
-				local keepArt = ns.UnitThemeArt and held and held.Art or false
-				if keepArt or FRAMES.themeHeld[entry[1]] then
-					FRAMES.themeHeld[entry[1]] = keepArt or nil
+				-- (A style theme's ring and plate stand in for the frame art: hidden,
+				-- faded and held with it, by its row or its override. The row alone
+				-- left the theme's box drawn, 2026-11-20. Asked only while that's
+				-- so, and once more to let go.)
+				local themed = ns.UnitThemeArt and (artHide or artKeep) or false
+				if themed or FRAMES.themeHeld[entry[1]] then
+					FRAMES.themeHeld[entry[1]] = themed or nil
 					for _, region in ipairs(ns.UnitThemeArt(frame)) do
-						FRAMES.Claim(region, entry[1], "Art", false, keepArt, false)
+						FRAMES.Claim(region, entry[1], "Art", artHide, artKeep, artRuled)
 					end
 				end
 			end
@@ -14610,6 +14614,17 @@ do
 			SetHidden(region, hide)
 		end
 		wipe(want)
+	end
+
+	-- (UnitStyle.lua: a theme's plate or ring made after the parts were applied, a
+	-- pet called later say. Applied once more next frame, so it goes with the art.)
+	function ns.UnitThemeArtMade()
+		if FRAMES.themeMadeSoon then return end
+		FRAMES.themeMadeSoon = true
+		C_Timer.After(0, function()
+			FRAMES.themeMadeSoon = nil
+			ns.ApplyUnitFrameParts()
+		end)
 	end
 
 	-- For the Why window (WhyPanel.lua): the parts a unit frame has on this
