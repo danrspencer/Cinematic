@@ -3355,6 +3355,178 @@ do
 	end
 end
 
+-- selfdodge: the settings the selftarget run (2026-11-15) didn't try, to find
+-- one that keeps you over the shoulder with yourself targeted (a player asked,
+-- 2026-11-20). Turning the camera can't do it: the game's camera always looks
+-- at you, so only the offset puts you aside. One run: nothing targeted (a
+-- screenshot of where you should be), then yourself targeted, then each step
+-- ALONE from your own settings (put back between steps), HOLD seconds and a
+-- screenshot each, the step's CVars read back. Then the target cleared, your
+-- settings back. The screenshot where you're aside again names the setting;
+-- run on both clients. Into db.shoulderSelfDodge; a /reload mid-run puts your
+-- camera settings back (db.shoulderSelfDodgeKept). Typed again: stops.
+do
+	local HOLD = 3
+	local FOCUS0 = { test_cameraTargetFocusEnemyStrengthPitch = "0", test_cameraTargetFocusEnemyStrengthYaw = "0",
+		test_cameraTargetFocusInteractStrengthPitch = "0", test_cameraTargetFocusInteractStrengthYaw = "0" }
+	local STEPS = {
+		{ "left shoulder (offset the other way)", function(v) return { [SHOULDER] = ("%.2f"):format(-math.abs(v)) } end },
+		{ "target focus strengths 0", function() return FOCUS0 end },
+		{ "smooth style 0 (never follow)", function() return { cameraSmoothStyle = "0" } end },
+		{ "camera pivot off", function() return { cameraPivot = "0" } end },
+		{ "ActionCam on run again, then the offset", function(v) return { [SHOULDER] = ("%.2f"):format(v) } end, "on" },
+		{ "ActionCam off, then the offset alone", function(v) return { [SHOULDER] = ("%.2f"):format(v) } end, "off" },
+	}
+	local run
+	local function Write(text)
+		local lines = ns.db.shoulderSelfDodge
+		if #lines < 4000 then lines[#lines + 1] = ("%.2f %s"):format(GetTime() - run.began, text) end
+	end
+	local function Self() return UnitExists("target") and ns.Flag(UnitIsUnit("target", "player")) end
+	local function Box(head, line, r, g, b) ns.PadTestBox(head, line, r or 1, g or 0.82, b or 0) end
+	local function Shot(what)
+		ns.PadTestBoxHide()
+		C_Timer.After(0.1, function()
+			local ok = pcall(function() Screenshot() end)
+			if run then Write(("screenshot %s at %s: %s"):format(what, date("%m%d%y_%H%M%S"), ok and "taken" or "failed")) end
+		end)
+	end
+	-- (Every camera setting back as it was at the start; how many differed.)
+	local function PutBack(kept)
+		local back = 0
+		for name, value in pairs(kept or {}) do
+			if Text(GetCVar(name)) ~= value then
+				pcall(SetCVar, name, value)
+				back = back + 1
+			end
+		end
+		return back
+	end
+	local restorer = CreateFrame("Frame")
+	restorer:RegisterEvent("PLAYER_ENTERING_WORLD")
+	restorer:SetScript("OnEvent", function(self)
+		self:UnregisterAllEvents()
+		local kept = ns.db and ns.db.shoulderSelfDodgeKept
+		if kept then
+			ns.db.shoulderSelfDodgeKept = nil
+			Log(("selfdodge: cut short by a reload, %d camera settings put back"):format(PutBack(kept)))
+		end
+	end)
+	local function End(why)
+		if not run then return end
+		run.frame:SetScript("OnUpdate", nil)
+		run.frame:UnregisterAllEvents()
+		local back = PutBack(run.kept)
+		ns.db.shoulderSelfDodgeKept = nil
+		ns.shoulderTestHold = nil
+		Write(("end: %s, %d settings put back"):format(why, back))
+		Log(("selfdodge: %s, %d lines in db.shoulderSelfDodge"):format(why, #ns.db.shoulderSelfDodge))
+		run = nil
+		if ns.ApplyShoulderCam then ns.ApplyShoulderCam() end
+	end
+	local function Try(i)
+		local step = STEPS[i]
+		PutBack(run.kept)
+		local said = {}
+		if step[3] then said[#said + 1] = ("ActionCam %s %s"):format(step[3], CamExec(step[3])) end
+		for name, value in pairs(step[2](run.offset)) do
+			if GetCVar(name) == nil then
+				said[#said + 1] = name .. " missing on this client"
+			else
+				pcall(SetCVar, name, value)
+				said[#said + 1] = ("%s %s -> %s (reads %s)"):format(name, Text(run.kept[name]), value, Text(GetCVar(name)))
+			end
+		end
+		Write(("step %d %s: %s"):format(i, step[1], table.concat(said, ", ")))
+		Box(("Self dodge %d/%d: %s"):format(i, #STEPS, step[1]), "hands off, keep yourself targeted", 0.7, 0.7, 0.7)
+	end
+	local function Tick(_, elapsed)
+		run.clock, run.sampleClock = run.clock + elapsed, run.sampleClock + elapsed
+		if run.sampleClock >= 0.2 then
+			run.sampleClock = 0
+			Write(("s %s | offset %s centered %s | zoom %.2f | self %s"):format(run.phase, Text(GetCVar(SHOULDER)),
+				Text(GetCVar(CENTERED)), Zoom(), Text(Self())))
+		end
+		if run.phase == "none" then
+			if UnitExists("target") then run.clock = 0 return end
+			if run.clock < HOLD then return end
+			run.offset = tonumber(GetCVar(SHOULDER)) or 0
+			Write(("nothing targeted: offset %.2f, zoom %.2f"):format(run.offset, Zoom()))
+			Shot("1 nothing targeted (where you should be)")
+			run.phase, run.clock = "wantSelf", 0
+			C_Timer.After(0.5, function() if run then Box("Self dodge", "TARGET YOURSELF (F1), then hands off") end end)
+		elseif run.phase == "wantSelf" then
+			if not Self() then run.clock = 0 return end
+			if run.clock < HOLD then return end
+			Shot("2 yourself, as it plays (centered)")
+			run.phase, run.at = "steps", 1
+			ns.shoulderTestHold = true
+			C_Timer.After(0.5, function() if run then Try(1) end end)
+			run.clock = -0.5
+		elseif run.phase == "steps" then
+			if not Self() then
+				Box("Self dodge", "TARGET YOURSELF again (F1)", 1, 0.3, 0.3)
+				run.clock = 0
+				return
+			end
+			if run.clock < HOLD then return end
+			Shot(("%d %s"):format(run.at + 2, STEPS[run.at][1]))
+			run.at, run.clock = run.at + 1, -0.5
+			if not STEPS[run.at] then
+				-- (After the last step's screenshot, not before it.)
+				run.phase, run.clock = "clear", -HOLD
+				C_Timer.After(0.5, function()
+					if not run then return end
+					Write(("steps done, %d settings put back"):format(PutBack(run.kept)))
+					ns.shoulderTestHold = nil
+					if ns.ApplyShoulderCam then ns.ApplyShoulderCam() end
+					Box("Self dodge", "CLEAR YOUR TARGET (Esc)")
+				end)
+				return
+			end
+			local at = run.at
+			C_Timer.After(0.5, function() if run and run.at == at then Try(at) end end)
+		elseif run.phase == "clear" then
+			if UnitExists("target") then run.clock = 0 return end
+			if run.clock < HOLD then return end
+			Shot(("%d cleared again"):format(#STEPS + 3))
+			run.phase = "ending"
+			C_Timer.After(0.5, function()
+				End("done")
+				ns.PadTestBox("Self dodge run done", "/reload, then say check log", 0.3, 1, 0.3)
+				C_Timer.After(15, function() if not run then ns.PadTestBoxHide() end end)
+			end)
+		end
+	end
+	function ns.ShoulderSelfDodge()
+		if run then
+			End("stopped")
+			ns.PadTestBoxHide()
+			return ns.Print("shoulder selfdodge: stopped")
+		end
+		if not ns.Setting("shoulderCam") then
+			return ns.Print("shoulder selfdodge: turn on the Shoulder Cam first")
+		end
+		ns.db.shoulderSelfDodge = {}
+		local kept = {}
+		for _, name in ipairs(CAMERA_CVARS) do
+			local value = GetCVar(name)
+			if value ~= nil then kept[name] = Text(value) end
+		end
+		ns.db.shoulderSelfDodgeKept = kept
+		run = { frame = CreateFrame("Frame"), phase = "none", clock = 0, sampleClock = 0, began = GetTime(), kept = kept }
+		Write(("start | %s | %s | zoom %.2f | side %s | paused %s"):format(ns.isRetail and "retail" or "Forever", Who(),
+			Zoom(), Text(ns.db.shoulderCamSide), Text(ns.GetShoulderCamDebug and ns.GetShoulderCamDebug().paused)))
+		run.frame:RegisterEvent("PLAYER_TARGET_CHANGED")
+		run.frame:SetScript("OnEvent", function()
+			if run then Write("target changed: " .. (Self() and "yourself" or UnitExists("target") and "other" or "none")) end
+		end)
+		run.frame:SetScript("OnUpdate", Tick)
+		Box("Self dodge", "CLEAR YOUR TARGET (Esc), stand still, WAIT for the next box")
+		ns.Print("shoulder selfdodge: follow the box, about 40 seconds; type it again to stop")
+	end
+end
+
 -- today: one run over the Shoulder Cam changes of 2026-11-15, each with its
 -- own verdict and screenshots, into db.shoulderTodayRun:
 --   swap:   the swap key pressed for you: the offset glides across over
@@ -4020,6 +4192,7 @@ function ns.ShoulderTest(arg)
 	elseif what == "swingsize" or what == "sizes" then ns.ShoulderSwingSize()
 	elseif what == "lock" then ns.ShoulderLock()
 	elseif what == "selftarget" then ns.ShoulderSelfTarget()
+	elseif what == "selfdodge" then ns.ShoulderSelfDodge()
 	elseif what == "today" then ns.ShoulderToday(rest)
 	elseif what == "profiletest" then ns.ShoulderProfileTest()
 	elseif what == "on" then Set("shoulderCam", true)
@@ -4030,7 +4203,7 @@ function ns.ShoulderTest(arg)
 	-- (The Shoulder Cam layout, Layouts.lua: made, or made again from the code, and switched to; offers the reload.)
 	elseif what == "layout" then ns.RegenerateLayout("Shoulder Cam")
 	else
-		ns.Print("shoulder: scan, frames, watch, quiet, sweep offsets|zoom|ease|next|stop, try pitch|head|enemy|interact|walls|off, walls, forms, shift [n|move], cams, map still|talk|ramp|back|walk|enemy, zoomcurve, mounts, aimclick, drag, follow [trial], angles, padscan, prdcheck, calibrate, lock, selftarget, today, profiletest, " ..
+		ns.Print("shoulder: scan, frames, watch, quiet, sweep offsets|zoom|ease|next|stop, try pitch|head|enemy|interact|walls|off, walls, forms, shift [n|move], cams, map still|talk|ramp|back|walk|enemy, zoomcurve, mounts, aimclick, drag, follow [trial], angles, padscan, prdcheck, calibrate, lock, selftarget, selfdodge, today, profiletest, " ..
 			"on, off, left, right, spot <percent>, strength <percent>, layout")
 	end
 end
