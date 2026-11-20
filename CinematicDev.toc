@@ -256,6 +256,7 @@ Dev\FriendPlatesTest.lua
 Dev\HealPlatesTest.lua
 Dev\HealIconsCastTest.lua
 Dev\OffscreenProbe.lua
+Dev\OffscreenIconTest.lua
 Dev\OffscreenHoldTest.lua
 Dev\NpcNamesTest.lua
 Dev\NameScaleTest.lua

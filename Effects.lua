@@ -4724,21 +4724,24 @@ function ns.plates.FriendWants(suffix)
 	return wants.shownBody, wants.shownMinions, wants.shownPlayers
 end
 
--- The game's Show Offscreen Nameplates in CineMode as the Nameplates page's
--- tick says (plateShowOffscreen): on, plates for units out of view stay,
--- pinned to the screen's edge, so rows and rules that look for plates (the
--- elite words) still find an elite behind you; off, they go. Yours back
--- after. Clients without it are left alone.
-ns.OFFSCREEN_PLATE_CVARS = ns.CVarSet("Offscreen plates on", "CineMode, plateShowOffscreen ticked (elite rules)",
+-- The game's Show Offscreen Nameplates in CineMode as Settings > General's
+-- Allow offscreen nameplates says (plateOffscreen): on, plates for units out
+-- of view stay, pinned to the screen's edge, so rows and rules that look for
+-- plates (the elite words) still find an elite behind you. Yours back after.
+-- Clients without it are left alone.
+ns.OFFSCREEN_PLATE_CVARS = ns.CVarSet("Offscreen plates on", "CineMode, Allow offscreen nameplates (Always, or Auto where a Vision needs them)",
 	{ secure = true, playerWins = true, values = { nameplateShowOffscreen = "1" } })
-ns.NO_OFFSCREEN_PLATE_CVARS = ns.CVarSet("Offscreen plates off", "CineMode, nothing here needs offscreen plates",
+-- (Held off by CineMode before 2026-11-20; never taken up now, only let go
+-- for anyone it still holds: on in the game's own settings stays on.)
+ns.NO_OFFSCREEN_PLATE_CVARS = ns.CVarSet("Offscreen plates off", "no longer used: let go only",
 	{ secure = true, playerWins = true, values = { nameplateShowOffscreen = "0" } })
 
--- Why CineMode holds offscreen plates on here (nil: it doesn't, they're off).
--- Off unless asked: they cost (the game builds a plate for everyone in range,
--- not just those in view) and the game's big head names flash as units cross
--- the screen's edge (Forever, 2026-11-05). On for:
---   your tick           the Nameplates page's Show Offscreen (elite rules)
+-- Why CineMode holds offscreen plates on here (nil: it doesn't, and leaves
+-- yours as it is). Never by default: they cost (the game builds a plate for
+-- everyone in range, not just those in view) and the game's big head names
+-- flash as units cross the screen's edge (Forever, 2026-11-05). On for:
+--   Always              all through CineMode (elite rules)
+--   Auto, where:
 --   Emote Vision        its plate cards (Buff, Guild, Ally, Achievement) where
 --                       their rows show: a buff's caster behind you has a unit
 --                       only through their plate (2026-11-19)
@@ -4751,8 +4754,9 @@ ns.NO_OFFSCREEN_PLATE_CVARS = ns.CVarSet("Offscreen plates off", "CineMode, noth
 -- (Emote Vision's want: FriendWants', gone over every 10 s, out of fights.)
 function ns.plates.OffscreenWhy(cinematic)
 	if not cinematic then return nil end
-	if ns.db.plateShowOffscreen then return "your Show Offscreen tick" end
-	if not ns.PlatesForcedHere(cinematic) then return nil end
+	local allow = ns.db.plateOffscreen
+	if allow == "always" then return "Allow offscreen nameplates: Always" end
+	if allow ~= "auto" or not ns.PlatesForcedHere(cinematic) then return nil end
 	-- (Not with an attackable target: a fight's likely coming, and the game
 	-- won't let plate settings change in one (tested 2026-11-19: SetCVar in a
 	-- fight, blocked). Let go now, out of it, the fight's plates are as in
@@ -4995,13 +4999,12 @@ function ns.UpdatePlates(cinematic, elapsed)
 	platesReleased = false
 	platesActive = cinematic and true or false
 	-- (The one let go first, so yours is what the other saves.)
-	-- Offscreen plates: the Nameplates page's tick, or where something needs a
-	-- unit for everyone around you, not only those in view (ns.plates.OffscreenWhy).
+	-- Offscreen plates: Allow offscreen nameplates Always, or Auto where
+	-- something needs a unit for everyone around you, not only those in view
+	-- (ns.plates.OffscreenWhy). Otherwise yours as it is: never turned off.
 	local offscreen = cinematic and ns.plates.OffscreenWhy(cinematic) ~= nil
-	local noOffscreen = cinematic and not offscreen or false
-	ns.ApplyCVarSet(offscreen and ns.NO_OFFSCREEN_PLATE_CVARS or ns.OFFSCREEN_PLATE_CVARS, false)
+	ns.ApplyCVarSet(ns.NO_OFFSCREEN_PLATE_CVARS, false)
 	ns.ApplyCVarSet(ns.OFFSCREEN_PLATE_CVARS, offscreen)
-	ns.ApplyCVarSet(ns.NO_OFFSCREEN_PLATE_CVARS, noOffscreen)
 	placeSuffix = ns.PlateSuffix()
 	platesForced = ns.PlatesForcedHere(cinematic)
 	-- (Let go before the other plate switches take hold, and taken up after

@@ -2,22 +2,30 @@
 -- game's Show Offscreen Nameplates, held on where Emote Vision's cards or Heal
 -- Vision need it, 2026-11-19) can be told from one in view. Combat Text
 -- Style draws numbers on plates, so a hit on someone behind you shows at the
--- edge. Plates can't be measured (GetCenter: restricted), but anchor points
--- can be read on Forever (GetPoint): maybe an edge plate's differ. One run,
--- out of a fight, CineMode off (it waits for that, then turns Show Offscreen
--- on for the run and puts yours back, a /reload too):
+-- edge. Plates can't be measured (GetCenter: restricted).
+-- Run 1 (Forever, 2026-11-20): GetPoint on the plate, its UnitFrame and
+-- health bar errored too; only frame level differed (102 -> 101); and only one
+-- unit matched, the others' GUIDs secret. So this one keys plates by the plate
+-- frame itself (and its unit token), keeps the whole error text, and walks
+-- every piece of each plate (children and regions, a few levels down), reading
+-- each piece's points, size, shown, alpha and art: the health bar's
+-- background texture's points were readable before (PlateRowLook.lua).
+-- One run, out of a fight, CineMode off (it waits for that, then turns Show
+-- Offscreen on for the run and puts yours back, a /reload too):
 --   1 in front   plates up in front of you, still: every readable value of
 --                each plate
 --   2 behind     turn your character around (it waits, no time limit, for
 --                you to face the other way): the same values again for the
---                same units, now pinned to the edge
--- Then per unit, which values differ between the two. Into
--- CinematicDB.offscreenProbeLog. Dev copy only (CinematicDev.toc).
+--                same plates, now pinned to the edge
+-- Then per plate, which values differ between the two, and each error text
+-- once. Into CinematicDB.offscreenProbeLog. Dev copy only (CinematicDev.toc).
 local _, ns = ...
 
 local SETTLE = 2
 local SAMPLES = 4
 local TURNED = 2.4 -- radians your facing must change for step 2 (about 140 degrees)
+local DEPTH = 3 -- levels of children walked under each plate
+local MAX_PIECES = 80 -- pieces read per plate, at most
 
 local run
 local function Say(text)
@@ -29,18 +37,31 @@ local function Show(value)
 	if Secret(value) then return "secret" end
 	if type(value) == "number" then return ("%.1f"):format(value) end
 	if type(value) == "table" then
-		local ok, name = pcall(function() return value.GetName and value:GetName() end)
-		return ok and name and tostring(name) or "frame"
+		local ok, name = pcall(function() return value.GetDebugName and value:GetDebugName() or value:GetName() end)
+		return ok and name and not Secret(name) and tostring(name) or "frame"
 	end
 	return tostring(value)
 end
--- Every return of a method, or its error.
+-- Every return of a method, or "error #n" (the text kept once in run.errors).
+local function ErrorId(err)
+	local text = tostring(err):gsub("^Interface[^:]*:%d+: ", ""):sub(1, 160)
+	local id = run.errorIds[text]
+	if not id then
+		run.errors[#run.errors + 1] = text
+		id = #run.errors
+		run.errorIds[text] = id
+	end
+	return "error #" .. id
+end
 local function Read(frame, method, ...)
-	if not (frame and frame[method]) then return "-" end
-	local out = { pcall(frame[method], frame, ...) }
-	if not out[1] then return "error: " .. tostring(out[2]):match("[^:]*$"):sub(1, 50) end
+	if not (frame and frame[method]) then return nil end
+	-- (Counted with select: a nil among the returns, GetPoint's relativeTo,
+	-- would cut # short and lose the offsets after it.)
+	local function Pack(...) return select("#", ...), { ... } end
+	local count, out = Pack(pcall(frame[method], frame, ...))
+	if not out[1] then return ErrorId(out[2]) end
 	local parts = {}
-	for i = 2, #out do parts[#parts + 1] = Show(out[i]) end
+	for i = 2, count do parts[#parts + 1] = Show(out[i]) end
 	return #parts > 0 and table.concat(parts, " ") or "nil"
 end
 
@@ -66,44 +87,78 @@ local function Facing()
 	return ok and not Secret(facing) and facing or nil
 end
 
+-- One piece's readings into r, each field "<path>.<what>".
+local PIECE_READS = { "GetNumPoints", "GetWidth", "GetHeight", "GetLeft", "GetTop", "GetAlpha",
+	"GetEffectiveAlpha", "IsShown", "IsVisible", "GetScale", "GetFrameLevel", "IsRectValid", "IsClampedToScreen" }
+local function ReadPiece(r, path, piece)
+	for _, method in ipairs(PIECE_READS) do
+		local value = Read(piece, method)
+		if value then r[path .. "." .. method] = value end
+	end
+	local points = 0
+	local ok, count = pcall(piece.GetNumPoints, piece)
+	if ok and type(count) == "number" and not Secret(count) then points = count end
+	for i = 1, math.max(points, 1) do r[path .. ".point" .. i] = Read(piece, "GetPoint", i) end
+	local art = Read(piece, "GetAtlas") or Read(piece, "GetTexture")
+	if art then r[path .. ".art"] = art end
+end
+
+-- Walks a plate: the plate, then its children and regions, by parent key
+-- where they have one, else by place in the list.
+local function Walk(r, path, frame, depth, seen)
+	if seen.count >= MAX_PIECES or seen[frame] then return end
+	seen[frame], seen.count = true, seen.count + 1
+	ReadPiece(r, path, frame)
+	if depth >= DEPTH then return end
+	local function Each(method, kind)
+		if not frame[method] then return end
+		local list = { pcall(frame[method], frame) }
+		if not table.remove(list, 1) then
+			r[path .. "." .. method] = ErrorId(list[1])
+			return
+		end
+		for i, child in ipairs(list) do
+			local okKey, key = pcall(function() return child.GetParentKey and child:GetParentKey() end)
+			local name = okKey and type(key) == "string" and not Secret(key) and key or (kind .. i)
+			Walk(r, path .. "/" .. name, child, depth + 1, seen)
+		end
+	end
+	Each("GetChildren", "c")
+	Each("GetRegions", "r")
+end
+
 -- One plate's readings: [field] = text.
 local function Readings(plate)
-	local frame, bar = plate.UnitFrame, plate.UnitFrame and plate.UnitFrame.healthBar
 	local r = {}
-	r.points = Read(plate, "GetNumPoints")
-	for i = 1, 2 do r["point" .. i] = Read(plate, "GetPoint", i) end
-	r.center = Read(plate, "GetCenter")
-	r.rect = Read(plate, "GetRect")
-	r.scale = Read(plate, "GetScale")
-	r.effScale = Read(plate, "GetEffectiveScale")
-	r.alpha = Read(plate, "GetAlpha")
-	r.shown = Read(plate, "IsShown")
-	r.visible = Read(plate, "IsVisible")
-	r.level = Read(plate, "GetFrameLevel")
-	r.strata = Read(plate, "GetFrameStrata")
-	r.clamped = Read(plate, "IsClampedToScreen")
-	r.ufPoint = Read(frame, "GetPoint", 1)
-	r.ufAlpha = Read(frame, "GetAlpha")
-	r.ufScale = Read(frame, "GetScale")
-	r.barPoint = Read(bar, "GetPoint", 1)
-	r.barShown = Read(bar, "IsShown")
-	local unit = plate.namePlateUnitToken
-	local ok, visible = pcall(UnitIsVisible, unit or "none")
-	r.unitVisible = ok and Show(visible) or "error"
+	Walk(r, "plate", plate, 0, { count = 0 })
+	-- (The pieces the first run read by name, in case the walk misses them.)
+	local frame = plate.UnitFrame
+	local bar = frame and frame.healthBar
+	if bar and bar.bgTexture then ReadPiece(r, "named.healthBar.bgTexture", bar.bgTexture) end
+	local unit = plate.namePlateUnitToken or (plate.UnitFrame and plate.UnitFrame.unit)
+	for _, check in ipairs({ "UnitIsVisible", "UnitInRange", "CheckInteractDistance" }) do
+		local fn = _G[check]
+		if fn then
+			local ok, value = pcall(fn, unit or "none", check == "CheckInteractDistance" and 4 or nil)
+			r["unit." .. check] = ok and Show(value) or ErrorId(value)
+		end
+	end
 	return r
 end
 
+-- [plate frame] = { token, readings }: the plate frame itself is the key (a
+-- plate stays with its unit while that unit has one; GUIDs can be secret).
 local function Snapshot()
 	local out = {}
 	for _, plate in ipairs(Plates()) do
-		local unit = plate.namePlateUnitToken
-		local ok, guid = pcall(UnitGUID, unit or "none")
-		if ok and guid and not Secret(guid) then
-			local okName, name = pcall(UnitName, unit)
-			out[guid] = { name = okName and not Secret(name) and name or "?", r = Readings(plate) }
-		end
+		out[plate] = { token = tostring(plate.namePlateUnitToken or (plate.UnitFrame and plate.UnitFrame.unit)), r = Readings(plate) }
 	end
 	return out
+end
+local function Count(snap)
+	local n = 0
+	for _ in pairs(snap) do n = n + 1 end
+	return n
 end
 local function Box(text, sub) ns.PadTestBox(text, sub or "", 1, 0.82, 0) end
 
@@ -111,37 +166,57 @@ local function Finish(done)
 	if run.ticker then run.ticker:Cancel() end
 	PutBack()
 	if done then
-		Say("--- compare: values that differ for the same unit, in front vs behind ---")
-		local units = 0
-		for guid, front in pairs(run.front) do
-			local back = run.back[guid]
-			if back then
-				units = units + 1
+		Say("--- compare: values that differ for the same plate, in front vs behind ---")
+		local both, gone = 0, 0
+		local sameEverywhere = {}
+		for plate, front in pairs(run.front) do
+			local back = run.back[plate]
+			if back and back.token == front.token then
+				both = both + 1
 				local diffs = {}
 				for field, value in pairs(front.r) do
-					if back.r[field] ~= value then diffs[#diffs + 1] = ("%s: %s -> %s"):format(field, value, back.r[field]) end
+					local after = back.r[field]
+					if after ~= value then
+						diffs[#diffs + 1] = ("%s: %s -> %s"):format(field, value, tostring(after))
+						sameEverywhere[field] = (sameEverywhere[field] or 0) + 1
+					end
+				end
+				for field, value in pairs(back.r) do
+					if front.r[field] == nil then diffs[#diffs + 1] = ("%s: nil -> %s"):format(field, value) end
 				end
 				table.sort(diffs)
-				Say(("  %s: %s"):format(front.name, #diffs > 0 and table.concat(diffs, "; ") or "nothing differs"))
+				Say(("  %s: %d fields, %s"):format(front.token, Count(front.r),
+					#diffs > 0 and table.concat(diffs, "; ") or "nothing differs"))
+			else
+				gone = gone + 1
 			end
 		end
-		local gone = 0
-		for guid in pairs(run.front) do if not run.back[guid] then gone = gone + 1 end end
-		Say(("%d units in both, %d had no plate behind you (offscreen setting %s)"):format(units, gone,
-			tostring(GetCVar("nameplateShowOffscreen"))))
+		-- (A field that changed on every plate is the likeliest tell.)
+		local always = {}
+		for field, n in pairs(sameEverywhere) do
+			if n == both then always[#always + 1] = field end
+		end
+		table.sort(always)
+		Say(("changed on every plate (%d): %s"):format(both, #always > 0 and table.concat(always, ", ") or "none"))
+		Say(("%d plates in both, %d in front had no plate behind you (or a new unit)"):format(both, gone))
 	end
+	for i, text in ipairs(run.errors) do Say(("error #%d: %s"):format(i, text)) end
 	Say(done and "done" or "stopped early")
 	run = nil
 	ns.PadTestBox(done and "Test done. /reload, then say \"check log\"." or "Test stopped.", "", 1, 0.82, 0)
 	C_Timer.After(12, function() if not run then ns.PadTestBoxHide() end end)
 end
 
+-- (Every field for the first 2 plates only: the compare covers the rest.)
 local function LogSnapshot(label, snap)
+	local logged = 0
 	for _, entry in pairs(snap) do
 		local fields = {}
 		for field, value in pairs(entry.r) do fields[#fields + 1] = field .. "=" .. value end
 		table.sort(fields)
-		Say(("  %s %s: %s"):format(label, entry.name, table.concat(fields, ", ")))
+		logged = logged + 1
+		Say(("  %s %s (%d fields)%s"):format(label, entry.token, #fields,
+			logged <= 2 and (": " .. table.concat(fields, ", ")) or ""))
 	end
 end
 
@@ -166,8 +241,9 @@ local function Tick()
 	end
 	if run.phase == "front" then
 		local count = #Plates()
-		if count < 2 then
-			Box("1/2: Stand where 2 or more mobs or players with plates are IN FRONT of you. Stay still.", "WAITING FOR YOU")
+		if count < 3 then
+			Box("1/2: Stand where 3 or more mobs or players with plates are IN FRONT of you, close by. Stay still.",
+				"WAITING FOR YOU")
 			run.phaseAt = GetTime()
 			return
 		end
@@ -227,7 +303,8 @@ function ns.OffscreenProbe()
 		return
 	end
 	CinematicDB.offscreenProbeLog = {}
-	run = { at = GetTime(), phase = "cine", phaseAt = GetTime(), samples = 0, front = {}, back = {} }
+	run = { at = GetTime(), phase = "cine", phaseAt = GetTime(), samples = 0, front = {}, back = {},
+		errors = {}, errorIds = {} }
 	Say(("start: %s (game %s), Cinematic %s, CineMode %s"):format(ns.isRetail and "retail" or "classic",
 		tostring((select(4, GetBuildInfo()))), ns.Version and ns.Version() or "?", tostring(ns.lastCinematic)))
 	run.ticker = C_Timer.NewTicker(0.25, function()

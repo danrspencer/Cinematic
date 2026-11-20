@@ -110,10 +110,15 @@ local function CineCell(kind, place)
 	end
 	if kind.how == "offscreen" then
 		-- (Effects.lua's OffscreenWhy: here exactly; elsewhere by the same rules.)
-		if db.plateShowOffscreen then return ON .. "on", { "Nameplates page's Show Offscreen tick (plateShowOffscreen)." } end
-		local off = { "Off: anyone out of view has no plate (no unit for the cards or Heal Vision)." }
+		if db.plateOffscreen == "always" then
+			return ON .. "on", { "Settings > General's Allow offscreen nameplates: Always (plateOffscreen)." }
+		end
+		local off = { "Not turned on: yours as it is (anyone out of view has no plate: no unit for the cards or Heal Vision)." }
+		if db.plateOffscreen ~= "auto" then
+			return YOURS .. "yours", { off[1], "Allow offscreen nameplates: Never." }
+		end
 		if place.suffix == "Instances" then
-			return OFF .. "off", { off[1], "CineMode doesn't hold plates here: only your tick turns it on." }
+			return OFF .. "off", { off[1], "CineMode doesn't hold plates here: only Always turns it on." }
 		end
 		local isHere = place.suffix == (ns.PlateSuffix and ns.PlateSuffix())
 		local noEnemy = "Not while you target an enemy (a fight's plates stay in view only: plate settings can't "

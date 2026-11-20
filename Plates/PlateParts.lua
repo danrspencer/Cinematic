@@ -2986,9 +2986,9 @@ function ns.ReportTargetMarks()
 		tostring(Style("targetArrowY")), tostring(Style("targetArrowBareY")), tostring(UnitExists("target"))))
 	-- (The game's Show Offscreen Nameplates: the elite rules see only plates.)
 	local on, off = ns.OFFSCREEN_PLATE_CVARS, ns.NO_OFFSCREEN_PLATE_CVARS
-	ns.Print(("  offscreen plates: game setting %s, held by CineMode %s, page tick %s, yours saved %s"):format(
+	ns.Print(("  offscreen plates: game setting %s, held by CineMode %s, Allow offscreen %s, yours saved %s"):format(
 		tostring(GetCVar("nameplateShowOffscreen")),
-		on and on.active and "on" or off and off.active and "off" or "no", tostring(Style("plateShowOffscreen")),
+		on and on.active and "on" or off and off.active and "off" or "no", tostring(ns.db.plateOffscreen),
 		tostring(ns.db.savedCVars and ns.db.savedCVars.nameplateShowOffscreen)))
 	-- (Each row's When now, top to bottom.)
 	local when = {}

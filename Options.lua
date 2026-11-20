@@ -2473,6 +2473,36 @@ local function CreatePanel()
 		skinMenu:SetPoint("TOPLEFT", skinLabel, "BOTTOMLEFT", -4, -6)
 		Tooltip(skinMenu, L["The look of Cinematic's settings windows: HD is flat and dark, and SD looks like the game's own."])
 		controls[#controls + 1] = skinMenu
+
+		-- Whether CineMode may turn on the game's Show Offscreen Nameplates
+		-- (plateOffscreen, Effects' ns.plates.OffscreenWhy): a profile setting.
+		-- None on a client without it.
+		if GetCVar("nameplateShowOffscreen") ~= nil then
+			local offLabel = Label(panel, "GameFontHighlight", L["Allow offscreen nameplates in CineMode"])
+			offLabel:SetPoint("TOPLEFT", skinMenu, "BOTTOMLEFT", 4, -14)
+			local OFF_TIP = L["Keeps plates for people behind you, so Heal Vision and Emote Vision see them too."]
+			local OFF_CHOICES = {
+				{ value = "auto", text = L["Auto"], tip = L["Only where Heal Vision or Emote Vision use them."] },
+				{ value = "always", text = L["Always"], tip = L["All through CineMode."] },
+				{ value = "never", text = L["Never"], tip = L["Cinematic never turns them on."] },
+			}
+			-- (A change is picked up as the old Nameplates tick's was: the
+			-- settings' Refresh, then the plates' next pass.)
+			local offMenu = Dropdown(panel, "plateOffscreen", OFF_CHOICES, 180)
+			if offMenu then
+				offMenu:SetPoint("TOPLEFT", offLabel, "BOTTOMLEFT", -4, -6)
+				Tooltip(offMenu, OFF_TIP)
+			else
+				-- (No modern dropdown on this client: one tick per choice.)
+				local above = offLabel
+				for _, choice in ipairs(OFF_CHOICES) do
+					local pick = Choice(panel, "plateOffscreen", choice.value, choice.text, choice.tip)
+					pick:SetPoint("TOPLEFT", above, "BOTTOMLEFT", above == offLabel and -4 or 0, -2)
+					above = pick
+				end
+			end
+			offLabel.searchLabel = L["Allow offscreen nameplates in CineMode"]
+		end
 	end
 
 	-- (Start in CineMode: on the Settings tab's CineMode part, the same
@@ -14243,13 +14273,8 @@ do
 				allRows:Box(L["Height"], "plateStyleHeight", 50, 300, 5, "%d", 100,
 					L["The health bar's height."], Changed, nil, "%")
 			end
-			-- (The game's Show Offscreen Nameplates in CineMode; none on a client
-			-- without it.)
-			if GetCVar("nameplateShowOffscreen") ~= nil then
-				local offscreen = stack:Add(Check(content, "plateShowOffscreen", L["Off-screen plates in CineMode"],
-					L["Keeps plates for units out of view pinned to the screen's edge in CineMode."]), "check")
-				offscreen.searchLabel = L["Off-screen plates in CineMode"]
-			end
+			-- (The game's Show Offscreen Nameplates in CineMode: Settings >
+			-- General's Allow offscreen nameplates, plateOffscreen.)
 
 			ns.PageBuildStep(true) -- (made ahead: the next frame from here)
 			stack:Header(content, L["All marks"])

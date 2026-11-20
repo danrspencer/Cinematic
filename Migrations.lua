@@ -5028,6 +5028,29 @@ STEPS[#STEPS + 1] = function()
 	ns.db.cooldownLinesV1 = true
 end
 
+-- (Step: offscreen plates a choice, 2026-11-20.)
+STEPS[#STEPS + 1] = function()
+	-- The Nameplates page's Off-screen plates in CineMode tick became Settings
+	-- > General's Allow offscreen nameplates in CineMode (Auto / Always /
+	-- Never, plateOffscreen). Ticked: Always, as it was. Here, in saved
+	-- profiles and reset points. Once.
+	if ns.db.plateOffscreenV1 then return end
+	local function Move(t)
+		if type(t) ~= "table" then return end
+		if t.plateShowOffscreen == true and t.plateOffscreen == nil then t.plateOffscreen = "always" end
+		t.plateShowOffscreen = nil
+	end
+	Move(ns.db)
+	for _, saved in pairs(ns.db.profiles or {}) do
+		if type(saved) == "table" then
+			Move(saved)
+			Move(saved.settings)
+		end
+	end
+	for _, point in pairs(ns.db.profileResetPoints or {}) do Move(point) end
+	ns.db.plateOffscreenV1 = true
+end
+
 -- Runs them all, each on its own: an error is logged and reported (the
 -- addon's error net, Diagnostics.lua), and the steps after it still run.
 function ns.RunMigrations()

@@ -1148,13 +1148,16 @@ DEFAULTS.plateStyleFadeTime = 1.5
 -- Width and Height; on plates no row fits too.
 DEFAULTS.plateStyleWidth = 1
 DEFAULTS.plateStyleHeight = 1
--- The game's Show Offscreen Nameplates on in CineMode (Effects'
--- OFFSCREEN_PLATE_CVARS): plates for units out of view stay, so the elite
--- rules find an elite behind you. Yours back after.
--- (Off: pinned plates make the game's big head name flash as a nearby unit
--- crosses the screen's edge, tested on Forever. Elite rules then lose an
--- elite off screen.)
-DEFAULTS.plateShowOffscreen = false
+-- Whether CineMode may turn on the game's Show Offscreen Nameplates (Effects'
+-- OFFSCREEN_PLATE_CVARS; Settings > General): plates for units out of view
+-- stay, pinned to the screen's edge, so the elite rules, Heal Vision and
+-- Emote Vision's plate cards find someone behind you. "auto": on only where
+-- those Visions need it; "always": on all through CineMode; "never": never
+-- turned on. Yours back after, and never turned off by us: on in the game's
+-- own settings stays on. (Never by default: they cost, and the game's big
+-- head names flash as units cross the screen's edge, Forever. The features
+-- work without them, just for those in view. User's call, 2026-11-20.)
+DEFAULTS.plateOffscreen = "never"
 for _, kind in ipairs({ "aggro", "focus", "mouseover", "others", "npc", "elite", "npcs", "players", "minions",
 	"all" }) do
 	DEFAULTS[kind .. "MarkAlpha"] = 1

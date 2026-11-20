@@ -1,15 +1,20 @@
--- /cine debug offhold: one run checking CineMode's smart hold on the game's
--- Show Offscreen Nameplates (Effects.lua's ns.plates.OffscreenWhy, 2026-11-19).
+-- /cine debug offhold: one run checking CineMode's hold on the game's Show
+-- Offscreen Nameplates by Settings > General's Allow offscreen nameplates in
+-- CineMode (plateOffscreen; Effects.lua's ns.plates.OffscreenWhy, 2026-11-20).
 -- It runs itself, out of a fight in the open world; the only thing it asks of
 -- you is targeting a mob (addons can't target). Steps:
 --   1 off        CineMode off, your Show Offscreen set to 0 for the run
---   2 on         CineMode on (turned on by the test), no target: held on if
---                Emote Vision's cards or Heal Vision want it here
---   3 enemy      you target an attackable mob: let go (0) at once
---   4 cleared    you clear the target: back on
---   5 city       a city, simulated for 3 s (the place readers answer "city"):
---                off, unless your own rows take cities in
---   6 back       CineMode back as it was, your setting back as it was
+--   2 never      Never, CineMode on (turned on by the test): stays 0
+--   3 yours on   Never, your Show Offscreen set to 1 (as yours): stays 1, not
+--                turned off by CineMode; then 0 again
+--   4 always     Always: on (1)
+--   5 auto       Auto, no target: on only if Emote Vision's cards or Heal
+--                Vision want it here (says which)
+--   6 enemy      you target an attackable mob: let go (0)
+--   7 cleared    you clear the target: as in step 5 again
+--   8 city       Auto in a city, simulated for 3 s (the place readers answer
+--                "city"): off, unless your own rows take cities in
+--   9 back       your pick, CineMode and your setting back as they were
 -- Each check: PASS or FAIL with the setting, the reason and what wants it.
 -- Into CinematicDB.offHoldLog. Puts everything back, a /reload too. Dev copy
 -- only (CinematicDev.toc).
@@ -37,14 +42,26 @@ local function Why()
 end
 local function State()
 	local wants = ns.plates and ns.plates.friendWants or {}
-	return ("Show Offscreen %s; reason %s; cards want plates %s; Heal Vision plates %s; your tick %s; place %s; "
+	return ("Show Offscreen %s; reason %s; cards want plates %s; Heal Vision plates %s; Allow offscreen %s; place %s; "
 		.. "target %s (attackable %s); CineMode %s"):format(Value(), tostring(Why()), tostring(wants.plateCards),
-		tostring(ns.HealVisionPlatesOn and ns.HealVisionPlatesOn()), tostring(ns.db.plateShowOffscreen),
+		tostring(ns.HealVisionPlatesOn and ns.HealVisionPlatesOn()), tostring(ns.db.plateOffscreen),
 		tostring(ns.PlateSuffix and ns.PlateSuffix() or "open world"), tostring(ns.Flag(UnitExists("target"))),
 		tostring(ns.Flag(UnitCanAttack("player", "target"))), tostring(Cine()))
 end
 local function Enemy()
 	return ns.Flag(UnitExists("target")) and ns.Flag(UnitCanAttack("player", "target")) and true or false
+end
+-- The Allow offscreen nameplates pick, the plate pass again at once.
+local function Allow(choice)
+	ns.db.plateOffscreen = choice
+	if ns.plates and ns.plates.seen then ns.plates.seen.at = nil end
+	Say("  Allow offscreen nameplates: " .. choice)
+end
+-- (Auto: on exactly while a Vision wants it here, the reason says which.)
+local function AutoCheck(what)
+	local why = Why()
+	Check(what, (why ~= nil) == (Value() == "1"),
+		(why and ("on for " .. why) or "nothing here wants it (cards' rows or Heal Vision): off") .. "; " .. State())
 end
 
 -- The simulated city: the place readers the plate code and the rows go by.
@@ -68,6 +85,7 @@ local function PutBack()
 	local saved = CinematicDB and CinematicDB.offHoldWas
 	if not saved or InCombatLockdown() then return end
 	if Cine() then SetCine(false) end
+	if saved.allow ~= nil and ns.db then ns.db.plateOffscreen = saved.allow end
 	pcall(SetCVar, "nameplateShowOffscreen", saved.value)
 	if saved.cine then C_Timer.After(0.5, function() SetCine(true) end) end
 	CinematicDB.offHoldWas = nil
@@ -94,30 +112,44 @@ local STEPS = {
 			Say("  your Show Offscreen set to 0 for the run")
 			Check("off outside CineMode", Value() == "0", State())
 		end },
-	{ key = "on", start = function() SetCine(true) end,
+	{ key = "never", start = function() Allow("never"); SetCine(true) end,
+		ready = function() return Cine() and not Enemy() end,
+		checks = function()
+			Check("Never: not turned on", Value() == "0" and Why() == nil, State())
+		end },
+	{ key = "yours on", start = function()
+			pcall(SetCVar, "nameplateShowOffscreen", "1")
+			Say("  your Show Offscreen set to 1 (as yours)")
+		end,
+		ready = function() return Cine() and not Enemy() end,
+		checks = function()
+			Check("Never: yours on stays on (CineMode doesn't turn it off)", Value() == "1", State())
+			pcall(SetCVar, "nameplateShowOffscreen", "0")
+			Say("  your Show Offscreen back to 0")
+		end },
+	{ key = "always", start = function() Allow("always") end,
 		ready = function() return Cine() and not Enemy() end,
 		checks = function()
 			local why = Why()
-			Say("  " .. State())
-			Check("held on here with no target", why ~= nil and Value() == "1",
-				why and ("for " .. why) or "nothing here wants it (cards' rows or Heal Vision): see the state line")
+			Check("Always: on", Value() == "1" and why ~= nil, State())
 		end },
+	{ key = "auto", start = function() Allow("auto") end,
+		ready = function() return Cine() and not Enemy() end,
+		checks = function() AutoCheck("Auto: on only where a Vision wants it") end },
 	{ key = "enemy", ask = "TARGET any attackable mob (Tab). Don't attack it.",
 		ready = function() return Cine() and Enemy() end,
 		checks = function()
-			Check("let go with an attackable target", Value() == "0" and Why() == nil, State())
+			Check("Auto: let go with an attackable target", Value() == "0" and Why() == nil, State())
 		end },
 	{ key = "cleared", ask = "CLEAR your target (Escape).",
 		ready = function() return Cine() and not ns.Flag(UnitExists("target")) end,
-		checks = function()
-			Check("back on once the target's cleared", Value() == "1" and Why() ~= nil, State())
-		end },
+		checks = function() AutoCheck("Auto: as before once the target's cleared") end },
 	{ key = "city", start = function() City(true) end,
 		ready = function() return Cine() and not Enemy() end,
 		checks = function()
 			local why = Why()
 			Say("  (simulated city) " .. State())
-			Check("off in a city unless your rows take cities in", (why == nil) == (Value() == "0"),
+			Check("Auto: off in a city unless your rows take cities in", (why == nil) == (Value() == "0"),
 				why and ("on for " .. why .. ": your own rule or City tick takes cities in") or "off")
 			Check("Emote Vision's cards don't want plates in a city", not (ns.plates.friendWants.plateCards),
 				tostring(ns.plates.friendWants.plateCards))
@@ -191,7 +223,7 @@ function ns.OffscreenHoldTest()
 		return
 	end
 	CinematicDB.offHoldLog = {}
-	CinematicDB.offHoldWas = { value = GetCVar("nameplateShowOffscreen"), cine = Cine() }
+	CinematicDB.offHoldWas = { value = GetCVar("nameplateShowOffscreen"), cine = Cine(), allow = ns.db.plateOffscreen }
 	run = { at = GetTime(), index = 1, phase = "start", pass = 0, fail = 0 }
 	Say(("start: %s (game %s), Cinematic %s, CineMode %s, your Show Offscreen %s; %s"):format(
 		ns.isRetail and "retail" or "classic", tostring((select(4, GetBuildInfo()))), ns.Version and ns.Version() or "?",
