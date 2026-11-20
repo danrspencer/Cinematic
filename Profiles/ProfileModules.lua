@@ -545,6 +545,27 @@ ns.PROFILE_MODULES = {
 				if ns.DEFAULTS[key] ~= nil and ns.DEFAULTS[key] ~= false then set(key, false) end
 			end
 		end },
+	-- (The Auto-Hide UI profile's: every page that isn't about your UI off,
+	-- the cameras, effects, styles, Visions, cards, music and the rest, so
+	-- only the fading and the frame pages are left.)
+	{ key = "ui-pages-only", name = "Only the UI pages", scope = { "Cameras/top", "Shoulder Cam",
+		"Skyriding Cam/top", "Effects/top", "Letterbox/top", "Tint/top", "Graphics+/top", "General/top",
+		"Style General/top", "Unit Style/top", "Raid Style/top", "Action Style/top", "Personal Style/top",
+		"Tooltip Style/top", "Nameplate Style/top", "Name Style/top", "Cast Bar Style/top", "Bubble Style/top",
+		"Interface Recolor/top", "Heal Vision/top", "Damage Vision", "Vitals Vision", "Quest Vision/top",
+		"Roll Vision/top", "Teleport Vision", "Death Vision/top", "Duel Vision/top", "Emote Vision",
+		"Card Vision/top", "Fishing/top", "Hunter/top" },
+		tip = "Every page that isn't about your UI off: no cameras, effects, styles, Visions or cards (music: the Sound choice).",
+		apply = function(set)
+			for _, key in ipairs({ "cameraModes", "shoulderCam", "skyrideCam", "visualEffects", "letterboxPage",
+				"tintPage", "graphicsPlus", "styleGeneral", "ufStyle", "rfStyle", "abStyle",
+				"prdStyle", "tooltipStyle", "handlePlateStyle", "plateNameStyle", "plateCastStyle", "bubblesStyle",
+				"irStyle", "combatTextStyle", "handleHealVision", "damageVision", "lowHealth", "questVision",
+				"questTalk", "rollWindow", "teleportVision", "deathScreen", "duelPlates", "emoteVision", "cards",
+				"windGuide", "handleQuality", "handleFishing", "handleHunter" }) do
+				if ns.DEFAULTS[key] ~= nil and ns.DEFAULTS[key] ~= false then set(key, false) end
+			end
+		end },
 	{ key = "no-custom-bubbles", name = "No custom bubbles", scope = { "Chat bubbles/Custom bubbles" },
 		tip = "Only the game's own chat bubbles: no off-screen ones, and none brought down from the top of the screen.",
 		apply = function(set)

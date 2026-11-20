@@ -426,6 +426,39 @@ if arg[1] and not update then
 			end
 		end
 		if db.offUntilPicked then print("problem\tpicked a profile: still off") end
+		-- Auto-Hide UI: Balanced's fading and frame pages, and nothing else.
+		-- (Worked out from its modules, not picked: picking one here leaves the
+		-- stand-in half switched for the checks after.)
+		local byName = {}
+		for _, profile in ipairs(ns.ALL_BUILTIN_PROFILES) do byName[profile.name] = profile end
+		local function Settings(name)
+			return ns.ApplyModules(ns.ResolveModules(byName[name], client, byName), ns.ModuleBase(client), client)
+		end
+		-- (Each welcome level a built-in; Auto-Hide UI one of them.)
+		local isLevel = false
+		for _, level in ipairs(ns.WELCOME_LEVELS) do
+			if not byName[level.profile] then print("problem\twelcome level " .. tostring(level.label) .. ": no such profile") end
+			if level.profile == "Auto-Hide UI" then isLevel = true end
+		end
+		if not isLevel then print("problem\tAuto-Hide UI: not in the welcome window") end
+		if not byName["Auto-Hide UI"] then
+			print("problem\tAuto-Hide UI: no such profile")
+		else
+			local hide, balanced = Settings("Auto-Hide UI"), Settings("Balanced")
+			for _, key in ipairs({ "handleFrames", "mouseover", "handleMinimap", "handleChat", "handlePlates",
+				"handleTooltips", "handleBubbles", "chatPeekChannelList", "hoverGroups", "editModeLayout" }) do
+				if ns.SerialValue(hide[key]) ~= ns.SerialValue(balanced[key]) then
+					print("problem\tAuto-Hide UI: " .. key .. " isn't as Balanced has it")
+				end
+			end
+			for _, key in ipairs({ "cameraModes", "visualEffects", "letterboxPage", "tintPage", "styleGeneral",
+				"cards", "emoteVision", "teleportVision", "handleFishing", "musicInCinematic", "handleQuality",
+				"handleHealVision", "rollWindow", "cardDuelOn", "cardLevelUpOn", "storyZoneCard" }) do
+				if ns.DEFAULTS[key] ~= nil and hide[key] ~= false then
+					print("problem\tAuto-Hide UI: " .. key .. " is on")
+				end
+			end
+		end
 	end
 	local problems, _, absent, nowhere, notes = ns.CheckModules(client, ns.ALL_BUILTIN_PROFILES)
 	-- Each built-in's settings (the dev build's run: it has every profile).

@@ -289,6 +289,23 @@ ns.BUILTIN_PROFILES = {
 		-- (No Quest Vision, as in every profile: Escape and walking off glide
 		-- back in the game's own talk windows too, since 2026-11-15.)
 	},
+	-- Balanced's fading and nothing else (2026-11-20): your UI hides and
+	-- comes back as in Balanced, with every page that isn't about the UI off
+	-- (no cameras, effects, styles, Visions, cards or music) and none of
+	-- EVERY_PROFILE's extras.
+	{
+		name = "Auto-Hide UI",
+		label = "Auto-Hide UI", -- (shown in your language)
+		-- (Lesser Invisibility, the Fading UI tile's: the UI going. The game's
+		-- own spelling, "Invisibilty".)
+		icon = "Interface\\Icons\\Spell_Magic_LesserInvisibilty",
+		tip = L["Just your UI hiding. It fades away and comes right back for a fight, a quest or a look with " ..
+			"the mouse, as in Balanced, with your bars and frames where you know them. Nothing else: no " ..
+			"cameras, letterbox, tint or weather, no styles, Visions, cards or music."],
+		picks = { layout = { forever = "preset" }, camera = "off", chat = "lite", sound = "nomusic" },
+		modules = { "ui-pages-only" },
+		preview = "bars",
+	},
 	-- Nothing on: for players who want just a few parts (Roll, Emote Vision,
 	-- cards...) and turn on only those pages. The welcome window's last
 	-- choice; none of EVERY_PROFILE's extras.
@@ -336,6 +353,9 @@ ns.WELCOME_LEVELS = {
 		line = "Cinema, with the camera over your shoulder.",
 		note = "It uses one of Blizzard's experimental camera settings: picking it or its test agrees to that. " ..
 			"Turn the Shoulder Cam off and your own camera settings come back." },
+	-- (Balanced's fading and nothing else, since 2026-11-20.)
+	{ label = "Auto-Hide UI", profile = "Auto-Hide UI",
+		line = "Just your UI hiding, as in Balanced. No cameras or effects." },
 	-- (noCustomize: no Next to Customize, whose parts it has all off.)
 	{ label = "Blank Slate", profile = "Blank Slate", noCustomize = true,
 		line = "Everything off. Turn on only the parts you want." },

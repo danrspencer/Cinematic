@@ -207,6 +207,29 @@ Smoke("built-in profiles: each builds and shares", function()
 	return "pass", count .. " profiles"
 end)
 
+-- Every built-in profile's icon is a file the game has (the welcome window
+-- and the Profiles page draw it; Auto-Hide UI's first one was blank).
+Smoke("built-in profiles: each icon is in the game", function()
+	local probe = UIParent:CreateTexture()
+	local bad, count = {}, 0
+	for _, profile in ipairs(ns.BUILTIN_PROFILES or {}) do
+		count = count + 1
+		local id
+		if GetFileIDFromPath then
+			id = GetFileIDFromPath(profile.icon)
+		else
+			probe:SetTexture(nil)
+			probe:SetTexture(profile.icon)
+			id = probe:GetTextureFileID()
+		end
+		if not id then bad[#bad + 1] = ("%s (%s)"):format(profile.name, tostring(profile.icon)) end
+	end
+	probe:Hide()
+	if count == 0 then return "fail", "no built-in profiles" end
+	if #bad > 0 then return "fail", "no such icon: " .. List(bad, 4) end
+	return "pass", count .. " icons"
+end)
+
 -- Themes through Share and back (yours as you have it, and two of ours).
 Smoke("theme share: export, read back", function()
 	if not (ns.ExportStyleTheme and ns.ReadSharedStyleTheme) then return "skip", "no theme share" end
