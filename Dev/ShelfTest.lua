@@ -34,6 +34,8 @@ local _, ns = ...
 
 local PLAY_FOR = 8   -- seconds a tile's watched at most
 local SHOT_AT = 2
+-- (later for a demo whose look comes partway: Mouseover's group, 2.5 s in)
+local SHOT_AT_FOR = { mouseover = 4 }
 local SKIP = { shoulder = "trying it agrees to its experimental camera setting" }
 -- (ShowMe.lua's once demos: shown and done, no Stop. Any other not running
 -- right after its click didn't start: the quest camera, 2026-11-20.)
@@ -171,6 +173,18 @@ local SHOWS = {
 	cdflash = function()
 		return ns.CooldownFlashTesting and ns.CooldownFlashTesting(GetTime()), "flash test running"
 	end,
+	-- (the group up as if pointed at: the pointer shown, an action bar back,
+	-- a frame not in the group still faded)
+	mouseover = function()
+		if not ns.MouseoverDemoState then return false, "no demo" end
+		local phase, pointer, spot, art, where = ns.MouseoverDemoState()
+		local bar = Effective(_G.MainActionBar or _G.MainMenuBar or _G.ActionButton1)
+		local other = Effective(_G.PlayerFrame) or Effective(_G.Minimap)
+		return phase == 2 and pointer and (bar or 0) > 0.8 and (other or 1) < 0.3,
+			("phase %s, pointer %s (aimed at %s; drawn at %s; texture %s), action bar %s, player frame %s"):format(
+				tostring(phase), tostring(pointer), tostring(spot), tostring(where), tostring(art),
+				bar and ("%.2f"):format(bar) or "?", other and ("%.2f"):format(other) or "?")
+	end,
 	speech = function()
 		return TextOnScreen(ns.L["Speech from behind you shows here."]), "its line searched for on screen"
 	end,
@@ -245,6 +259,7 @@ local function Finish(stopped)
 	end
 	-- (stopped on Subtle: yours again, Subtle's saved changes as they were)
 	if run.switchBack then pcall(run.switchBack) end
+	if run.levelBack then pcall(run.levelBack) end
 	-- (after the settings above: they were saved with it off)
 	ns.db.fadeUI = run.fadeUI
 	if ns.RestartTimers then ns.RestartTimers() end
@@ -302,7 +317,7 @@ local function TileStep(b)
 		ticker = C_Timer.NewTicker(0.25, function()
 			if not run then ticker:Cancel() return end
 			local t = GetTime() - began
-			if not shot and t >= SHOT_AT then
+			if not shot and t >= (SHOT_AT_FOR[key] or SHOT_AT) then
 				shot = true
 				pcall(Screenshot)
 				Log(("tile %s: screenshot at %s"):format(key, date("%H:%M:%S")))
@@ -322,7 +337,7 @@ local function TileStep(b)
 				end
 			end
 			local still = ns.ShowMeRunning(key)
-			if (still and t < PLAY_FOR) or t < SHOT_AT + 0.5 then return end
+			if (still and t < PLAY_FOR) or t < (SHOT_AT_FOR[key] or SHOT_AT) + 0.5 then return end
 			ticker:Cancel()
 			if still then
 				b:Click()
@@ -339,6 +354,41 @@ local function TileStep(b)
 			C_Timer.After(1, Next)
 		end)
 	end
+end
+
+-- A level picked by its card for the tiles that can't play on yours (the
+-- user's OK, 2026-11-20: tests set themselves up), and yours again after by
+-- its card, that level's saved settings put back as they were (switching
+-- saves the live ones into it). run.levelBack switches back; Finish too.
+local function DeepCopy(t)
+	if type(t) ~= "table" then return t end
+	local out = {}
+	for k, v in pairs(t) do out[k] = DeepCopy(v) end
+	return out
+end
+local function SwitchLevel(name, Next)
+	local cards, card = ns.WelcomeCards and ns.WelcomeCards() or {}, {}
+	for i, each in ipairs(ns.WELCOME_LEVELS) do card[each.profile or ns.DEFAULT_PROFILE] = cards[i] end
+	local mine = ns.ActiveProfile()
+	if not card[name] or mine == name then
+		Log(("level: %s not picked (its card %s, active %s)"):format(name, tostring(card[name] ~= nil), tostring(mine)))
+		return Next()
+	end
+	local saved = ns.db.profiles and ns.db.profiles[name]
+	local savedCopy = saved and DeepCopy(saved) or false
+	run.levelBack = function()
+		run.levelBack = nil
+		if card[mine] then card[mine]:Click() else ns.SetProfile(mine) end
+		ns.db.profiles[name] = savedCopy or nil
+		ns.db.fadeUI = false -- (CineMode still off for the rest of the test)
+		Log(("level: back to %s (active %s), %s's saved settings put back"):format(mine,
+			tostring(ns.ActiveProfile()), name))
+	end
+	card[name]:Click()
+	ns.db.fadeUI = false
+	Log(("level: %s picked for the tiles (yours: %s), active %s"):format(name, mine, tostring(ns.ActiveProfile())))
+	-- (a moment for its frames to be found and settle)
+	C_Timer.After(3, function() if run then Next() end end)
 end
 
 -- list: what to test, words apart ("questCam duel search"): tiles by their
@@ -474,8 +524,18 @@ function ns.ShelfTest(list)
 			end)
 		end)
 	end
+	-- (Mouseover named and greyed on your level, Blank Slate: Balanced for the
+	-- tiles, which fades your UI with Mouseover on; yours after.)
+	local needLevel = only and only.mouseover and ns.ShowMeBlocked("mouseover", true) and not InCombatLockdown()
+	if needLevel then steps[#steps + 1] = function(Next) SwitchLevel("Balanced", Next) end end
 	for _, b in ipairs(row.ShelfTiles()) do
 		if Want(b.demo.key) then steps[#steps + 1] = TileStep(b) end
+	end
+	if needLevel then
+		steps[#steps + 1] = function(Next)
+			if run.levelBack then run.levelBack() end
+			C_Timer.After(1.5, function() if run then Next() end end)
+		end
 	end
 	-- The tour: Watch the tour clicked; every half second, what plays (its
 	-- place, n of N), the window's alpha and the notice; its order against

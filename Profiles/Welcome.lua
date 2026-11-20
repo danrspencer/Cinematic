@@ -459,6 +459,9 @@ local SHELF_MORE = {
 			"out as you leave." },
 	{ key = "cards", label = "Card Vision", icon = "Interface\\Icons\\INV_Misc_Book_09", group = "vis",
 		tip = "Title cards for the moments of your day: a new zone, a level, a fight." },
+	-- (the Mouseover page's own icon, a pointing hand)
+	{ key = "mouseover", label = "Mouseover", icon = "Interface\\Cursor\\Point", group = "ui",
+		tip = "Point at where a faded frame lives and it comes back, with its group." },
 	{ key = "cdflash", label = "Cooldown Flash", icon = "Interface\\Icons\\Spell_Nature_TimeStop", group = "ui",
 		tip = "A spell's icon flashes in the middle of the screen as it comes off cooldown." },
 	{ key = "speech", label = "Speech", icon = "Interface\\Icons\\Ability_Warrior_RallyingCry", group = "ui",
@@ -487,7 +490,7 @@ local TOUR = { { key = "fadeUI" }, { key = "bars" }, { key = "tint" }, { key = "
 -- The features with nothing to play: a line of links under the grid, "Also
 -- in Cinematic", each opening its settings page (by its English name, as
 -- ns.OpenOptions takes it) over the welcome window, closing back to it. The
--- ones waiting for a demo of their own (Heal Vision, Mouseover, Nameplates,
+-- ones waiting for a demo of their own (Heal Vision, Nameplates,
 -- Chat Bubbles, Combat Text, Skyriding Cam) are here till they have one.
 local SHELF_LINKS = {
 	{ page = "Graphics+", label = "Graphics Boost", group = "atmo",
@@ -504,8 +507,6 @@ local SHELF_LINKS = {
 		tip = "Quest mobs keep their nameplates, with a quest mark." },
 	{ page = "Duel Vision", label = "Duel Vision", group = "vis",
 		tip = "In CineMode, the nameplates of two players dueling near you show." },
-	{ page = "Mouseover groups", label = "Mouseover", group = "ui",
-		tip = "Point at where a faded frame lives and it comes back, with its group." },
 	{ page = "Nameplates", label = "Nameplates", group = "ui",
 		tip = "Nameplates that show only for what matters: your target, a mob on you, a friend in need." },
 	{ page = "Chat bubbles", label = "Chat Bubbles", group = "ui",

@@ -99,6 +99,122 @@ local function StartFade(window, hold, keep)
 end
 fadeFrame:SetScript("OnEvent", function() ns.StopShowMe() end)
 
+-- Mouseover: the UI faded as CineMode fades it, then one mouseover group
+-- back as if you'd pointed at where it lives (a pointer drawn there), then
+-- faded again. The frames pass's profile preview does the showing (Core.lua,
+-- Frames.lua: ns.previewRows, just those rows up, the rest faded), so it's
+-- your level's own frames and fade times. The Action bars group, else the
+-- first with members. Only where your frames are looked after: a level that
+-- fades nothing (Blank Slate) has nothing to bring back.
+local HOVER_FADE, HOVER_SHOW, HOVER_AFTER = 2.5, 3.5, 2 -- seconds: faded, the group up, faded again
+local hoverFrame = CreateFrame("Frame")
+local hoverDemo -- { startAt, rows, pointer, phase }
+local function HoverGroupRows()
+	local groups = ns.GetHoverGroups and ns.GetHoverGroups() or {}
+	local pick, first
+	for _, group in ipairs(groups) do
+		if not group.off and group.members and #group.members > 0 then
+			first = first or group
+			for _, key in ipairs(group.members) do
+				if key == "mainbar" then pick = pick or group end
+			end
+		end
+	end
+	pick = pick or first
+	if not pick then return nil end
+	local rows = {}
+	for _, key in ipairs(pick.members) do rows[key] = true end
+	return rows, pick
+end
+-- Where to point: the main action bar's middle if it's in the group, else
+-- the group's first shown frame (in UIParent's units), and its name.
+-- (2026-11-20: the first shown frame could be the XP bar or the bags; no
+-- pointer was seen on the bar.)
+local function HoverSpot(rows)
+	local best
+	for _, entry in ipairs(ns.managed or {}) do
+		local frame = entry.frame
+		if rows[entry.row] and frame and frame.GetCenter and not (frame.IsForbidden and frame:IsForbidden())
+			and ns.Flag(frame:IsVisible()) then
+			local x, y = frame:GetCenter()
+			if type(x) == "number" and type(y) == "number" and not (issecretvalue and issecretvalue(x)) then
+				local scale = frame:GetEffectiveScale() / UIParent:GetEffectiveScale()
+				local spot = { x * scale, y * scale, entry.name or tostring(entry.row) }
+				if entry.row == "mainbar" then return spot[1], spot[2], spot[3] end
+				best = best or spot
+			end
+		end
+	end
+	if best then return best[1], best[2], best[3] end
+end
+local function StopHoverDemo()
+	local was = hoverDemo
+	if not was then return end
+	hoverDemo = nil
+	ns.SetOnUpdate(hoverFrame, nil)
+	if was.pointer then was.pointer:Hide() end
+	ns.previewRows = nil
+	ns.framesWake = "mouseover demo"
+end
+local NO_ROWS = {}
+local function HoverStep()
+	local d = hoverDemo
+	local t = GetTime() - d.startAt
+	local phase = t < HOVER_FADE and 1 or t < HOVER_FADE + HOVER_SHOW and 2 or 3
+	-- (kept on: the frames pass drops a preview at its time, Core.lua)
+	ns.previewUntil = GetTime() + 1
+	if phase ~= d.phase then
+		d.phase = phase
+		ns.previewRows = phase == 2 and d.rows or NO_ROWS
+		ns.framesWake = "mouseover demo"
+		if d.pointer then
+			local x, y, name = HoverSpot(d.rows)
+			d.spot = x and ("%s at %.0f, %.0f"):format(tostring(name), x, y) or "none found"
+			if phase == 2 and x then
+				d.pointer:ClearAllPoints()
+				d.pointer:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", x, y)
+				d.pointer:Show()
+			else
+				d.pointer:Hide()
+			end
+		end
+	end
+	if t >= HOVER_FADE + HOVER_SHOW + HOVER_AFTER then
+		ns.previewRows = nil
+		ns.framesWake = "mouseover demo"
+		ns.SetOnUpdate(hoverFrame, nil)
+	end
+end
+local hoverPointer
+-- (For the shelf's test: its phase (1 faded, 2 the group up, 3 faded again) and the pointer up.)
+function ns.MouseoverDemoState()
+	local art = hoverPointer and hoverPointer.art
+	return hoverDemo and hoverDemo.phase, hoverPointer ~= nil and hoverPointer:IsShown(),
+		hoverDemo and hoverDemo.spot, art and tostring(art:GetTexture()),
+		hoverPointer and hoverPointer:GetLeft() and ("%.0f, %.0f, strata %s, alpha %.2f"):format(hoverPointer:GetLeft(),
+			hoverPointer:GetTop(), hoverPointer:GetFrameStrata(), hoverPointer:GetEffectiveAlpha()) or nil
+end
+local function StartHoverDemo()
+	StopHoverDemo()
+	local rows = HoverGroupRows()
+	if not rows then error("no mouseover group") end
+	if not hoverPointer then
+		-- (A pointer of its own, not the mouse: drawn over the faded frames,
+		-- out of UIParent's way.)
+		hoverPointer = CreateFrame("Frame", nil, UIParent)
+		hoverPointer:SetFrameStrata("TOOLTIP")
+		hoverPointer:SetSize(32, 32)
+		local art = hoverPointer:CreateTexture(nil, "OVERLAY")
+		art:SetAllPoints()
+		art:SetTexture("Interface\\Cursor\\Point")
+		hoverPointer.art = art
+		hoverPointer:Hide()
+	end
+	hoverDemo = { startAt = GetTime(), rows = rows, pointer = hoverPointer }
+	ns.SetOnUpdate(hoverFrame, HoverStep)
+	HoverStep()
+end
+
 -- Audio: CineMode's music (the Audio page, Effects.lua's ns.UpdateMusic), as
 -- a camera starts it: the game's music switched on at no volume, faded up to
 -- your own, held, faded out, and your settings back (saved as Cinematic saves
@@ -237,6 +353,14 @@ local DEMOS = {
 			end
 		end },
 	speech = { once = true, start = function() ns.TestSpeechBehind() end },
+	-- (Mouseover: above. Only with your frames looked after.)
+	mouseover = { seconds = HOVER_FADE + HOVER_SHOW + HOVER_AFTER + 1.5, fade = true,
+		start = StartHoverDemo, stop = StopHoverDemo,
+		blocked = function()
+			if not (ns.ProfileChosen() and ns.AnyFramePageOn and ns.AnyFramePageOn() and ns.db.mouseover) then
+				return L["It brings back a faded frame: pick a level that fades your UI and has Mouseover on."]
+			end
+		end },
 	-- (CineMode's music: in, held, out; above. Its fades and hold, and a moment.)
 	audio = { seconds = 14, start = StartMusicDemo, stop = StopMusicDemo,
 		running = function() return musicDemo ~= nil end },
@@ -381,7 +505,8 @@ local IN_PROFILE = { fadeUI = { "handleFrames" }, bars = { "letterboxPage", "let
 	camera = { "cameraModes" }, vitals = { "lowHealth" }, tele = { "teleportVision" }, shoulder = { "shoulderCam" },
 	weather = { "tintPage", "weatherTint" }, timeTitle = { "cards", "timeOfDayChange" }, cards = { "cards" },
 	recap = { "damageVision" }, damage = { "damageVision" }, emote = { "emoteVision" }, roll = { "rollWindow" },
-	deathVision = { "deathScreen" }, duel = { "duelPlates" }, audio = { "musicInCinematic" } }
+	deathVision = { "deathScreen" }, duel = { "duelPlates" }, audio = { "musicInCinematic" },
+	mouseover = { "handleFrames", "mouseover" } }
 -- A camera's Test by its scene (CameraRows.lua's triggers): on with the Cameras
 -- page's switch, the scene ticked and a camera picked (camera: the one to pick
 -- for Turn on).
