@@ -1046,3 +1046,67 @@ function ns.CreateCombatTextStylePanel(kit)
 	canvas:Hide()
 	kit.RegisterSubpage(canvas, "Combat Text Style", L["Combat Text Style"])
 end
+
+-- The welcome window's Combat Text demo (ShowMe.lua): this page's preview, a
+-- nameplate as yours look, on the screen near its top (over the faded
+-- window), the page's mix of hits played on it twice. Your numbers' look,
+-- whether the page is on or not: it's what they'd look like.
+local DEMO_PASSES, DEMO_EVERY = 2, 4 -- (rounds of the mix, seconds apart)
+local demo
+function ns.ShowCombatTextDemo(on)
+	if not on then
+		if demo then
+			demo.round = demo.round + 1
+			demo:Hide()
+		end
+		return true
+	end
+	if not ns.MakePlateRowLookPreview then return false end
+	if not demo then
+		demo = CreateFrame("Frame", nil, UIParent)
+		demo:SetSize(480, 170)
+		demo:SetPoint("TOP", UIParent, "TOP", 0, -130)
+		demo:SetFrameStrata("FULLSCREEN")
+		demo:EnableMouse(false)
+		local preview = ns.MakePlateRowLookPreview(demo, 480, "others")
+		preview:SetPoint("TOPLEFT")
+		preview:SetHeight(170) -- (room over the plate for the numbers' climb, as on the page)
+		preview.plate:ClearAllPoints()
+		preview.plate:SetPoint("BOTTOM", preview, "BOTTOM", 0, 44 / 1.6)
+		-- (the numbers over it, past its top: not in it, which clips)
+		local layer = CreateFrame("Frame", nil, demo)
+		layer:SetAllPoints(preview)
+		layer:SetFrameLevel(math.min(preview:GetFrameLevel() + 30, 9000))
+		layer.zoom = 1
+		demo.preview, demo.layer, demo.round = preview, layer, 0
+		-- (Not the page's picker, Scene button or "not saved" tag: they're the
+		-- page's, and showed on the screen, 2026-11-20. Hiding them didn't
+		-- hold (something shows them again after), so in this copy of the
+		-- preview they go onto a frame that's never shown.)
+		local away = CreateFrame("Frame", nil, demo)
+		away:Hide()
+		for _, piece in ipairs(preview.pagePieces or {}) do piece:SetParent(away) end
+	end
+	demo:Show()
+	demo.round = demo.round + 1
+	local this = demo.round
+	for pass = 0, DEMO_PASSES - 1 do
+		for _, step in ipairs(MIX) do
+			C_Timer.After(pass * DEMO_EVERY + step[1], function()
+				if this == demo.round and demo:IsShown() then
+					demo.played = (demo.played or 0) + 1
+					ns.CombatTextSample(demo.preview.plate, step[2], demo.layer, step[3], step[4])
+				end
+			end)
+		end
+	end
+	return true
+end
+-- (For the shelf's test: shown, and how many hits it's played.)
+function ns.CombatTextDemoState()
+	local pieces = 0
+	for _, piece in ipairs(demo and demo.preview.pagePieces or {}) do
+		if piece:IsVisible() then pieces = pieces + 1 end
+	end
+	return demo ~= nil and demo:IsShown(), demo and demo.played or 0, pieces
+end

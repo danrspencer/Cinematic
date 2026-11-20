@@ -554,6 +554,10 @@ function ns.MakePlateRowLookPreview(parent, width, kind)
 	tag:SetPoint("TOPRIGHT", -8, -6)
 	tag:SetText(L["Preview: not saved"])
 	tag.searchSkip = true
+	-- (The settings page's own parts, for a preview shown away from it: the
+	-- welcome window's Combat Text demo hides them, CombatTextPage.lua.)
+	holder.pagePieces = { tag, sceneButton }
+	for _, pill in ipairs(picks) do holder.pagePieces[#holder.pagePieces + 1] = pill end
 
 	-- over: a choice pointed at in the panel ({ key = value }), shown, not saved;
 	-- note: the words over the scene for it (Preview: not saved).

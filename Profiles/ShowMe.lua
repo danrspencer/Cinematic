@@ -451,6 +451,10 @@ local DEMOS = {
 	plates = { seconds = 7, fade = true, switches = { "handlePlates" },
 		start = function() ns.plateDemo = true end,
 		stop = function() ns.plateDemo = nil end },
+	-- (Combat Text: the Combat Text Style page's preview, its hits playing, CombatTextPage.lua.)
+	combatText = { seconds = 9, fade = true,
+		start = function() if not ns.ShowCombatTextDemo(true) then error("no preview") end end,
+		stop = function() ns.ShowCombatTextDemo(false) end },
 	-- (Chat Bubbles: two in your bubble look over the world, Bubbles.lua.)
 	bubbles = { seconds = 7, fade = true, start = function() ns.ShowBubbleDemo(true) end,
 		stop = function() ns.ShowBubbleDemo(false) end },
@@ -512,7 +516,7 @@ end
 local NEEDS = { vitals = "FlashVitals", tele = "TestTeleportVision", emote = "TestEmoteVision",
 	roll = "TestRollWindow", damage = "TestDamageVision", shoulder = "ShoulderCamDemo",
 	timeTitle = "TestTimeChangeTitle", cards = "CardTest", recap = "TestDamageRecap", cdflash = "TestCooldownFlash",
-	speech = "TestSpeechBehind", audio = "SaveCVar", bubbles = "ShowBubbleDemo", deathVision = "TestDeathVision" }
+	speech = "TestSpeechBehind", audio = "SaveCVar", bubbles = "ShowBubbleDemo", combatText = "ShowCombatTextDemo", deathVision = "TestDeathVision" }
 for key in pairs(CAM_DEMOS) do NEEDS[key] = "CameraTestStart" end
 function ns.ShowMeAvailable(key)
 	return DEMOS[key] ~= nil and not (NEEDS[key] and not ns[NEEDS[key]])
@@ -611,7 +615,7 @@ local IN_PROFILE = { fadeUI = { "handleFrames" }, bars = { "letterboxPage", "let
 	recap = { "damageVision" }, damage = { "damageVision" }, emote = { "emoteVision" }, roll = { "rollWindow" },
 	deathVision = { "deathScreen" }, duel = { "duelPlates" }, audio = { "musicInCinematic" },
 	mouseover = { "handleFrames", "mouseover" }, heal = { "handleHealVision" }, plates = { "handlePlates" },
-	bubbles = { "handleBubbles" } }
+	bubbles = { "handleBubbles" }, combatText = { "combatTextStyle" } }
 -- A camera's Test by its scene (CameraRows.lua's triggers): on with the Cameras
 -- page's switch, the scene ticked and a camera picked (camera: the one to pick
 -- for Turn on).

@@ -240,6 +240,13 @@ local SHOWS = {
 		return shown and (w or 0) > 40 and (h or 0) > 10, ("bubbles shown %s, /say bubble %s x %s"):format(
 			tostring(shown), w and ("%.0f"):format(w) or "?", h and ("%.0f"):format(h) or "?")
 	end,
+	-- (the preview up and hits played on it)
+	combatText = function()
+		if not ns.CombatTextDemoState then return false, "no demo" end
+		local shown, played, pieces = ns.CombatTextDemoState()
+		return shown and played > 2 and (pieces or 0) == 0, ("preview shown %s, %d hits played, %d of the page's own parts showing"):format(
+			tostring(shown), played, pieces or 0)
+	end,
 	speech = function()
 		return TextOnScreen(ns.L["Speech from behind you shows here."]), "its line searched for on screen"
 	end,
