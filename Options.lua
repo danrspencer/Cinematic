@@ -15995,6 +15995,7 @@ local function CreateCooldownPanel()
 	RecordKey(icons, "cooldownGroupDefaults")
 	RecordKey(icons, "cooldownProcOnly")
 	RecordKey(icons, "cooldownAlwaysShow")
+	RecordKey(icons, "cooldownNeverShow")
 	RecordKey(icons, "cooldownBuffMode")
 	RecordKey(icons, "cooldownSmartDefaults")
 	RecordKey(icons, "cooldownFlashReady")
@@ -16052,13 +16053,14 @@ local function CreateCooldownPanel()
 	}
 	-- The groups of tracked buffs and bars, with modes of their own (ns.CooldownBuffMode).
 	local BUFF_GROUP = { buffs = true, bars = true, otherbuffs = true }
-	-- A spell's mode: "always", "ready", "recharge" or "proc" (set on its own:
-	-- db.cooldownAlwaysShow, ReadyOnly, RechargeOnly, ProcOnly; else its group's).
+	-- A spell's mode: "always", "ready", "recharge", "proc" or "never" (set on its own:
+	-- db.cooldownAlwaysShow, ReadyOnly, RechargeOnly, ProcOnly, NeverShow; else its group's).
 	local MODES = {
 		{ value = "always", text = L["Always"] },
 		{ value = "ready", text = L["When ready"] },
 		{ value = "recharge", text = L["While recharging"] },
 		{ value = "proc", text = L["When it procs"] },
+		{ value = "never", text = L["Never"] },
 	}
 	local BUFF_MODES = {
 		{ value = "always", text = L["Always"] },
@@ -16101,7 +16103,7 @@ local function CreateCooldownPanel()
 	end
 
 	local OWN_MODES = { ready = "cooldownReadyOnly", recharge = "cooldownRechargeOnly", proc = "cooldownProcOnly",
-		always = "cooldownAlwaysShow" }
+		always = "cooldownAlwaysShow", never = "cooldownNeverShow" }
 	local function ModeOf(spell)
 		local sit = View()
 		if sit then
@@ -16763,8 +16765,9 @@ local function CreateCooldownPanel()
 			listed[BUFF_GROUP[spell.group] and "buff" or "spell"][spell.id] = true
 		end
 		for _, set in ipairs({
-			{ "other", "spell", { db.cooldownReadyOnly, db.cooldownRechargeOnly, db.cooldownProcOnly,
-				store.cooldownReadyOnly, store.cooldownRechargeOnly, store.cooldownProcOnly, store.cooldownAlwaysShow } },
+			{ "other", "spell", { db.cooldownReadyOnly, db.cooldownRechargeOnly, db.cooldownProcOnly, db.cooldownNeverShow,
+				store.cooldownReadyOnly, store.cooldownRechargeOnly, store.cooldownProcOnly, store.cooldownAlwaysShow,
+				store.cooldownNeverShow } },
 			{ "otherbuffs", "buff", { db.cooldownBuffMode, store.cooldownBuffMode } },
 		}) do
 			local group, seen, missing = set[1], listed[set[2]], {}
@@ -16884,7 +16887,7 @@ local function CreateCooldownPanel()
 	-- Reset: just the spell icons' settings (the page's Reset does the rest too).
 	local SPELL_ICON_KEYS = { cooldownReadyOnly = true, cooldownReadyEarly = true, cooldownEarlyOn = true,
 		cooldownRechargeOnly = true, cooldownNeedsPower = true, cooldownReadyAnyTime = true, cooldownGroupDefaults = true,
-		cooldownProcOnly = true, cooldownAlwaysShow = true, cooldownBuffMode = true, cooldownSmartDefaults = true,
+		cooldownProcOnly = true, cooldownAlwaysShow = true, cooldownNeverShow = true, cooldownBuffMode = true, cooldownSmartDefaults = true,
 		cooldownFlashReady = true, cooldownSituations = true, cooldownRowSettings = true }
 	local iconsReset = ns.PanelButton(settings)
 	iconsReset:SetSize(60, 20)

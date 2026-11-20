@@ -18,7 +18,7 @@ local _, ns = ...
 
 local SETUP, STEP, WAIT = 8, 12, 4 -- seconds: the first step, each one's, before it acts
 local KEYS = { "cooldownReadyOnly", "cooldownReadyEarly", "cooldownEarlyOn", "cooldownRechargeOnly",
-	"cooldownNeedsPower", "cooldownReadyAnyTime", "cooldownProcOnly", "cooldownAlwaysShow",
+	"cooldownNeedsPower", "cooldownReadyAnyTime", "cooldownProcOnly", "cooldownAlwaysShow", "cooldownNeverShow",
 	"cooldownGroupDefaults", "cooldownSituations" }
 local PLACES = { "world", "city", "inn", "dungeon", "raid", "bg" }
 
@@ -69,6 +69,7 @@ local function OwnReady(anyTime)
 	local db, id = ns.db, run.spell
 	db.cooldownSituations = {}
 	db.cooldownRechargeOnly[id], db.cooldownProcOnly[id], db.cooldownAlwaysShow[id] = nil, nil, nil
+	db.cooldownNeverShow[id] = nil
 	db.cooldownReadyOnly[id] = true
 	db.cooldownNeedsPower[id] = nil
 	db.cooldownEarlyOn[id], db.cooldownReadyEarly[id] = true, nil

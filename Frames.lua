@@ -9195,7 +9195,7 @@ function ns.CooldownGroupSettings(group, sit)
 	return set.mode or builtIn or "always", set.power, set.early, set.anyTime
 end
 
--- A spell's mode ("always", "ready", "recharge", "proc"), whether it's its
+-- A spell's mode ("always", "ready", "recharge", "proc", "never"), whether it's its
 -- own (else its group's), and for "ready" its Resources, Show early on,
 -- seconds (nil: the default share) and Out of fights (shown when ready out of
 -- fights too, not faded). Set under what it's turned into (from
@@ -9222,7 +9222,7 @@ function ns.CooldownSpellMode(id, group, sit)
 	end
 	local db = ns.db
 	if not (db.cooldownReadyOnly[id] or db.cooldownRechargeOnly[id] or db.cooldownProcOnly[id]
-		or db.cooldownAlwaysShow[id]) then
+		or db.cooldownAlwaysShow[id] or db.cooldownNeverShow[id]) then
 		id = ns.BaseSpell(id)
 	end
 	if db.cooldownReadyOnly[id] then
@@ -9234,6 +9234,8 @@ function ns.CooldownSpellMode(id, group, sit)
 		return "proc", true
 	elseif db.cooldownAlwaysShow[id] then
 		return "always", true
+	elseif db.cooldownNeverShow[id] then
+		return "never", true
 	end
 	-- (Its group's mode not set: the Smart set pick, if it has one and Smart
 	-- set's ticked, and no addon places the icons itself: see CooldownGroupSettings.)
@@ -10784,6 +10786,9 @@ local function ReadyTarget(icon, id, bar)
 		readyTargets[icon] = (left and left > 0) and 1 or 0
 	elseif mode == "proc" then
 		readyTargets[icon] = ns.SpellGlowing(id, icon) and 1 or 0
+	elseif mode == "never" then
+		readyTargets[icon] = 0
+		return -- (Never: hidden, its flash too)
 	end
 	-- (Flashing as its cooldown ends: shown for it, whatever its mode.)
 	if readyTargets[icon] == 0 and ns.CooldownIconFlashing(icon) then
@@ -10823,7 +10828,7 @@ function UpdateReadyOnly(elapsed, now)
 		ns.UpdateCooldownSituation()
 		local db = ns.db
 		local any = next(db.cooldownReadyOnly) or next(db.cooldownRechargeOnly) or next(db.cooldownProcOnly)
-			or next(db.cooldownBuffMode) or ns.CooldownRowAny("notBuff") or ns.cooldownSitNow
+			or next(db.cooldownNeverShow) or next(db.cooldownBuffMode) or ns.CooldownRowAny("notBuff") or ns.cooldownSitNow
 		for _, group in pairs(ns.COOLDOWN_BAR_GROUPS) do
 			any = any or ns.CooldownGroupSettings(group) ~= "always"
 		end
@@ -11180,6 +11185,8 @@ function ns.ReportCooldowns()
 				elseif mode == "proc" then
 					print(("    when it procs%s: %s"):format(from,
 						ns.SpellGlowing(id, part) and "glowing, shown" or "no glow, faded"))
+				elseif mode == "never" then
+					print(("    never%s: faded"):format(from))
 				end
 			else
 				local start, duration = SwipeTimes(part)

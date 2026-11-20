@@ -15,7 +15,7 @@ local L = ns.L
 -- The settings a situation keeps, as Default keeps them (Core's EnsureTables).
 -- (No Close the gaps: where the icons sit is the bar's, the same in each.)
 local SET_KEYS = { "cooldownReadyOnly", "cooldownReadyEarly", "cooldownEarlyOn", "cooldownRechargeOnly",
-	"cooldownNeedsPower", "cooldownReadyAnyTime", "cooldownProcOnly", "cooldownAlwaysShow", "cooldownGroupDefaults", "cooldownBuffMode",
+	"cooldownNeedsPower", "cooldownReadyAnyTime", "cooldownProcOnly", "cooldownAlwaysShow", "cooldownNeverShow", "cooldownGroupDefaults", "cooldownBuffMode",
 	"cooldownFlashReady" }
 ns.COOLDOWN_SIT_KEYS = SET_KEYS
 
@@ -137,7 +137,7 @@ end
 -- or its base: as Default's, ns.CooldownSpellMode.)
 local function OwnKey(set, id)
 	if set.cooldownReadyOnly[id] or set.cooldownRechargeOnly[id] or set.cooldownProcOnly[id]
-		or set.cooldownAlwaysShow[id] then
+		or set.cooldownAlwaysShow[id] or set.cooldownNeverShow[id] then
 		return id
 	end
 	return ns.BaseSpell(id)
@@ -156,6 +156,8 @@ function ns.CooldownSitSpellMode(sit, id, group)
 		return "proc", "spell"
 	elseif set.cooldownAlwaysShow[key] then
 		return "always", "spell"
+	elseif set.cooldownNeverShow[key] then
+		return "never", "spell"
 	end
 	local own = set.cooldownGroupDefaults[group or "other"]
 	if own and own.mode then
@@ -267,7 +269,7 @@ end
 -- nil for Default).
 
 local MODE_TEXT = {
-	always = L["Always"], ready = L["When ready"], recharge = L["While recharging"], proc = L["When it procs"],
+	always = L["Always"], ready = L["When ready"], recharge = L["While recharging"], proc = L["When it procs"], never = L["Never"],
 	combat = L["In combat"], quiet = L["Out of combat"], hidden = L["Hidden"],
 }
 ns.COOLDOWN_MODE_TEXT = MODE_TEXT

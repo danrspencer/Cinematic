@@ -4497,6 +4497,7 @@ function ns.EnsureTables()
 	ns.db.cooldownReadyAnyTime = ns.db.cooldownReadyAnyTime or {} -- ...spell ID -> true: When ready out of fights too
 	ns.db.cooldownProcOnly = ns.db.cooldownProcOnly or {} -- ...spell ID -> true: only while it glows (a proc)
 	ns.db.cooldownAlwaysShow = ns.db.cooldownAlwaysShow or {} -- ...spell ID -> true: Always, whatever its group's
+	ns.db.cooldownNeverShow = ns.db.cooldownNeverShow or {} -- ...spell ID -> true: Never, faded all the time
 	ns.db.cooldownGroupDefaults = ns.db.cooldownGroupDefaults or {} -- ...group -> { mode, power, early, anyTime }
 	ns.db.cooldownBuffMode = ns.db.cooldownBuffMode or {} -- ...tracked buff's spell ID -> its own mode
 	-- ...a bar (its group) or spell ID -> { numbers, keybinds, notBuff }: its row's own (Frames.lua's ns.CooldownRowSetting)

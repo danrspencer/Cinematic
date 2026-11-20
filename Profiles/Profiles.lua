@@ -41,7 +41,8 @@ local PROFILE_TABLES = {
 	"friendlyShow", "bgShow", "worldShow", "cityShow", "groupShow", "instanceShow", "addonFrames", "gamepadPressButtons",
 	"hoverGroups", "cooldownReadyOnly", "cooldownReadyEarly", "cooldownEarlyOn", "cooldownRechargeOnly", "cooldownNeedsPower",
 	"cooldownReadyAnyTime",
-	"cooldownGroupDefaults", "cooldownProcOnly", "cooldownAlwaysShow", "cooldownBuffMode", "cooldownFlashReady",
+	"cooldownGroupDefaults", "cooldownProcOnly", "cooldownAlwaysShow", "cooldownNeverShow", "cooldownBuffMode",
+	"cooldownFlashReady",
 	"cooldownSituations", -- (the Cooldown Manager page's situations: CooldownSituations.lua)
 	"frameRules", -- (none in any built-in profile: each starts with no Custom Visibility Rules)
 	"rowFollow", -- (the grids' Follow: which row each follows; Cinema's mana bar its resource bar)
