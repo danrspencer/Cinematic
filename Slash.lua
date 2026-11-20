@@ -664,7 +664,7 @@ local function HandleSlash(msg)
 		local group = arg:match("^hover%s+(%S+)") or "quests"
 		local last
 		ns.hoverWatch = C_Timer.NewTicker(0.1, function()
-			local focus = GetMouseFoci and GetMouseFoci()[1] or (GetMouseFocus and GetMouseFocus())
+			local focus = ns.MouseFocus()
 			local ok, focusName = pcall(function() return focus and focus:GetDebugName() or "nothing" end)
 			local parts = { "on " .. (ok and tostring(focusName) or "?") }
 			for _, entry in ipairs(ns.managed) do

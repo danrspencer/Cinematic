@@ -5480,13 +5480,7 @@ local function NoteLines(tooltip)
 	return lines
 end
 
-local function MouseFocus()
-	if GetMouseFoci then
-		return GetMouseFoci()[1]
-	elseif GetMouseFocus then
-		return GetMouseFocus()
-	end
-end
+local MouseFocus = ns.MouseFocus
 
 local function MouseOverWorld()
 	local focus = MouseFocus()

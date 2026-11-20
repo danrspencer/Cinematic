@@ -847,12 +847,7 @@ function ns.PrintPanelsDebug()
 			tostring(Spot(box) ~= nil), box:GetNumPoints(), tostring(point), tostring(relativeName), tostring(relativePoint),
 			tostring(Number(x)), tostring(Number(y))))
 	end
-	local focus
-	if GetMouseFoci then
-		focus = GetMouseFoci()[1]
-	elseif GetMouseFocus then
-		focus = GetMouseFocus()
-	end
+	local focus = ns.MouseFocus()
 	local names = {}
 	while focus and #names < 6 do
 		names[#names + 1] = (focus.GetName and focus:GetName()) or (handles[focus:GetParent()] == focus and

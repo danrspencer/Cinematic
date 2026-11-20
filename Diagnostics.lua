@@ -1834,7 +1834,7 @@ do
 			"CompactUnitFrame_UpdateAuras", "CompactUnitFrame_UpdateBuffs" }) do
 			ns.Log("raidparts", ("%s: %s"):format(fn, type(_G[fn])))
 		end
-		local focus = GetMouseFoci and GetMouseFoci()[1]
+		local focus = ns.MouseFocus()
 		if focus then
 			ns.Log("raidparts", ("under the mouse: %s, debug name %s, parent %s"):format(Describe(focus),
 				Safe(focus.GetDebugName, focus) or "?",
@@ -3349,8 +3349,7 @@ function ns.MinimapPulseTest()
 		end
 		if GetTime() >= nextSnap then
 			nextSnap = GetTime() + 0.5
-			local foci = GetMouseFoci and GetMouseFoci()
-			local focus = type(foci) == "table" and foci[1] or (GetMouseFocus and GetMouseFocus())
+			local focus = ns.MouseFocus()
 			local x, y = GetCursorPosition()
 			local okOver, over = pcall(function() return ns.Flag(Minimap:IsMouseOver()) end)
 			local okSweep, sweep = pcall(ns.MinimapSweepState or function() return "no sweep code" end)

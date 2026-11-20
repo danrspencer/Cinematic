@@ -2074,13 +2074,7 @@ do
 		local now = GetTime()
 		if focusAt ~= now then
 			focusAt = now
-			if GetMouseFoci then
-				focus = GetMouseFoci()[1]
-			elseif GetMouseFocus then
-				focus = GetMouseFocus()
-			else
-				focus = nil
-			end
+			focus = ns.MouseFocus()
 			if focus == WorldFrame then
 				focus = nil
 			end

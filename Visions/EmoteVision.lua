@@ -1299,8 +1299,7 @@ function nameLink.Report(prefix)
 	local x, y = button:GetCenter()
 	local tx, ty
 	if shown then tx, ty = shown:GetCenter() end
-	local foci = GetMouseFoci and GetMouseFoci() or { GetMouseFocus and GetMouseFocus() }
-	local focus = foci and foci[1]
+	local focus = ns.MouseFocus()
 	local clicked = nameLink.clicked
 	ns.Print(("%sFace click: shown %s, who %s, aims at %q, at %s,%s size %dx%d, strata %s level %d; "
 		.. "face shown %s at %s,%s; key down %s; mouse on %s; last click %s"):format(prefix,

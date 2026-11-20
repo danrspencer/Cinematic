@@ -1103,12 +1103,7 @@ local lastClick = { at = -math.huge }
 local clickWatcher = CreateFrame("Frame")
 clickWatcher:RegisterEvent("GLOBAL_MOUSE_DOWN")
 clickWatcher:SetScript("OnEvent", function()
-	local focus
-	if GetMouseFoci then
-		focus = GetMouseFoci()[1]
-	elseif GetMouseFocus then
-		focus = GetMouseFocus()
-	end
+	local focus = ns.MouseFocus()
 	if focus ~= nil and focus ~= WorldFrame then
 		return
 	end

@@ -1460,10 +1460,7 @@ aim.turnBy = 0.47 -- (the share of the target's x the game's turn takes off, at 
 aim.farthest = 0.85 -- (the click's x it's never taken past: the furthest measured)
 -- (Over the world or a nameplate: forbidden ones can't be asked, so count as a plate.)
 function aim.OverWorld()
-	local ok, focus = pcall(function()
-		if GetMouseFoci then return GetMouseFoci()[1] end
-		return GetMouseFocus and GetMouseFocus()
-	end)
+	local ok, focus = pcall(ns.MouseFocus)
 	if not ok or focus == nil or focus == WorldFrame then return true end
 	if focus.IsForbidden and focus:IsForbidden() then return true end
 	local okName, name = pcall(focus.GetName, focus)
