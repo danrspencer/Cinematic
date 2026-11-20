@@ -36,8 +36,8 @@ local PAIRS = {
 }
 -- The settings the test changes (and puts back).
 -- (Each cast page and every switch it's under: added at the start, ns.PageSwitchOf.)
-local KEPT_KEYS = { "unitCastStyle", "plateCastStyle" }
-local CAST_PAGES = { "unitCastStyle", "plateCastStyle" }
+local KEPT_KEYS = { "unitCastStyle", "playerCastStyle", "plateCastStyle" }
+local CAST_PAGES = { "unitCastStyle", "playerCastStyle", "plateCastStyle" }
 for _, id in ipairs({ "PLAYER", "TARGET", "PLATE" }) do
 	for _, key in ipairs({ "plateCastOn_", "plateCastGameAs_", "plateCastFrame_", "plateCastOwn_" }) do
 		KEPT_KEYS[#KEPT_KEYS + 1] = key .. id

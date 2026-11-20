@@ -20,6 +20,7 @@ local L = ns.L
 local DEFAULTS = ns.DEFAULTS
 DEFAULTS.plateCastStyle = true
 DEFAULTS.unitCastStyle = true -- (the unit frames' cast bars' page, its own since 2026-11-17)
+DEFAULTS.playerCastStyle = true -- (your cast bar's page: Your Cast Bar, its own tab since 2026-11-20)
 DEFAULTS.plateCastWidth = 1        -- times the game's, about its middle
 DEFAULTS.plateCastHeight = 1       -- times the game's, its top kept
 DEFAULTS.plateCastPlayerWidth = 1  -- your cast bar's width, times the game's (the You tab, with its own look)
@@ -205,6 +206,7 @@ local function SwitchFor(id)
 	if id == nil then
 		return (ns.StyleOn("unitCastStyle") or not ns.StyleOn("plateCastStyle")) and "unitCastStyle" or "plateCastStyle"
 	end
+	if id == "PLAYER" then return "playerCastStyle" end
 	return id == "PLATE" and "plateCastStyle" or "unitCastStyle"
 end
 local function Active(id, db)
@@ -1777,7 +1779,7 @@ local function BuildCastPage(kit, spec)
 
 	-- The row shown in the preview (nil: Default): the last one whose panel
 	-- was opened (to start with: the page's own row, without a Default).
-	local editing = (spec.tabs == "units" and "PLAYER") or (not spec.default and spec.ids[1]) or nil
+	local editing = (spec.tabs == "units" and spec.ids[1]) or (not spec.default and spec.ids[1]) or nil
 	local preview -- (below: drawn again as each setting changes)
 	local panels = {} -- [id or "DEFAULT"] = its panel's sample, once made
 	local function Changed()
@@ -1814,15 +1816,16 @@ local function BuildCastPage(kit, spec)
 	-- (Spread over the scene as plates over units, each scaled with however
 	-- big the page makes the preview: in one row at one size they sat close
 	-- together at its top, the rest of it empty.)
+	-- (spec.slots: { row id, sample kind, which of SAMPLES } each, and spec.spots
+	-- their places, as parts of the preview's width and height. The unit
+	-- frames' page: the target's and a boss's, under their frames' bars; Your
+	-- Cast Bar's: yours alone, low in the middle, as the game has it (its own
+	-- tab since 2026-11-20, user: it isn't a unit frame's).)
 	local units = spec.tabs == "units"
-	local SLOT_IDS = units and { "PLAYER", "TARGET", "BOSS" } or nil
-	local SLOT_KINDS = units and { "player", "unit", "boss" } or { "plate", "plate", "plate" }
-	local SPOTS = { { 0.24, 0.3 }, { 0.5, 0.58 }, { 0.76, 0.3 } }
-	-- (The unit frames' page: taller samples, a mana bar too; yours at the
-	-- bottom in the middle, as the game has it, the other two above.)
-	if units then
-		SPOTS = { { 0.5, 0.74 }, { 0.25, 0.27 }, { 0.75, 0.27 } }
-		PREVIEW_H = 180
+	local SLOTS = spec.slots or { { "PLATE", "plate", 1 }, { "PLATE", "plate", 2 }, { "PLATE", "plate", 3 } }
+	local SPOTS = spec.spots or { { 0.24, 0.3 }, { 0.5, 0.58 }, { 0.76, 0.3 } }
+	if spec.previewH then
+		PREVIEW_H = spec.previewH
 		preview:SetHeight(PREVIEW_H)
 	end
 	local plates = {}
@@ -1840,10 +1843,12 @@ local function BuildCastPage(kit, spec)
 	end
 	local function SlotLabel(i, info)
 		if not units then return L[info[1]] end
-		return L[TAB_NAMES[SLOT_IDS[i]] or SLOT_IDS[i]]
+		return L[TAB_NAMES[SLOTS[i][1]] or SLOTS[i][1]]
 	end
-	for i, info in ipairs(SAMPLES) do
-		local bar = MakeSample(preview, info, SLOT_KINDS[i])
+	for i, slot in ipairs(SLOTS) do
+		local info = SAMPLES[slot[3]]
+		local bar = MakeSample(preview, info, slot[2])
+		bar.info = info
 		local barW = bar.gameW or SAMPLE_W
 		local plate = CreateFrame("Frame", nil, preview)
 		plate:SetSize(barW, 26)
@@ -1869,7 +1874,7 @@ local function BuildCastPage(kit, spec)
 		name.searchSkip = true
 		bar:SetPoint("TOP", health, "BOTTOM", 0, -2)
 		bar.offset = (i - 1) * 0.3
-		bar.slotId = SLOT_IDS and SLOT_IDS[i] or editing
+		bar.slotId = units and slot[1] or editing
 		samples[i] = bar
 		-- (The unit frames' page: a unit frame's bars, health and mana, dressed as
 		-- the Unit Frames page says, the cast bar under them: preview:Refresh.)
@@ -1916,7 +1921,14 @@ local function BuildCastPage(kit, spec)
 		plate.power:SetStatusBarColor(0, 0.45, 1)
 		plate.ground:SetShown(view.ufBorder == "game" or not ns.StyleOn("ufStyle"))
 		bar:ClearAllPoints()
-		if framed then
+		-- (Yours sits under your frame only when it's joined to it: else alone.)
+		local alone = id == "PLAYER" and not framed
+		plate.health:SetShown(not alone)
+		plate.power:SetShown(not alone)
+		if alone then
+			bar:SetWidth(bar.gameW or SAMPLE_W)
+			bar:SetPoint("TOP", plate, "TOP", 0, 0)
+		elseif framed then
 			local room = bar.Icon:IsShown() and bar.Icon:GetAlpha() > 0 and bar.Icon:GetWidth() + 3 or 0
 			bar:SetPoint("TOPLEFT", plate.power, "BOTTOMLEFT", room, -PIN_GAP)
 			bar:SetPoint("TOPRIGHT", plate.power, "BOTTOMRIGHT", 0, -PIN_GAP)
@@ -1933,7 +1945,7 @@ local function BuildCastPage(kit, spec)
 		local db = ns.GetDB()
 		for i, bar in ipairs(samples) do
 			local id = SlotId(bar)
-			Dress(bar, SAMPLES[i], Look(id), not id or SizedAs(id, db))
+			Dress(bar, bar.info or SAMPLES[i], Look(id), not id or SizedAs(id, db))
 			DressFrameBars(bar, FrameLooked(id, db), id)
 		end
 	end
@@ -2278,16 +2290,28 @@ local function BuildCastPage(kit, spec)
 	kit.RegisterSubpage(canvas, spec.page, L[spec.title])
 end
 
--- The unit frames' cast bars (yours, your target's and focus's, the bosses'
--- and arena enemies'), with the Default row every cast bar can follow: the
--- Unit Frames icon's Cast Style tab.
+-- The unit frames' cast bars (your target's and focus's, the bosses' and
+-- arena enemies'), with the Default row every cast bar can follow: the Unit
+-- Frames icon's Cast Bars tab. (Yours its own tab since 2026-11-20, below.)
 function ns.CreateUnitCastStylePanel(kit)
 	BuildCastPage(kit, { page = "Unit Cast Style", title = "Cast Style", tabs = "units", switch = "unitCastStyle",
-		ids = { "PLAYER", "TARGET", "BOSS" }, default = true,
-		intro = L["How the unit frames' cast bars look: yours, your target's and focus's, and the bosses' and arena " ..
+		ids = { "TARGET", "BOSS" }, default = true,
+		slots = { { "TARGET", "unit", 2 }, { "BOSS", "boss", 3 } }, spots = { { 0.28, 0.45 }, { 0.72, 0.45 } },
+		intro = L["How the unit frames' cast bars look: your target's and focus's, and the bosses' and arena " ..
 		"enemies'. Each row's These bars picks its look: the game's (they start so), the Default row's, or its own, " ..
-		"set in its Look panel. The Default row is every cast bar's base look, the nameplates' too while theirs " ..
-		"says so. Changes show at once, here and on bars casting now."] })
+		"set in its Look panel. The Default row is every cast bar's base look, yours and the nameplates' too while " ..
+		"theirs says so. Changes show at once, here and on bars casting now."] })
+end
+
+-- Your cast bar: the Unit Frames icon's Your Cast Bar tab, its own since
+-- 2026-11-20 (user: it isn't a unit frame's; the game moves it on its own in
+-- Edit Mode). Its Default: the Cast Bars tab's Default row.
+function ns.CreatePlayerCastStylePanel(kit)
+	BuildCastPage(kit, { page = "Player Cast Style", title = "Your Cast Bar", tabs = "units", switch = "playerCastStyle",
+		ids = { "PLAYER" }, defaultName = L["Default's (Cast Bars)"],
+		slots = { { "PLAYER", "player", 1 } }, spots = { { 0.5, 0.55 } }, previewH = 110,
+		intro = L["How your cast bar looks: the game's (it starts so), the Default row's (on the Cast Bars tab), the " ..
+		"unit frame's, or its own, set in its Look panel. Changes show at once, here and on your casts."] })
 end
 
 -- The nameplates' cast bars: the Nameplates hub's Cast Bar Style. Their

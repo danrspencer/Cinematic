@@ -4885,6 +4885,30 @@ STEPS[#STEPS + 1] = function()
 	end
 end
 
+-- (Your cast bar its own tab, 2026-11-20.)
+STEPS[#STEPS + 1] = function()
+	-- Your cast bar's look moved off the unit frames' Cast Bars tab onto its
+	-- own, Your Cast Bar (playerCastStyle). The Cast Bars tab turned off
+	-- before turned your bar's look off too: so it stays. Saved profiles too.
+	-- Once.
+	if not ns.db.playerCastTabV1 then
+		local function Split(t)
+			if type(t) == "table" and t.unitCastStyle == false and t.playerCastStyle == nil then
+				t.playerCastStyle = false
+			end
+		end
+		Split(ns.db)
+		for _, saved in pairs(ns.db.profiles or {}) do
+			if type(saved) == "table" then
+				Split(saved)
+				Split(saved.settings)
+			end
+		end
+		for _, point in pairs(ns.db.profileResetPoints or {}) do Split(point) end
+		ns.db.playerCastTabV1 = true
+	end
+end
+
 -- Runs them all, each on its own: an error is logged and reported (the
 -- addon's error net, Diagnostics.lua), and the steps after it still run.
 function ns.RunMigrations()

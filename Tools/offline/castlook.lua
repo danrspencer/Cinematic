@@ -31,7 +31,7 @@ end
 local db = ns.GetDB()
 -- (Each cast page on, and every switch it's under: Unit Frames' and the
 -- nameplates' style pages, the Style hub's. Off on a fresh install.)
-for _, key in ipairs({ "unitCastStyle", "plateCastStyle" }) do
+for _, key in ipairs({ "unitCastStyle", "playerCastStyle", "plateCastStyle" }) do
 	local switch = key
 	while switch do
 		db[switch] = true
@@ -72,18 +72,18 @@ local before = Snapshot(target)
 db.plateCastGameAs_PLAYER = true
 target:Refresh()
 local border = target.Border
-Check("target: border hidden", border and border:GetAlpha() < 0.01, border and border:GetAlpha())
-Check("target: name on the left", target.Text:GetJustifyH() == "LEFT", target.Text:GetJustifyH())
-Check("target: icon 12 wide", math.abs(target.Icon:GetWidth() - 12) < 0.01, target.Icon:GetWidth())
-Check("target: name beside the icon", Points(target.Text):find("LEFT>", 1, true) == 1, Points(target.Text))
+Check("your bar: border hidden", border and border:GetAlpha() < 0.01, border and border:GetAlpha())
+Check("your bar: name on the left", target.Text:GetJustifyH() == "LEFT", target.Text:GetJustifyH())
+Check("your bar: icon 12 wide", math.abs(target.Icon:GetWidth() - 12) < 0.01, target.Icon:GetWidth())
+Check("your bar: name beside the icon", Points(target.Text):find("LEFT>", 1, true) == 1, Points(target.Text))
 db.plateCastGameAs_PLAYER = false
 target:Refresh()
 local after = Snapshot(target)
-Check("target back: name justify", after.justify == before.justify, after.justify .. " was " .. before.justify)
-Check("target back: name anchors", after.text == before.text, after.text .. " | was " .. before.text)
-Check("target back: icon anchors", after.icon == before.icon, after.icon .. " | was " .. before.icon)
-Check("target back: icon size", math.abs(after.iconW - before.iconW) < 0.01, after.iconW .. " was " .. before.iconW)
-Check("target back: border shown", border and border:GetAlpha() > 0.5, border and border:GetAlpha())
+Check("your bar back: name justify", after.justify == before.justify, after.justify .. " was " .. before.justify)
+Check("your bar back: name anchors", after.text == before.text, after.text .. " | was " .. before.text)
+Check("your bar back: icon anchors", after.icon == before.icon, after.icon .. " | was " .. before.icon)
+Check("your bar back: icon size", math.abs(after.iconW - before.iconW) < 0.01, after.iconW .. " was " .. before.iconW)
+Check("your bar back: border shown", border and border:GetAlpha() > 0.5, border and border:GetAlpha())
 
 -- A saved Nameplates' pick on the target's row is held back: the game's look.
 db.plateCastOn_TARGET, db.plateCastFrame_TARGET, db.plateCastGameAs_TARGET = true, false, false
@@ -162,6 +162,22 @@ db.plateCastGameAs_PLATE = false
 local okOff, errOff = pcall(fight.Refresh, fight)
 Check("fight: taken off with secret sizes", okOff, errOff)
 _G.issecretvalue = secretCheck
+
+-- Your cast bar its own tab (2026-11-20): its switch is Your Cast Bar's
+-- (playerCastStyle), not the Cast Bars tab's (unitCastStyle), each under the
+-- Unit Frames style icon.
+Check("your bar's tab switch under Unit Frames' style", ns.PageSwitchOf("playerCastStyle") == "ufStyle",
+	ns.PageSwitchOf("playerCastStyle"))
+db.plateCastOn_PLAYER, db.plateCastFrame_PLAYER, db.plateCastGameAs_PLAYER = true, false, true
+local mine = ns.MakeCastLookSample(UIParent, "unit", 1, "PLAYER")
+db.unitCastStyle = false
+mine:Refresh()
+Check("Cast Bars tab off: your bar keeps its look", mine.Text:GetJustifyH() == "LEFT", mine.Text:GetJustifyH())
+db.unitCastStyle, db.playerCastStyle = true, false
+mine:Refresh()
+Check("Your Cast Bar tab off: your bar the game's", mine.Text:GetJustifyH() ~= "LEFT", mine.Text:GetJustifyH())
+db.playerCastStyle, db.plateCastGameAs_PLAYER = true, false
+mine:Refresh()
 
 print(("castlook %s: %d FAIL"):format(client, fails))
 if fails > 0 then os.exit(1) end

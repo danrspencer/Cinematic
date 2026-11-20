@@ -528,8 +528,10 @@ local SHOW_IN_TABS = {
 			"power is low." },
 		-- (UnitStyle.lua's page, a tab here too: its look by its rows, 2026-11-16)
 		{ "Unit Frames", "Unit Style", "How the unit frames look." },
-		-- (PlateCastStyle.lua's unit frames' page: yours, target & focus, boss & arena, and the Default row)
-		{ "Cast Bars", "Unit Cast Style", "How your cast bar and the unit frames' cast bars look." },
+		-- (PlateCastStyle.lua's unit frames' page: target & focus, boss & arena, and the Default row)
+		{ "Cast Bars", "Unit Cast Style", "How the unit frames' cast bars look." },
+		-- (...and yours, its own tab since 2026-11-20)
+		{ "Your Cast Bar", "Player Cast Style", "How your cast bar looks." },
 	},
 	-- (The personal resource display: the HUD's PRD section, PersonalResources.lua's
 	-- page at its PRD parts, PersonalStyle.lua's look.)

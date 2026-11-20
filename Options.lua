@@ -2930,6 +2930,9 @@ do
 				sub = "Combat" },
 			{ "Unit Cast Style", "Interface\\Icons\\Spell_Nature_Lightning", label = "Cast Bars", section = "Interface",
 				sub = "Combat", tabOf = "Unit Style" }, -- (PlateCastStyle.lua's unit frames' page)
+			-- (Your cast bar its own tab, 2026-11-20: PlateCastStyle.lua's player page.)
+			{ "Player Cast Style", "Interface\\Icons\\Spell_Nature_Lightning", label = "Your Cast Bar",
+				section = "Interface", sub = "Combat", tabOf = "Unit Style" },
 			-- (The personal resource display its own icon, as in the Interface hub: 2026-11-17.)
 			{ "Personal Style", ns.HELP_DISC:gsub("HelpDisc$", "PersonalResources"), label = "Personal Resources",
 				section = "Interface", sub = "Combat" },
@@ -9110,7 +9113,7 @@ local function CreateCombatPanel()
 		-- to the page with the rest of its settings, right of its heading, named
 		-- label or the page.)
 		-- (Each section's frames' Style page, a palette by its heading: ns.StyleIcon.)
-		local SECTION_STYLES = { units = "Unit Style", prd = "Personal Style", playercast = "Unit Cast Style",
+		local SECTION_STYLES = { units = "Unit Style", prd = "Personal Style", playercast = "Player Cast Style",
 			bars = "Action Style", raid = "Raid Style" }
 		local function Section(page, heading, tab, link)
 			local sectionRows = {}
@@ -21957,6 +21960,8 @@ ns.OnLanguage(function()
 		Lap("CreatePlateCastStylePanel")
 		ns.CreateUnitCastStylePanel(ns.lowHealthKit) -- (the unit frames' cast bars: Unit Frames' Cast Style tab)
 		Lap("CreateUnitCastStylePanel")
+		ns.CreatePlayerCastStylePanel(ns.lowHealthKit) -- (yours: Unit Frames' Your Cast Bar tab)
+		Lap("CreatePlayerCastStylePanel")
 	end
 	CreateEffectsPanel()
 	Lap("CreateEffectsPanel")
