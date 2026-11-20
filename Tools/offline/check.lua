@@ -236,6 +236,21 @@ if arg[1] and not update then
 			Problem("an unpicked row with default Ours doesn't play ours")
 		end
 		row.default = nil
+		-- The login window asks only with both versions on (a row with no
+		-- ours check counts as on).
+		local ours = false
+		if not ns.ConflictUndecided(row) then Problem("unpicked row with no ours check isn't asked") end
+		row.ours = function() return ours end
+		if ns.ConflictUndecided(row) then Problem("asked with Cinematic's version off") end
+		ours = true
+		if not ns.ConflictUndecided(row) then Problem("not asked with both versions on") end
+		on = false
+		if ns.ConflictUndecided(row) then Problem("asked with the other addon's version off") end
+		on = true
+		ns.SetConflictPick(row, "ours")
+		if ns.ConflictUndecided(row) then Problem("asked after a pick") end
+		picks[row.id] = nil
+		row.ours = nil
 		table.remove(ns.CONFLICTS)
 	end
 	-- The camera director (Director.lua): decides once a frame at most, not

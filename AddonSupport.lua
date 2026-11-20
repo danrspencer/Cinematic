@@ -277,6 +277,13 @@ function ns.ConflictTheirsOn(row)
 	return ok and on and true or false
 end
 
+-- Whether Cinematic's version is on now (a row with no ours check: yes).
+function ns.ConflictOursOn(row)
+	if not row.ours then return true end
+	local ok, on = pcall(row.ours)
+	return ok and on and true or false
+end
+
 -- The row for a feature whose other addon's version is on now, its pick and
 -- that addon, or nil.
 function ns.ConflictState(key)

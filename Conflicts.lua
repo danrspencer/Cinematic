@@ -3,8 +3,8 @@
 -- the addons' rows: Support/). Here: holding the other addon's version at
 -- alpha 0 while a row's pick is Ours and Cinematic's is on (its settings left
 -- be), the Addons > Conflicts page, and the window that comes
--- up at login over everything (the welcome window too) while a conflict whose
--- addon's version is on has no pick yet.
+-- up at login over everything (the welcome window too) while a conflict with
+-- both versions on has no pick yet.
 
 local _, ns = ...
 local L = ns.L
@@ -109,9 +109,7 @@ end
 -- and Cinematic's on.
 local function Holding(row)
 	if not row.hide or ns.ConflictPick(row) ~= "ours" or not ns.ConflictTheirsOn(row) then return false end
-	if not row.ours then return true end
-	local ok, on = pcall(row.ours)
-	return ok and on and true or false
+	return ns.ConflictOursOn(row)
 end
 
 -- Every row's frames held or let go, as their picks and states say.
@@ -172,11 +170,13 @@ local function Ordered(only)
 	return list
 end
 
--- The ones the window asks about: no pick yet, the other addon's version on.
-local function Undecided(row)
+-- The ones the window asks about: no pick yet, and both versions on (with
+-- Cinematic's off there's nothing to pick between).
+function ns.ConflictUndecided(row)
 	local _, picked = ns.ConflictPick(row)
-	return not picked and ns.ConflictTheirsOn(row)
+	return not picked and ns.ConflictTheirsOn(row) and ns.ConflictOursOn(row)
 end
+local Undecided = ns.ConflictUndecided
 
 -- The row's line for the page and window: what it is, and what Ours does.
 local function About(row)
@@ -528,7 +528,7 @@ local function CreateWindow()
 	end)
 end
 
--- all: every row (/cine conflicts), not just the unpicked ones whose addon's version is on.
+-- all: every row (/cine conflicts), not just the unpicked ones with both versions on.
 function ns.ShowConflicts(all)
 	local rows = Ordered(not all and Undecided or nil)
 	if #rows == 0 then
