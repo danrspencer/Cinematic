@@ -2531,7 +2531,32 @@ do
 	menu.parentOf, menu.fold = {}, { ["UI Manager"] = true, Visions = true, Style = true, ["Quality of life"] = true,
 		Wheels = true }
 	local logged
-	local function Fold(current)
+	-- Never in a fight (2026-11-20): the list made again from our code then has
+	-- every line call the gamepad UI's cursor code, blocked in fights (Forever:
+	-- a yellow "Interface action failed" per line, 2041 in one fight). The
+	-- newest page asked for is folded to as the fight ends.
+	local foldAfterFight, foldWatch
+	local Fold
+	local function FoldAfterFight(current)
+		foldAfterFight = current
+		if not foldWatch then
+			foldWatch = CreateFrame("Frame")
+			foldWatch:SetScript("OnEvent", function(self)
+				self:UnregisterEvent("PLAYER_REGEN_ENABLED")
+				local page = foldAfterFight
+				foldAfterFight = nil
+				if page then
+					local ok, err = pcall(Fold, page)
+					if not ok and ns.Log then ns.Log("error", "left list fold after fight: " .. tostring(err)) end
+				end
+			end)
+		end
+		foldWatch:RegisterEvent("PLAYER_REGEN_ENABLED")
+	end
+	-- (For ListFoldTest.lua: the page waiting for the fight's end, if any.)
+	function ns.LeftListFoldWaiting() return foldAfterFight end
+	function Fold(current)
+		if InCombatLockdown() then return FoldAfterFight(current) end
 		local list = SettingsPanel and SettingsPanel.GetCategoryList and SettingsPanel:GetCategoryList()
 		-- (The page shown's line and every line it's under, by key.)
 		local open = {}
@@ -2591,7 +2616,8 @@ do
 		menu.lineNow[hubName] = category
 		local panel = SettingsPanel
 		if menu.selecting or not (panel and panel.SelectCategory and panel:IsShown()) then return end
-		if InCombatLockdown() and panel:IsProtected() then return end
+		-- (Not in a fight either way: picking a line can make the list again, Fold.)
+		if InCombatLockdown() then return end
 		if panel.GetCurrentCategory and panel:GetCurrentCategory() == category then return end
 		menu.selecting = true
 		ok, err = pcall(panel.SelectCategory, panel, category)

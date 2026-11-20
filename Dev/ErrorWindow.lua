@@ -20,8 +20,10 @@ local function Plain(value)
 end
 
 -- (Blocked lines keep more: who started it sits under the game's own calls,
--- 9th line or lower for Settings opening, 2026-11-19.)
-local BLOCKED_STACK_LINES = 18
+-- 9th line or lower for Settings opening, 2026-11-19; and the stack's bottom
+-- 10 lines too, where the first caller is: a list redraw in a fight was
+-- 20+ game calls deep, 2026-11-20.)
+local BLOCKED_STACK_LINES = 30
 local function Trim(stack, kind)
 	if type(stack) ~= "string" then return nil end
 	stack = stack:gsub("Interface[/\\]AddOns[/\\]", "")
@@ -257,7 +259,7 @@ if type(_G.DisplayInterfaceActionBlockedMessage) == "function" then
 	hooksecurefunc("DisplayInterfaceActionBlockedMessage", function()
 		local at = GetTime()
 		displayAt = at
-		local stack = debugstack and debugstack(2, 24, 0)
+		local stack = debugstack and debugstack(2, 18, 10)
 		local fight = InCombatLockdown() and "(in combat)" or "(out of combat)"
 		C_Timer.After(0, function()
 			if watcher.blockedAt == at then return end
@@ -281,7 +283,7 @@ local function OnChatLine(_, text)
 	local at = GetTime()
 	if chatAt == at then return end -- (the same line in another chat window)
 	chatAt = at
-	local stack = debugstack and debugstack(2, 24, 0)
+	local stack = debugstack and debugstack(2, 18, 10)
 	local fight = InCombatLockdown() and "(in combat)" or "(out of combat)"
 	C_Timer.After(0, function()
 		if displayAt == at or watcher.blockedAt == at then return end
