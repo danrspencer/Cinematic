@@ -5,7 +5,8 @@
 -- the end. Another addon is played by code loaded under a made-up addon's
 -- path (the call stack is how we tell ours from theirs).
 --   1 any frame   a test panel faded: another addon's detached part fades
---                 with it, one detached later too, ours stays, all back after
+--                 with it, one detached later too, ours stays, one raised by
+--                 SetAlphaFromBoolean is put back down, all back after
 --   2 gryphons    the Overrides tab's Action bar art: Hide. Each gryphon
 --                 gone (detached by FlareUI if it's on, else by the stand-in
 --                 addon), and kept gone when that addon raises it; screenshot
@@ -54,6 +55,11 @@ local theirs = loadstring([[
 	if on ~= nil then region:SetIgnoreParentAlpha(on) end
 	if alpha then region:SetAlpha(alpha) end
 ]], "@Interface\\AddOns\\CinematicStandInAddon\\Bars.lua")
+-- (The same addon raising a part through SetAlphaFromBoolean, Forever's call.)
+local theirsBool = loadstring([[
+	local region = ...
+	region:SetAlphaFromBoolean(true, 1, 0)
+]], "@Interface\\AddOns\\CinematicStandInAddon\\Bars.lua")
 
 local function Caps()
 	local bar = _G.MainActionBar or _G.MainMenuBar
@@ -68,10 +74,12 @@ local function LogCaught(label)
 	end
 	Log(("  %s: /cine why's list for the art: %s"):format(label, #parts > 0 and table.concat(parts, "; ") or "none"))
 end
-local function LogHas(text, from)
-	for i = from + 1, #(ns.db.log or {}) do
-		local line = ns.db.log[i]
-		if type(line) == "string" and line:find(text, 1, true) then return true end
+-- (Searched by its words in the log's newest lines: the log keeps a set
+-- number of lines, dropping the oldest, so an index from before can't be used.)
+local function LogHas(text)
+	local log = ns.db.log or {}
+	for i = #log, math.max(1, #log - 400), -1 do
+		if type(log[i]) == "string" and log[i]:find(text, 1, true) then return true end
 	end
 	return false
 end
@@ -139,7 +147,6 @@ local function StepGryphons()
 			Log(("  %s already ignores EndCaps' alpha (FlareUI or the game)"):format(cap == left and "left" or "right"))
 		end
 	end
-	local logFrom = #(ns.db.log or {})
 	local function Keep(key, value)
 		if run.kept[key] == nil then run.kept[key] = ns.db[key] == nil and false or ns.db[key] end
 		ns.db[key] = value
@@ -155,8 +162,8 @@ local function StepGryphons()
 		Verdict(Plain(left:GetEffectiveAlpha()) == 0 and Plain(right:GetEffectiveAlpha()) == 0,
 			"both gryphons at 0 while they ignore EndCaps' alpha")
 		LogCaught("hidden")
-		Log(("  verdict INFO: a new catch line in /cine log %s (once per part a session)"):format(
-			tostring(LogHas("ignores its frame's alpha", logFrom))))
+		Verdict(LogHas("EndCaps.LeftEndCap ignores its frame's alpha (detached by"),
+			"the catch is in /cine log, with who detached it")
 		theirs(left, nil, 1)
 		Log("  the stand-in addon raised the left gryphon to 1")
 		Later(WAIT / 2, function()
@@ -189,6 +196,13 @@ local function StepAnyFrame()
 	Verdict(Plain(loose:GetAlpha()) == 0, "another addon's detached part faded with the panel")
 	Verdict(Plain(late:GetAlpha()) == 0, "one detached while it's faded: faded too (the shared hook)")
 	Verdict(Plain(own:GetAlpha()) == 1, "a part Cinematic detached left as it is")
+	if loose.SetAlphaFromBoolean then
+		theirsBool(loose)
+		Log(("  the stand-in addon raised it by SetAlphaFromBoolean: %s"):format(Describe(loose)))
+		Verdict(Plain(loose:GetAlpha()) == 0, "raised by SetAlphaFromBoolean while faded: put back to 0")
+	else
+		Log("  verdict INFO: no SetAlphaFromBoolean on this client")
+	end
 	panel:SetAlpha(1)
 	ns.SyncDetached(panel)
 	Verdict(Plain(loose:GetAlpha()) == 1 and Plain(late:GetAlpha()) == 1, "the panel back up: theirs back at 1")

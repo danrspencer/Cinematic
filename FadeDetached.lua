@@ -29,6 +29,10 @@ local ours = setmetatable({}, { __mode = "k" }) -- part -> true: Cinematic detac
 local by = setmetatable({}, { __mode = "k" }) -- part -> the addon that detached it, when seen
 local hooked = setmetatable({}, { __mode = "k" })
 local logged = setmetatable({}, { __mode = "k" })
+-- part -> true: the hook saw another addon (or the game) detach it, and not
+-- undo it. For a part that answers whether it's detached with a secret: the
+-- walk can't read it, this can.
+local seenOn = setmetatable({}, { __mode = "k" })
 local busy = false
 
 local function Plain(value)
@@ -40,11 +44,12 @@ local function Usable(region)
 		and type(region.IsIgnoringParentAlpha) == "function"
 		and not (region.IsForbidden and region:IsForbidden())
 end
--- Whether it ignores its parent's alpha; nil when the game won't say (a secret
--- answer: 1247 parts with FlareUI 6.13 on Forever). Those only the hook catches.
+-- Whether it ignores its parent's alpha. A secret answer (1246 parts under
+-- FlareUI's frames on Forever) goes by what the hook saw set: nil when it saw
+-- nothing.
 local function Ignoring(region)
 	local on = region:IsIgnoringParentAlpha()
-	if issecretvalue and issecretvalue(on) then return nil end
+	if issecretvalue and issecretvalue(on) then return seenOn[region] end
 	return on == true
 end
 local function NameOf(region)
@@ -104,6 +109,13 @@ function Apply(region)
 	end
 end
 
+-- (Forever's SetAlphaFromBoolean sets it too, with a secret answer to pick by:
+-- its own alpha can't be read from that, so the last one kept stands.)
+local function OnBoolAlpha(region)
+	if busy or not taken[region] then return end
+	Apply(region)
+end
+
 local function OnOwnAlpha(region, alpha)
 	local info = taken[region]
 	if busy or not info then return end
@@ -120,6 +132,9 @@ local function Take(region, root)
 	if not hooked[region] then
 		hooked[region] = true
 		hooksecurefunc(region, "SetAlpha", OnOwnAlpha)
+		if type(region.SetAlphaFromBoolean) == "function" then
+			hooksecurefunc(region, "SetAlphaFromBoolean", OnBoolAlpha)
+		end
 	end
 	-- (Logged when an addon detached it, as Cinematic watched: the game's own,
 	-- set before we loaded, would fill /cine log: the chat edit box's prompt.)
@@ -226,6 +241,7 @@ local function OnIgnore(region, on)
 		local who = Caller()
 		by[region] = who
 		ours[region] = who == ADDON_NAME or nil
+		seenOn[region] = not ours[region] or nil
 		if ours[region] then return Release(region) end
 		local root = Detached(region) and FadedRoot(region)
 		if root then
@@ -235,6 +251,7 @@ local function OnIgnore(region, on)
 		end
 	else
 		ours[region] = nil
+		seenOn[region] = nil
 		Release(region)
 	end
 end

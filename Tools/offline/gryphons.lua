@@ -145,5 +145,32 @@ panel:SetAlpha(1)
 ns.SyncDetached(panel)
 Check("the frame back up: the part has its own alpha back", theirs:GetAlpha() == 1, theirs:GetAlpha())
 
+-- A part that answers whether it's detached with a secret (FlareUI's frames
+-- on Forever): faded when the hook saw an addon detach it, left when it didn't.
+local SECRET = {}
+local realIsSecret = issecretvalue
+issecretvalue = function(value) return value == SECRET end -- luacheck: ignore 121
+local panel2 = Alpha(CreateFrame("Frame", "TestSecretPanel", UIParent))
+local seenPart = Alpha(CreateFrame("Frame", "TestSeenPart", panel2))
+local unseenPart = Alpha(CreateFrame("Frame", "TestUnseenPart", panel2))
+seenPart.SetAlphaFromBoolean = function(self, on, ifTrue, ifFalse) self._alpha = on and ifTrue or ifFalse end
+stack = "[string \"@Interface/AddOns/SomeAddon/Raid.lua\"]:5: in function"
+seenPart:SetIgnoreParentAlpha(true) -- (while the panel is up: the hook sees it)
+stack = ""
+unseenPart._ignore = true -- (set before we watched)
+seenPart.IsIgnoringParentAlpha = function() return SECRET end
+unseenPart.IsIgnoringParentAlpha = function() return SECRET end
+panel2:SetAlpha(0)
+ns.SyncDetached(panel2)
+Check("a secret answer, detached as the hook watched: faded with its frame", seenPart:GetAlpha() == 0,
+	seenPart:GetAlpha())
+Check("a secret answer the hook never saw: left (nothing to go by)", unseenPart:GetAlpha() == 1, unseenPart:GetAlpha())
+seenPart:SetAlphaFromBoolean(true, 1, 0)
+Check("raised by SetAlphaFromBoolean while faded: put back to 0", seenPart:GetAlpha() == 0, seenPart:GetAlpha())
+panel2:SetAlpha(1)
+ns.SyncDetached(panel2)
+Check("its frame back up: the secret part back at 1", seenPart:GetAlpha() == 1, seenPart:GetAlpha())
+issecretvalue = realIsSecret -- luacheck: ignore 121
+
 print(fails == 0 and "ALL PASS" or (fails .. " FAILED"))
 os.exit(fails == 0 and 0 or 1)
