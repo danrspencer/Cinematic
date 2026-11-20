@@ -227,6 +227,7 @@ local function PrintDebugHelp()
 	print("  /cine debug deathtest - one run checking the Death Vision page: its menu, Test, sliders and switch, with screenshots (dev copy)")
 	print("  /cine debug resettest [logout] - one run checking what a reset puts back (layouts, plate settings), or with logout the plate settings going back at logout, across a reload (dev copy)")
 	print("  /cine debug cursortest - one run checking Replace cursor icon: your pick over open ground and the UI, the game's own over a mailbox or an NPC, with on-screen steps and Yes/No (dev copy; again to stop)")
+	print("  /cine debug xprelog - one run checking whether a relog changes the floating XP text's font (kill one, relog, kill one; dev copy; again to stop)")
 	print("  /cine debug blockedline - one run checking the error box catches the yellow \"Interface action failed\" line, with or without the game's event (dev copy; again to stop)")
 	print("  /cine debug listfold - one run checking our settings' left list is never made again in a fight (no yellow \"Interface action failed\" lines); you start and end a fight (dev copy; again to stop)")
 	print("  /cine debug euiswing - one run recording why EllesmereUI's swing timer stays hidden in CineMode (dev copy; again to stop)")
@@ -1868,6 +1869,10 @@ local function HandleSlash(msg)
 		-- (Dev copy: which way of moving the game's floating combat text works, CombatTextTest.lua.)
 		if ns.CombatTextTest then ns.CombatTextTest(arg:match("^cttest%s*(.*)$"))
 		else ns.Print("/cine debug cttest is in the dev copy only.") end
+	elseif cmd == "debug" and arg == "xprelog" then
+		-- (Dev copy: whether a relog changes the floating text font, XpRelogTest.lua.)
+		if ns.XpRelogTest then ns.XpRelogTest()
+		else ns.Print("/cine debug xprelog is in the dev copy only.") end
 	elseif cmd == "debug" and arg == "blockedline" then
 		-- (Dev copy: the error box catches the event-less "Interface action failed" line, BlockedLineTest.lua.)
 		if ns.BlockedLineTest then ns.BlockedLineTest()

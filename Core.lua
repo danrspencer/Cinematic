@@ -4239,11 +4239,11 @@ function ns.TurnOffCompletely(onCancel)
 		"so you can tell whether a problem is ours. Your settings are kept.\n\nTo bring it back, " ..
 		"tick Cinematic in the AddOns list (Game Menu or character select)."]
 	-- (The game's floating text drawn blank now, Hide all floating text: it
-	-- keeps that font till a full restart, our numbers gone with us meanwhile.)
+	-- keeps that font till you log out, our numbers gone with us meanwhile.)
 	local live = ns.db and ns.db.worldTextLive
 	if live == nil then live = ns.blankWorldFont ~= nil end
 	if live then
-		text = text .. "\n\n|cffff8040" .. L["The game's floating text stays hidden until you fully restart the game."] .. "|r"
+		text = text .. "\n\n|cffff8040" .. L["The game's floating text stays hidden until you log out and back in."] .. "|r"
 	end
 	StaticPopupDialogs.CINEMATIC_TURN_OFF = {
 		text = text,
@@ -4899,17 +4899,14 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 		ns.db = CinematicDB
 		-- Floating world text (the XP gained over you, and damage numbers with it:
 		-- one font) drawn in a font whose letters are specks too small to see.
-		-- The game keeps the font it first loaded, so changes need a game restart.
+		-- The game reads the font as you log in (a /reload keeps the one it
+		-- has), so changes need a log out and back in (/cine debug xprelog).
 		-- (On the Combat Text Style page since 2026-11-10, gated by it: one who
 		-- had it on gets the page on, its own numbers off, so nothing changes.)
 		if ns.db.hideWorldText and ns.db.combatTextStyle == nil then
 			ns.db.combatTextStyle = true
 			ns.db.combatTextNumbers = false
 			ns.db.combatTextHideGame = false
-		end
-		if ns.db.hideWorldText and ns.db.combatTextStyle and ns.db.styleGeneral ~= false then
-			ns.blankWorldFont = "Interface\\AddOns\\" .. ADDON_NAME .. "\\Fonts\\Blank.ttf"
-			DAMAGE_TEXT_FONT = ns.blankWorldFont
 		end
 		-- The once-only settings updates (Migrations.lua).
 		ns.RunMigrations()
@@ -4946,6 +4943,13 @@ ticker:SetScript("OnEvent", ns.Profiled("Core events", function(self, event, arg
 			end
 		end
 		ns.InitProfiles()
+		-- (The blank font from the settings this character logs in with: after
+		-- its own profile is loaded over the last character's. Picked before,
+		-- one character's XP choice went to the next: Tools/offline/xpfont.lua.)
+		if ns.db.hideWorldText and ns.db.combatTextStyle and ns.db.styleGeneral ~= false then
+			ns.blankWorldFont = "Interface\\AddOns\\" .. ADDON_NAME .. "\\Fonts\\Blank.ttf"
+			DAMAGE_TEXT_FONT = ns.blankWorldFont
+		end
 		ns.InitLog()
 		SLASH_CINEMATIC1 = "/cine"
 		SLASH_CINEMATIC2 = "/cinematic"

@@ -1755,7 +1755,7 @@ function ns.CombatNumbersToggle()
 		db.combatTextStyle and "on" or "off", db.styleGeneral and "on" or "off",
 		db.combatTextNumbers and "on" or "off",
 		ns.combatTextBlocked and (", but held back: " .. ns.combatTextBlocked .. " is loaded") or "",
-		GAME_NUMBERS.active and "off" or "showing", db.hideWorldText and "hidden after a restart" or "showing",
+		GAME_NUMBERS.active and "off" or "showing", db.hideWorldText and "hidden after a relog" or "showing",
 		tostring(GAME_FONT),
 		LogRunning() and "combat log lines" or (logListening and (logLines and "log off: all hits count"
 			or "no log lines have come: all hits count") or "no log on this client"),

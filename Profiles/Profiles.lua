@@ -994,7 +994,7 @@ function ns.ResetAddon(settingsOnly)
 	local kept = {}
 	kept.vitalsThemeEdits = ns.isDev and CinematicDB and CinematicDB.vitalsThemeEdits or nil
 	-- (What the game's floating text draws until a restart: not a setting.
-	-- Hide all floating text reset off still says "restart the game to apply".)
+	-- Hide all floating text reset off still says "log out and back in to apply".)
 	kept.worldTextLive = ns.db.worldTextLive or nil
 	-- (The dev copy keeps the flight times learned, Reset Everything too: each
 	-- route takes a flight to learn again. The speed scale goes with them, as

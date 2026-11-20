@@ -226,7 +226,7 @@ function ns.CreateCombatTextStylePanel(kit)
 	end
 	local function GetDB() return ns.GetDB() or {} end
 	local function XpHidden() return GetDB().hideWorldText and true or false end
-	-- (The XP row's restart: the tick isn't what the game draws yet.)
+	-- (The XP row's relog: the tick isn't what the game draws yet.)
 	local function RestartPending()
 		local db = ns.db or {}
 		local wanted = db.hideWorldText and db.combatTextStyle and db.styleGeneral ~= false and true or false
@@ -379,7 +379,7 @@ function ns.CreateCombatTextStylePanel(kit)
 	xpName:SetPoint("LEFT", xp, "LEFT", 0, 0)
 	Cell(xp, L["The game's"], "game", L["The game's floating text: XP gained and the rest."],
 		function() SetXpHidden(false) end, function() return not XpHidden() end)
-	Cell(xp, L["None"], "none", L["Hides all the game's floating text, its numbers too; needs a full game restart."],
+	Cell(xp, L["None"], "none", L["Hides all the game's floating text, its numbers too; needs a log out and back in."],
 		function()
 			if XpHidden() then return end
 			local using = {}
@@ -397,12 +397,12 @@ function ns.CreateCombatTextStylePanel(kit)
 		if RestartPending() then
 			xpNote:SetTextColor(1, 0.55, 0.25)
 			xpNote:SetText(XpHidden()
-				and L["Restart the game to apply. With it hidden the game draws none of its numbers, so The game's is grayed out in the rows above."]
-				or L["Restart the game to apply: until then the game's floating text stays hidden."])
+				and L["Log out and back in to apply. With it hidden the game draws none of its numbers, so The game's is grayed out in the rows above."]
+				or L["Log out and back in to apply: until then the game's floating text stays hidden."])
 		else
 			xpNote:SetTextColor(0.62, 0.62, 0.62)
 			xpNote:SetText(XpHidden() and L["With it hidden the game draws none of its numbers, so The game's is grayed out in the rows above."]
-				or L["None hides all of the game's floating text, its numbers too, and takes a game restart."])
+				or L["None hides all of the game's floating text, its numbers too, and takes a log out and back in."])
 		end
 	end
 	kit.AddControl(xpHolder)

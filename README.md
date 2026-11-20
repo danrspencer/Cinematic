@@ -16,7 +16,7 @@ Between fights it fades your UI away, adds letterbox bars and a color tint that 
 * **Names and nameplates:** hide unit names and nameplates in CineMode. You decide per kind (mobs, NPCs, your faction, the other faction, pets, totems) what shows in fights, what stays up in the open world, cities, inns, dungeons, raids and PvP (flagged, or in battlegrounds and arenas), and which names stay. Outside CineMode, nameplates are left to the game.
 * **Hide the UI, keep the look:** a keybind that works like Alt+Z but leaves the tint, letterbox and other effects on screen. It's made for screenshots.
 * **The minimap stays up while tracking** herbs, minerals, treasure or fish.
-* **Hide all floating text** (XP, damage, healing) if you'd like a clean screen. It takes a game restart.
+* **Hide all floating text** (XP, damage, healing) if you'd like a clean screen. It takes a log out and back in.
 * **Tooltips** (advanced, off by default): hide tooltips in CineMode, in fights or in the camera modes, with a list of the ones that still show, and keybinds to hold for a peek or to switch the hiding off.
 * **Chat bubbles:** hide them by place, show just the text floating over the speaker, and set the text size.
 * **Your call on every frame:** keep any frame always visible, or fade extra ones from other addons. More than 30 addons are handled out of the box, among them Details!, Bartender4, ElvUI, EllesmereUI, Plater, Platynator, Questie, RestedXP Guides, BigWigs, DynamicCam and Leatrix Plus ([the full list](https://sapo-wow-dev.github.io/Cinematic/guides/other-addons.html)). Where one of them does something Cinematic does too, the **Addon Conflicts** page lets you pick whose plays. For anything else, **Add mode** (or `/cine add`) lets you click a frame to pick it.

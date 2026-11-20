@@ -21771,11 +21771,13 @@ ns.OnLanguage(function()
 		OnAccept = ReloadUI,
 		timeout = 0, whileDead = true, hideOnEscape = true,
 	}
-	-- The game keeps the floating-text font it first loaded, so only a fresh start applies it
+	-- The game reads the floating-text font as you log in: a /reload keeps the
+	-- one it has, logging out and back in takes the new one (/cine debug
+	-- xprelog, Forever 2026-11-20; it once said a full restart was needed).
 	StaticPopupDialogs.CINEMATIC_WORLD_TEXT_RESTART = {
 		-- (No Exit button: Quit is the game's alone, forbidden from an addon's
 		-- popup, tested on Forever 2026-11-10.)
-		text = L["Floating text changes after you fully restart the game (/reload isn't enough). The same goes for getting it back: until a full restart it stays hidden, even with Cinematic turned off."],
+		text = L["Floating text changes after you log out and back in (/reload isn't enough). The same goes for getting it back: until you log out it stays hidden, even with Cinematic turned off."],
 		button1 = CLOSE or L["Close"],
 		timeout = 0, whileDead = true, hideOnEscape = true,
 	}
