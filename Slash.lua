@@ -1590,6 +1590,9 @@ local function HandleSlash(msg)
 			ns.GetDB().weatherTint and "on" or "off", rgb(w.target), rgb(w.shown)))
 	elseif cmd == "debug" and arg == "viewdist" then
 		ns.ViewDistTest()
+	elseif cmd == "debug" and arg == "ufwatch" then
+		-- (Players too: watches the unit frames for parts moved after a fight, UnitFrameWatch.lua.)
+		ns.UnitWatchToggle()
 	elseif cmd == "debug" and arg == "unitframes" then
 		ns.LogUnitFrames()
 	elseif cmd == "debug" and arg == "ids" then

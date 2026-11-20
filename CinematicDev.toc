@@ -181,6 +181,7 @@ Style\CombatTextTexts.lua
 Style\CombatTextStyle.lua
 Style\CombatTextPage.lua
 Style\UnitStyle.lua
+Style\UnitFrameWatch.lua
 Style\RaidStyle.lua
 Style\GeneralStyle.lua
 Style\StyleOverrides.lua
