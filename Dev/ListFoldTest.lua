@@ -3,8 +3,9 @@
 -- is blocked: a yellow "Interface action failed" per line (Forever, 2041 in one
 -- fight, 2026-11-20). It sets itself up (CineMode off, settings closed); you
 -- only start a fight and end it when the box says so:
---   1 calm      pages in three hubs picked out of a fight: the list folds
---               (made again at least once) and nothing blocked (PASS/FAIL)
+--   1 calm      pages in three hubs picked out of a fight: nothing blocked; how
+--               often the list was made again is said (the game's OpenToCategory
+--               makes it as it picks, ns.PickSettingsCategory) (PASS/FAIL)
 --   2 fight     waits for you to start a fight (no time limit)
 --   3 control   the list made again once by hand in the fight: how many lines
 --               it blocks, to show the trigger is live (INFO)
@@ -103,7 +104,7 @@ local function Calm()
 		if not run then return end
 		Shot("step 1")
 		StackIfAny(blocked0)
-		Verdict(made > made0 and Blocked() == blocked0, ("list made again %d time(s) (1+ wanted: it folds), blocked +%d (0 wanted)")
+		Verdict(Blocked() == blocked0, ("list made again %d time(s) (by the game's OpenToCategory), blocked +%d (0 wanted)")
 			:format(made - made0, Blocked() - blocked0))
 		Say("--- 2 of 5: waiting for a fight ---")
 		WaitFor("Left list test: 2 of 5. Start a fight: attack any enemy or a training dummy. The test waits.",

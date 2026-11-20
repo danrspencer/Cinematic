@@ -229,6 +229,7 @@ local function PrintDebugHelp()
 	print("  /cine debug cursortest - one run checking Replace cursor icon: your pick over open ground and the UI, the game's own over a mailbox or an NPC, with on-screen steps and Yes/No (dev copy; again to stop)")
 	print("  /cine debug xprelog - one run checking whether a relog changes the floating XP text's font (kill one, relog, kill one; dev copy; again to stop)")
 	print("  /cine debug blockedline - one run checking the error box catches the yellow \"Interface action failed\" line, with or without the game's event (dev copy; again to stop)")
+	print("  /cine debug taintopen [ways] - which way of opening the settings leaves its lists written by us: 6 ways (or the numbers given), each after a /reload (click its Reload button); some ask for Escape > Options, way 6 in a fight (dev copy; again to stop)")
 	print("  /cine debug listfold - one run checking our settings' left list is never made again in a fight (no yellow \"Interface action failed\" lines); you start and end a fight (dev copy; again to stop)")
 	print("  /cine debug euiswing - one run recording why EllesmereUI's swing timer stays hidden in CineMode (dev copy; again to stop)")
 	print("  /cine debug solo <Addon> [more] - only that addon (its parts and what it needs) and Cinematic load: turns the rest off and reloads; solo off brings them back (dev copy)")
@@ -1884,6 +1885,10 @@ local function HandleSlash(msg)
 		-- (Dev copy: the error box catches the event-less "Interface action failed" line, BlockedLineTest.lua.)
 		if ns.BlockedLineTest then ns.BlockedLineTest()
 		else ns.Print("/cine debug blockedline is in the dev copy only.") end
+	elseif cmd == "debug" and (arg == "taintopen" or arg:find("^taintopen ")) then
+		-- (Dev copy: which way of opening the settings taints its lists, one /reload a way, BlockedLineTest.lua.)
+		if ns.TaintOpenTest then ns.TaintOpenTest(arg:match("^taintopen%s*(.*)$"))
+		else ns.Print("/cine debug taintopen is in the dev copy only.") end
 	elseif cmd == "debug" and arg == "listfold" then
 		-- (Dev copy: our settings' left list never made again in a fight, ListFoldTest.lua.)
 		if ns.ListFoldTest then ns.ListFoldTest()

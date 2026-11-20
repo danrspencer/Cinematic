@@ -2529,7 +2529,7 @@ do
 	-- their pages shows, and fold again as you go elsewhere (2026-11-16); so
 	-- do their group lines (Combat...) and Wheels under them: a line open
 	-- while the page shown is it or one under it. The game's list: a
-	-- category's SetExpanded, the list made again. (Its names unchecked on
+	-- category's SetExpanded (the list shows it once the game makes it again). (Its names unchecked on
 	-- each client: /cine log says what it found, once.)
 	menu.parentOf, menu.fold = {}, { ["UI Manager"] = true, Visions = true, Style = true, ["Quality of life"] = true,
 		Wheels = true }
@@ -2572,7 +2572,6 @@ do
 				break
 			end
 		end
-		local changed = false
 		for key in pairs(menu.fold) do
 			local category = subpages[key]
 			if type(category) == "table" and category.SetExpanded then
@@ -2580,11 +2579,14 @@ do
 				local now = category.IsExpanded and category:IsExpanded() or category.expanded or false
 				if (now and true or false) ~= inside then
 					category:SetExpanded(inside)
-					changed = true
 				end
 			end
 		end
-		if changed and list and list.CreateCategories then list:CreateCategories() end
+		-- (Not made again from here, 2026-11-20: the list made by our code stays
+		-- written by us all session (/cine debug taintopen: its view and data
+		-- provider, 76 fields), and Escape > Options in a fight read it, so every
+		-- settings line's gamepad call was blocked (1756 yellow lines). The groups
+		-- fold the next time the game makes its list again, or as you click them.)
 		if not logged and ns.Log then
 			logged = true
 			local probe = subpages["UI Manager"]
@@ -2623,7 +2625,7 @@ do
 		if InCombatLockdown() then return end
 		if panel.GetCurrentCategory and panel:GetCurrentCategory() == category then return end
 		menu.selecting = true
-		ok, err = pcall(panel.SelectCategory, panel, category)
+		ok, err = pcall(ns.PickSettingsCategory, panel, category)
 		menu.selecting = nil
 		if not ok and ns.Log then ns.Log("error", "left list pick: " .. tostring(err)) end
 	end
@@ -20078,31 +20080,37 @@ local MOVED_PAGES = { ["Combat Vision"] = "Card Vision", ["Story Vision"] = "Car
 -- commands that open and read pages (StyleSixTest.lua).
 function ns.SettingsPageCanvas(name) return subpages[name] or (ns.settingsCanvases and ns.settingsCanvases[name]) end
 
--- Opens the game's settings window at a category (object or id). With the
--- gamepad UI there (Forever's SmartNavigation), Settings.OpenToCategory also
--- moves the gamepad cursor into the page (ActivateCategory > FocusContainer >
--- EnterFocusGroup), which only the game's own code may do: from ours it prints
--- "Interface action failed because of an AddOn". There the window is shown and
--- the page picked (SelectCategory, as the category list's click does), which
--- leaves the gamepad focus alone. Out of combat only (ShowUIPanel).
+-- Picks a settings page (category object or id), opening the window if need be.
+-- Out of a fight always through the game's Settings.OpenToCategory, never our
+-- own SelectCategory: picking one of our pages moves the left list from the
+-- game's pages to the AddOns ones and the game makes the list again (SetCategorySet
+-- > CreateCategories). Done from our SelectCategory, that list stays written by
+-- us all session; Escape > Options in a fight later moves it back, reads what we
+-- wrote, and every settings line's gamepad call is blocked (Forever, 1756 yellow
+-- lines). Through OpenToCategory the list stays clean: /cine debug taintopen 7
+-- PASS, 0 blocked (2026-11-20). (OpenToCategory may print one "Interface action
+-- failed" line out of a fight now and then, the gamepad focus it sets: one line,
+-- harmless.) In a fight (no gamepad UI, window not protected: ns.OpenOptions)
+-- the window is shown and the page picked directly; OpenToCategory's ShowUIPanel
+-- is blocked then.
+function ns.PickSettingsCategory(panel, target)
+	local id = target
+	if type(target) == "table" then id = target.GetID and target:GetID() end
+	if not InCombatLockdown() and Settings and Settings.OpenToCategory and id then
+		Settings.OpenToCategory(id)
+		return
+	end
+	if type(target) == "number" then target = panel and panel.GetCategory and panel:GetCategory(target) or nil end
+	if panel and panel.SelectCategory and type(target) == "table" then
+		if not panel:IsShown() then panel:Show() end
+		panel:SelectCategory(target)
+	elseif panel and not InCombatLockdown() then
+		ShowUIPanel(panel)
+	end
+end
+
 function ns.OpenSettingsCategory(target)
-	local panel = SettingsPanel
-	if _G.SmartNavigation and panel and panel.SelectCategory then
-		if type(target) == "number" then
-			target = panel.GetCategory and panel:GetCategory(target) or nil
-		end
-		if target then
-			if not panel:IsShown() then ShowUIPanel(panel) end
-			if not panel:IsShown() then panel:Show() end
-			panel:SelectCategory(target)
-			return
-		end
-	end
-	if Settings and Settings.OpenToCategory then
-		local id = target
-		if type(target) == "table" then id = target.GetID and target:GetID() end
-		if id then Settings.OpenToCategory(id) elseif panel then ShowUIPanel(panel) end
-	end
+	ns.PickSettingsCategory(SettingsPanel, target)
 end
 
 function ns.OpenOptions(page)
@@ -20122,7 +20130,7 @@ function ns.OpenOptions(page)
 		-- in a fight: "Interface action failed" once a line.)
 		if panel and panel.SelectCategory and not panel:IsProtected() and not _G.SmartNavigation then
 			panel:Show()
-			panel:SelectCategory(line or subpages[page] or category)
+			ns.PickSettingsCategory(panel, line or subpages[page] or category)
 		elseif not (panel and panel:IsShown()) then
 			openAfterFight.page = page
 			openAfterFight:RegisterEvent("PLAYER_REGEN_ENABLED")
