@@ -1789,6 +1789,10 @@ local function HandleSlash(msg)
 	elseif cmd == "debug" and arg:find("^cursorsweep") then
 		-- (One cursor sweep, the faded minimap under your mouse: NodeSweep.lua.)
 		ns.CursorSweepTest(arg:match("^cursorsweep%s*(.*)$"))
+	elseif cmd == "debug" and arg == "peekdebuffs" then
+		-- (Dev copy: a buff peek leaves the debuffs faded, a debuff peek brings them, BuffPeekDebuffTest.lua.)
+		if ns.BuffPeekDebuffTest then ns.BuffPeekDebuffTest() else
+			ns.Print("/cine debug peekdebuffs is in the dev copy only.") end
 	elseif cmd == "debug" and arg:find("^bufftest") then
 		-- (Dev copy: one run recording buff pictures left hidden after a "Just the new one" peek, BuffFadeTest.lua.)
 		if ns.BuffFadeTest then ns.BuffFadeTest(arg:match("^bufftest%s*(.*)$")) else

@@ -312,6 +312,8 @@ local function AdvancedNow(entry, n, out)
 			Add(out, "on", L["Just the new one: only the buff you gained shows, the others stay faded"], "Buffs/debuffs",
 				"buffPeekOnlyNew")
 		end
+	elseif name == "DebuffFrame" and tick.buffsOnly and auraOnly and not n.hovered then
+		Add(out, "block", L["A buff peek brings up only your buffs, not your debuffs"], "Buffs/debuffs", "buffPeek")
 	end
 	if name == "ObjectiveTrackerFrame" and db.questRevealOnlyThat and (n.events or NONE).quest and not n.hovered
 		and not n.fightingShown then

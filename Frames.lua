@@ -12697,6 +12697,7 @@ function ns.UpdateFrames(cinematic, elapsed)
 		local w = tickTables.whyTick or {}
 		tickTables.whyTick = w
 		w.debuffsOnly, w.auraOnly, w.buffPeekUp = debuffsOnly, auraOnly, buffPeekUntil > now
+		w.buffsOnly = events.aura and not debuffPeekOn
 		w.flashTestUp, w.trackerTimerUp, w.questTimerUp = flashTestUp, trackerTimerUp, questTimerUp
 		w.taxiHidesMinimap, w.trackingPaused, w.cooldownBarUp = taxiHidesMinimap, trackingPaused, barUp
 		w.portraitAllowed, w.fighting, w.calm, w.offWhen = portraitAllowed, fighting, calm, offWhen
@@ -12738,7 +12739,11 @@ function ns.UpdateFrames(cinematic, elapsed)
 			or (petUnhappyUp and entry.name == "PetFrame")
 			or (flashTestUp and ns.COOLDOWN_BAR_GROUPS[entry.name])
 			or (triggered[row] and not (debuffsOnly and auraOnly[row]
-				and (entry.name == "BuffFrame" or entry.name == "TemporaryEnchantFrame")))
+				and (entry.name == "BuffFrame" or entry.name == "TemporaryEnchantFrame"))
+				-- (...and the other way round: a buff peek alone leaves the debuffs
+				-- faded, so a long one you always have, a rested XP debuff, isn't
+				-- brought up by every kill's buff.)
+				and not (events.aura and not debuffPeekOn and auraOnly[row] and entry.name == "DebuffFrame"))
 		-- (The chat's tabs and buttons: by their own rows, not the chat window's.)
 		local listShown = combatShown
 			and (entry.name and combatShown[entry.name]

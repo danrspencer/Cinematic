@@ -265,6 +265,7 @@ Dev\EuiCastTest.lua
 Dev\AddonTest.lua
 Dev\EuiCooldownTest.lua
 Dev\BuffFadeTest.lua
+Dev\BuffPeekDebuffTest.lua
 Dev\SpokenTest.lua
 Dev\ChatRevealTest.lua
 Dev\ChecksProbe.lua
