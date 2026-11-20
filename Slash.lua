@@ -463,7 +463,7 @@ local function HandleSlash(msg)
 		local degrees, speed = arg:match("^(%S+)%s*(%S*)$")
 		degrees, speed = tonumber(degrees) or 90, tonumber(speed) or 30
 		local yawSpeed = tonumber(GetCVar("cameraYawMoveSpeed")) or 180
-		ns.Print(("turning %d degrees left at %d°/sec (cameraYawMoveSpeed = %s)"):format(degrees,
+		ns.Print(("turning %d degrees left at %dÂ°/sec (cameraYawMoveSpeed = %s)"):format(degrees,
 			speed, tostring(GetCVar("cameraYawMoveSpeed"))))
 		MoveViewLeftStart(speed / yawSpeed)
 		C_Timer.After(degrees / speed, function() MoveViewLeftStop() end)
@@ -496,7 +496,7 @@ local function HandleSlash(msg)
 	elseif cmd == "debug" and arg == "flyby" then
 		local d = ns.GetFlyByDebug()
 		if d.active then
-			ns.Print(("fly-by on: %s, %.1f of %.1f sec, view %.0f° from behind you"):format(
+			ns.Print(("fly-by on: %s, %.1f of %.1f sec, view %.0fÂ° from behind you"):format(
 				d.phase, d.t, d.T, d.view))
 		else
 			ns.Print("fly-by off")
@@ -513,7 +513,7 @@ local function HandleSlash(msg)
 		-- camera's turn shows as a jump. /cine restarttest [degrees/sec], 4 sec.
 		local speed = num or 40
 		local yawSpeed = tonumber(GetCVar("cameraYawMoveSpeed")) or 180
-		ns.Print(("turning left at %d°/sec for 4 sec, restarting the turn every 0.1 sec"):format(speed))
+		ns.Print(("turning left at %dÂ°/sec for 4 sec, restarting the turn every 0.1 sec"):format(speed))
 		local sends = 0
 		local function Send()
 			sends = sends + 1
@@ -1230,7 +1230,7 @@ local function HandleSlash(msg)
 				and (", heading for %.1f"):format(zoom.from + zoom.delta) or ""))
 		local tentAngle, cameraAngle, braking = ns.CozyTentDebug()
 		if tentAngle then
-			ns.Print(("cozy sway: tent guessed at %.0f°, camera at %.0f° (from in front of you), keeping 90° clear%s"):format(
+			ns.Print(("cozy sway: tent guessed at %.0fÂ°, camera at %.0fÂ° (from in front of you), keeping 90Â° clear%s"):format(
 				tentAngle, cameraAngle, braking and "; braking away from it now" or ""))
 		else
 			ns.Print(t and "cozy sway: not going yet (it steers clear of the tent once the cozy camera starts)"
@@ -1475,7 +1475,7 @@ local function HandleSlash(msg)
 		C_Timer.After(6, function() LogLines(6, true) end)
 	elseif cmd == "debug" and arg == "quest" then
 		local q = ns.GetQuestCamDebug()
-		ns.Print(("quest cam: %s, event camera %s; turned %.1f°, lowered %.1f°%s; your distance %s, zoomed to %s"):format(
+		ns.Print(("quest cam: %s, event camera %s; turned %.1fÂ°, lowered %.1fÂ°%s; your distance %s, zoomed to %s"):format(
 			q.active and "on" or (q.talking and "waiting") or "off", tostring(ns.db.eventQuestCamera), q.turned, q.lowered, q.handedOver and " (handed over to you)" or "", tostring(q.zoom), tostring(q.zoomedTo)))
 	elseif cmd == "debug" and arg == "shoulder" and ns.GetShoulderCamDebug then
 		local d = ns.GetShoulderCamDebug()
@@ -1523,9 +1523,9 @@ local function HandleSlash(msg)
 			ticks = ticks + 1
 			local d = ns.GetTurnDebug()
 			local ok, facing = pcall(GetPlayerFacing)
-			local line = (("walking %s, keys %s, facing %s | offset %.0f°, extra %.0f°/s, glide %.0f | camera turning %s | follow off %s (style %s), yaw speed cvar %s"):format(
+			local line = (("walking %s, keys %s, facing %s | offset %.0fÂ°, extra %.0fÂ°/s, glide %.0f | camera turning %s | follow off %s (style %s), yaw speed cvar %s"):format(
 				tostring(ns.IsRPWalking and ns.IsRPWalking()), d.keys ~= "" and d.keys or "-",
-				(ok and type(facing) == "number") and ("%.0f°"):format(math.deg(facing)) or "?",
+				(ok and type(facing) == "number") and ("%.0fÂ°"):format(math.deg(facing)) or "?",
 				d.offset, d.extra, d.glide, d.axis, tostring(d.followOff), tostring(d.smoothStyle),
 				tostring(d.yawSpeed)))
 			ns.Print(line)
@@ -1949,7 +1949,7 @@ local function HandleSlash(msg)
 			if not ok then return "error" end
 			if facing == nil then return "hidden" end
 			if issecretvalue and issecretvalue(facing) then return "secret" end
-			return ("%.0f°"):format(math.deg(facing))
+			return ("%.0fÂ°"):format(math.deg(facing))
 		end
 		ns.Print("facing test for 10 seconds: turn with the keys, then with the mouse. Facing now: " .. Facing())
 		local watcher = ns.facingWatcher
@@ -2219,7 +2219,7 @@ local function HandleSlash(msg)
 	elseif cmd == "orbit" then
 		ns.OrbitCommand(arg)
 	elseif cmd == "debug" and arg == "behind" then
-		-- The Swing behind you step on its own (5 sec at 45°/s, as the Flight
+		-- The Swing behind you step on its own (5 sec at 45Â°/s, as the Flight
 		-- script's): try it mid-flight with the camera turned aside. Each second
 		-- of it goes in the log (UpdateTaxi).
 		ns.ScriptCenterCamera(5, 45, 0, 1.5)

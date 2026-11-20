@@ -2423,7 +2423,7 @@ ns.COMBAT_SHOW = {
 	{ key = "flags", label = L["Flag carriers"], default = false, addon = "Blizzard_Deprecated_ArenaUI",
 		page = "interface", frames = { "ArenaEnemyFramesContainer" } },
 	-- morePage: the options page with more settings for it, which can keep it up besides
-	-- (a » by its name on the HUD page opens it).
+	-- (a Â» by its name on the HUD page opens it).
 	{ key = "minimap", label = L["Minimap"], default = true, groups = { "minimap" }, morePage = "Minimap" },
 	-- The bar behind the zone's name (not the name): follows the minimap's
 	-- ticks until set (see ROW_FALLBACK).
