@@ -6797,8 +6797,8 @@ L["When the marks and their colors show on the plates."] = "Cuándo se muestran 
 
 -- Plates/PlateGuild.lua
 L["trainer,weapon master"] = "instructor,maestro de armas,maestra de armas"
-L["pet trainer"] = "instructor de mascotas"
-L["demon trainer"] = "instructor de demonios"
+L["pet trainer"] = "de mascotas"
+L["demon trainer"] = "de demonios"
 L["alchem"] = "alquimi"
 L["blacksmith"] = "herrer"
 L["enchant"] = "encantamiento"
