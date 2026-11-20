@@ -76,9 +76,26 @@ function ns.CreateCombatTextStylePanel(kit)
 	local intro = kit.PageIntro(content, title,
 		L["Shows damage and healing numbers of our own in place of the game's."])
 
+	-- An Experimental notice (not a gate: the page works as ever), back at
+	-- the user's ask (2026-11-20): the game never says whose a hit is, so
+	-- ours are told apart by guesswork (the log's lines, casts, totems).
+	-- A skull (the raid marker's: on every client) and a red Experimental.
+	local skull = content:CreateTexture(nil, "ARTWORK")
+	skull:SetSize(20, 20)
+	skull:SetPoint("TOPLEFT", intro, "BOTTOMLEFT", 0, -10)
+	skull:SetTexture("Interface\\TargetingFrame\\UI-RaidTargetingIcon_8")
+	local warnTitle = kit.Label(content, "GameFontNormalLarge", L["Experimental"])
+	warnTitle:SetPoint("LEFT", skull, "RIGHT", 6, 0)
+	warnTitle:SetTextColor(1, 0.25, 0.2)
+	local warnText = kit.Label(content, "GameFontHighlightSmall",
+		L["You may see other people's damage as your own."])
+	warnText:SetPoint("TOPLEFT", skull, "BOTTOMLEFT", 0, -6)
+	warnText:SetWidth(520)
+	warnText:SetJustifyH("LEFT")
+
 	local function Changed() ns.RefreshCombatTextStyle() end
 	local switch = kit.PageSwitch(content, "combatTextStyle", L["Enable Page"],
-		L["Turns this page's combat text on or off."], intro, Changed)
+		L["Turns this page's combat text on or off."], warnText, Changed)
 	local stack = kit.Stack(switch, "check")
 	local rows = ns.StyleRows(kit, content, stack, Changed, "combatTextStyle")
 	local function Ours(db) return rows.On(db) and db.combatTextNumbers end

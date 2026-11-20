@@ -1024,13 +1024,14 @@ do
 		probe = nil
 	end
 
-	function ns.CombatTextProbe(lines)
+	-- (seconds: a test that waits on the player as long as it takes asks for more.)
+	function ns.CombatTextProbe(lines, seconds)
 		if probe then Stop("run again") return end
 		maxLines = lines or MAX_LINES
 		probe, counts = CreateFrame("Frame"), { combat = 0, log = 0 }
 		ns.db.combatTextLog = {}
 		log = ns.db.combatTextLog
-		stopAt = GetTime() + SECONDS
+		stopAt = GetTime() + (seconds or SECONDS)
 		local get = (C_CVar and C_CVar.GetCVar) or GetCVar
 		local function CVar(name) return name .. "=" .. Call(get, name) end
 		local loaded = C_AddOns and C_AddOns.IsAddOnLoaded or IsAddOnLoaded
@@ -1109,9 +1110,11 @@ do
 		end)
 		ns.combatTextRecord = Rec
 		ns.SetOnUpdate(probe, function()
-			if GetTime() >= stopAt then Stop("3 minutes") end
+			if GetTime() >= stopAt then Stop(("%d s"):format(seconds or SECONDS)) end
 		end)
-		ns.Print("combattext: recording for 3 minutes. Fight as you do, then /reload (no need to stop it first)")
+		if not seconds then
+			ns.Print("combattext: recording for 3 minutes. Fight as you do, then /reload (no need to stop it first)")
+		end
 	end
 end
 

@@ -1047,8 +1047,68 @@ local function PetHit(hit, now)
 	end
 	return false
 end
--- A hit no line came for: your pet's, else someone else's (left out).
+-- Your totems' hits (2026-11-20, /cine debug totemhit on Forever): no log
+-- line comes with them either, and a totem isn't your pet, so a shaman's
+-- Searing Totem numbers were all left out. But each of its shots is a cast
+-- of its own (Attack, 3606) on its plate, the game says the totem is yours
+-- (UnitIsOwnerOrControllerOfUnit), its target reads, and its hit lands
+-- 0.11-0.20 s after the cast ends with the totem close by, 0.96-1.07 s from
+-- about 20 yards (its range): a cast waits WAIT for its hit, still under the
+-- 2.2 s between its casts. So a hit with no line, on the mob
+-- a totem of yours just finished a cast at, is that totem's: one hit per
+-- cast, in your pet's look. In a group too: someone else's hit counts only
+-- landing on that mob in the same moment, once per shot. A totem with no
+-- plate (friendly plates off) can't be heard: its hits stay left out.
+local totem = { WAIT = 1.5, casts = {}, frame = CreateFrame("Frame") } -- (WAIT: seconds a cast waits for its hit)
+ns.CombatTextTotem = totem -- (Tools/offline/totemcast.lua)
+function totem.Fresh(now)
+	local casts = totem.casts
+	while casts[1] and now - casts[1].at > totem.WAIT do table.remove(casts, 1) end
+end
+function totem.OnCast(unit)
+	if type(unit) ~= "string" or not Plain(unit) or not unit:find("^nameplate") then return end
+	if not On() or (ns.CombatTextBy and ns.CombatTextBy("pet") ~= "ours") then return end -- (By: below)
+	local okOwn, own = pcall(UnitIsOwnerOrControllerOfUnit, "player", unit)
+	if not (okOwn and Plain(own) and own) then return end
+	local okPet, isPet = pcall(UnitIsUnit, unit, "pet") -- (your pet's: PetHit has those)
+	if okPet and Plain(isPet) and isPet then return end
+	local okT, target = pcall(UnitGUID, unit .. "target")
+	if not (okT and Plain(target) and target) then return end
+	local now = GetTime()
+	totem.Fresh(now)
+	if #totem.casts < 8 then totem.casts[#totem.casts + 1] = { at = now, target = target } end
+	if ns.combatTextRecord then Trace(("your totem %s finished a cast at %s"):format(unit, target)) end
+end
+-- Whether a hit on this mob, landed at, is a totem's: its cast taken.
+function totem.Take(guid, at, now)
+	if not guid then return false end
+	totem.Fresh(now)
+	for i, cast in ipairs(totem.casts) do
+		if cast.target == guid and math.abs(at - cast.at) <= totem.WAIT then
+			table.remove(totem.casts, i)
+			return true
+		end
+	end
+	return false
+end
+if ns.Check.Api("UnitIsOwnerOrControllerOfUnit") then
+	pcall(totem.frame.RegisterEvent, totem.frame, "UNIT_SPELLCAST_SUCCEEDED") -- (every unit's: the totem's plate)
+	totem.frame:SetScript("OnEvent", ns.Profiled("Combat text", function(_, _, unit) totem.OnCast(unit) end))
+end
+function totem.Hit(hit, now)
+	local node = NODE[hit.id]
+	if not node or node.word or hit.melee or CT.Kind(hit.id) == "heal" then return false end
+	if ns.CombatTextBy and ns.CombatTextBy("pet") ~= "ours" then return false end
+	return totem.Take(hit.guid, hit.at or now, now)
+end
+
+-- A hit no line came for: your totem's or pet's, else someone else's (left out).
 Unclaimed = function(hit, now)
+	if hit[1] and hit[2] and totem.Hit(hit, now) and StillThere(hit) then
+		Trace("TOTEM'S: no line, on the mob your totem just cast at")
+		local crit = NODE[hit.id] and NODE[hit.id].crit
+		return Spawn(hit[1], hit[2], hit[3], crit and "petCrit" or "pet", hit.via, nil, hit.tag)
+	end
 	if hit[1] and hit[2] and PetHit(hit, now) and StillThere(hit) then
 		Trace("PET'S: no line, on your pet's target")
 		local crit = NODE[hit.id] and NODE[hit.id].crit

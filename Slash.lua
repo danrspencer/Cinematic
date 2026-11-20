@@ -1887,6 +1887,9 @@ local function HandleSlash(msg)
 	elseif cmd == "debug" and arg == "deadmob" then
 		-- (Dev copy: what addons can read about a dead mob, its name above all, CorpseTest.lua.)
 		if ns.CorpseTest then ns.CorpseTest() else ns.Print("/cine debug deadmob is in the dev copy only.") end
+	elseif cmd == "debug" and arg == "totemhit" then
+		-- (Dev copy: what a shaman's totem hits bring our combat numbers, TotemHitTest.lua.)
+		if ns.TotemHitTest then ns.TotemHitTest() else ns.Print("/cine debug totemhit is in the dev copy only.") end
 	elseif cmd == "debug" and arg == "checks" then
 		-- (Dev copy: which checks this client has to replace pcalls, ChecksProbe.lua, Tools/pcall-plan.md.)
 		if ns.ChecksProbe then ns.ChecksProbe()

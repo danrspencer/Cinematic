@@ -218,7 +218,7 @@ read_globals = {
 	"IsInInstance", "GetInstanceInfo", "strsplit", "C_RaidLocks", "EJ_GetCreatureInfo", "EJ_GetCurrentInstance",
 	"GetPlayerInfoByGUID", "UnitAura", "C_SummonInfo", "GetSummonConfirmSummoner", "ConfirmSummon",
 	"ERR_TRADE_COMPLETE", "CancelEmote",
-	"EJ_GetEncounterInfoByIndex", "EJ_GetEncounterInfo", "UnitIsTapDenied", "EJ_GetInstanceForMap", "EJ_SelectInstance", "UnitEffectiveLevel",
+	"EJ_GetEncounterInfoByIndex", "EJ_GetEncounterInfo", "UnitIsTapDenied", "UnitIsOwnerOrControllerOfUnit", "EJ_GetInstanceForMap", "EJ_SelectInstance", "UnitEffectiveLevel",
 	"IsInRaid",
 	"IsIndoors",
 	"IsMounted",
