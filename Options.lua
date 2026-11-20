@@ -2033,6 +2033,11 @@ local HubAdd, HubTab
 -- Opens a match's page, scrolled to it and highlighted. onPage: it's
 -- already open (found by its own search box, or its hub's).
 local function ShowMatch(entry, onPage)
+	-- (The page opened first: opening it picks its hub's first icon, and after
+	-- the tab below had picked the Names icon (a Names row, on the Nameplates
+	-- page's canvas) that took it back to the Nameplates icon, the row hidden.
+	-- /cine debug findtabs, 2026-11-20.)
+	if not onPage then ns.OpenOptions(entry.page.key) end
 	HubTab(entry.page.key) -- (a hub's page: its tab picked)
 	-- In a closed section of the Camera Settings page: opened first.
 	local object = entry.edges and entry.edges.top
@@ -2043,7 +2048,6 @@ local function ShowMatch(entry, onPage)
 		end
 		object = object:GetParent()
 	end
-	if not onPage then ns.OpenOptions(entry.page.key) end
 	local canvas = entry.page.canvas
 	-- (A page's Enable switch, in its header: made as the page shows, so
 	-- looked up once it has.)
@@ -20304,6 +20308,12 @@ function ns.OpenSettingByKey(settingKey, page)
 	if not entry then return false end
 	ShowMatch(entry)
 	return entry.text, entry.page.name or "Cinematic"
+end
+-- (For the dev copy's /cine debug findtabs, FindTabsTest.lua: what /cine find
+-- <id> goes to, its frame and page.)
+function ns.FindEntryOf(settingKey)
+	local _, keyed = BuildSearchIndex()
+	return keyed[settingKey]
 end
 
 -- /cine debug ids: every page's controls, those with an id (/cine find <id>)
