@@ -4929,6 +4929,25 @@ STEPS[#STEPS + 1] = function()
 		for _, point in pairs(ns.db.profileResetPoints or {}) do Copy(point) end
 		ns.db.tooltipLocationV1 = true
 	end
+	-- Emote Vision's You level up card started with Cheer, Dance, Flex; now
+	-- Cheer, Congratulate, Commend. A list still as it started takes the new
+	-- one (here and in saved profiles); one you changed stays. Once.
+	if not ns.db.youLevelEmotesV1 then
+		local function Update(t)
+			if type(t) == "table" and t.emoteVisionYouLevelEmotes == "CHEER,DANCE,FLEX" then
+				t.emoteVisionYouLevelEmotes = "CHEER,CONGRATULATE,COMMEND"
+			end
+		end
+		Update(ns.db)
+		for _, saved in pairs(ns.db.profiles or {}) do
+			if type(saved) == "table" then
+				Update(saved)
+				Update(saved.settings)
+			end
+		end
+		for _, point in pairs(ns.db.profileResetPoints or {}) do Update(point) end
+		ns.db.youLevelEmotesV1 = true
+	end
 end
 
 -- Runs them all, each on its own: an error is logged and reported (the

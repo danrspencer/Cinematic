@@ -297,7 +297,8 @@ local MOMENTS = {
 		tip = "An enemy player keeps you targeted for 5 seconds while you're out of a fight, not in " ..
 			"battlegrounds (needs enemy nameplates on). Once they've looked away, it can happen again.",
 		sample = { name = "Kargash", class = "ROGUE", line = "is stalking you" } },
-	{ id = "YouLevel", on = "emoteVisionYouLevel", name = "You level up", emotes = { "CHEER", "DANCE", "FLEX" },
+	{ id = "YouLevel", on = "emoteVisionYouLevel", name = "You level up",
+		emotes = { "CHEER", "CONGRATULATE", "COMMEND" }, -- (was Cheer, Dance, Flex: Migrations youLevelEmotesV1)
 		tip = "You reach a new level: the emotes go to everyone, to celebrate.",
 		sample = { name = "You", line = "reached level %d", level = 42, group = true,
 			icon = "Interface\\Icons\\Spell_Holy_SurgeOfLight" } },
