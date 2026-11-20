@@ -268,13 +268,14 @@ local function UnitPartItem(parent, info, at)
 		settingsPage = page }
 end
 
+-- Whether a row passes the filter chip (All, Showing, Hidden...).
+local function PassesFilter(item, filter)
+	if item.filters then return filter == "all" or item.filters[filter] and true or false end
+	return filter == "all" or (filter == "addons" and item.section == "addons") or filter == item.kind
+end
 -- Whether a row is in the list as filtered and searched (a part: by its own name).
 local function Matches(item, words, filter)
-	if item.filters then
-		if not (filter == "all" or item.filters[filter]) then return false end
-	elseif not (filter == "all" or (filter == "addons" and item.section == "addons") or filter == item.kind) then
-		return false
-	end
+	if not PassesFilter(item, filter) then return false end
 	return words == "" or item.title:lower():find(words, 1, true) ~= nil
 		or (not item.parent and item.sectionLabel:lower():find(words, 1, true) ~= nil)
 end
@@ -511,7 +512,7 @@ local function Gather(view, revealAll)
 	local found = {}
 	local filter = revealAll and "all" or view.filter
 	local words = revealAll and "" or view.search:lower()
-	local narrowed = filter ~= "all" or words ~= ""
+	local searched = words ~= ""
 	local function Count(item)
 		counts.all = counts.all + 1
 		if item.filters then
@@ -530,7 +531,12 @@ local function Gather(view, revealAll)
 			Count(part)
 			local match = Matches(part, words, filter)
 			any = any or match
-			if (open and (own or not narrowed)) or (narrowed and match) or revealAll then
+			-- (Listed while its frame is open: those the filter passes, all of
+			-- them if the frame's own name was searched. Search words find parts
+			-- with the frame shut too; a filter chip alone doesn't open frames,
+			-- so a frame with parts can still be closed on Showing or Hidden.)
+			if revealAll or (searched and match)
+				or (open and PassesFilter(part, filter) and (own or match)) then
 				listed[#listed + 1] = part
 			end
 		end
@@ -1333,14 +1339,18 @@ end
 
 -- For the dev copy's test run (WhyTest.lua): the window up at a tab (and a
 -- row open), and a tab's rows as Copy report has them.
-function ns.WhyWindowTab(tab, openKey)
+function ns.WhyWindowTab(tab, openKey, filter)
 	ns.ShowWhyWindow()
 	if not windowView then return end
-	windowView.tab, windowView.filter, windowView.openKey, windowView.openParent = tab, "all", openKey, nil
+	windowView.tab, windowView.filter, windowView.openKey, windowView.openParent = tab, filter or "all", openKey, nil
 	Fill(windowView)
 end
 function ns.WhyGather(tab)
 	return Gather({ tab = tab, filter = "all", search = "" }, true)
+end
+-- (And as the window lists them for a filter, search and open row.)
+function ns.WhyGatherView(tab, filter, search, openKey)
+	return Gather({ tab = tab, filter = filter or "all", search = search or "", openKey = openKey })
 end
 
 function ns.ShowWhyWindow()

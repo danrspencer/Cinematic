@@ -6,7 +6,8 @@
 -- own verdict. Steps: 1 every tab in turn, 2 a Hearthstone (Teleport Vision
 -- and the cameras), 3 a target (the Target row), 4 a Zone card (Cards and
 -- Recent), 5 sitting still (the standing-still timer and the triggers), 6 the
--- world map (what pauses the timer), 7 the Recent tab. Numbers after it run
+-- world map (what pauses the timer), 7 the Recent tab, 8 the Player frame row
+-- opened and closed on each filter (its parts only while open). Numbers after it run
 -- just those steps. Typed again: stops. Dev copy only (CinematicDev.toc).
 local _, ns = ...
 
@@ -225,6 +226,52 @@ local STEPS = {
 		verdict = function(s)
 			if not s.count or s.count == 0 then return false, "Recent was empty" end
 			return true, ("%d lines on Recent"):format(s.count)
+		end },
+	-- (A frame's parts on the Showing and Hidden filters: listed only while the
+	-- frame is open, so it can be closed; they used to be listed always.)
+	{ name = "fold", say = "Just watch: the Player frame row opened and closed on each filter.", length = 9,
+		prep = function() ns.WhyWindowTab("interface") end,
+		tick = function(s, t)
+			local filters = { "all", "shown", "hidden" }
+			local at = math.min(#filters * 2, math.floor(t / 1.4) + 1)
+			if s.at == at then return end
+			s.at = at
+			local filter, open = filters[math.ceil(at / 2)], at % 2 == 0 and "player" or nil
+			ns.WhyWindowTab("interface", open, filter)
+			local ok, found = pcall(ns.WhyGatherView, "interface", filter, "", open)
+			-- (Every other frame stays closed: none of their parts may be listed.)
+			local listed, top, others, withParts, names = 0, false, 0, 0, {}
+			for _, item in ipairs(ok and found or {}) do
+				if item.key == "player" then top = true end
+				if not item.parent and item.parts and #item.parts > 0 then withParts = withParts + 1 end
+				if item.parent and item.parent.key == "player" then
+					listed = listed + 1
+				elseif item.parent then
+					others = others + 1
+					names[item.parent.title] = true
+				end
+			end
+			local leaked = {}
+			for name in pairs(names) do leaked[#leaked + 1] = name end
+			s.out = s.out or {}
+			s.out[#s.out + 1] = { filter = filter, open = open ~= nil, top = top, listed = listed, others = others,
+				err = not ok and tostring(found) or nil }
+			Log(("%s %s: player row %s, %d parts listed; %d other frames with parts, %d of their parts listed%s%s")
+				:format(filter, open and "open" or "closed", top and "listed" or "not listed", listed, withParts, others,
+				#leaked > 0 and (" (" .. table.concat(leaked, ", ") .. ")") or "",
+				ok and "" or (" ERROR " .. tostring(found))))
+			Shot(("8 fold %s %s"):format(filter, open and "open" or "closed"))
+		end,
+		verdict = function(s)
+			local bad, out, openSeen = false, {}, false
+			for _, r in ipairs(s.out or {}) do
+				out[#out + 1] = ("%s %s: %d (others %d)"):format(r.filter, r.open and "open" or "closed", r.listed, r.others)
+				if r.err or (not r.open and r.listed > 0) or r.others > 0 then bad = true end
+				if r.open and r.top and r.listed > 0 then openSeen = true end
+			end
+			if #out < 6 then return false, "not every filter reached: " .. table.concat(out, ", ") end
+			if not openSeen then bad = true end
+			return not bad, table.concat(out, ", ")
 		end },
 }
 
