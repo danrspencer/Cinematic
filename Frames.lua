@@ -12312,6 +12312,56 @@ function tickTables.WorldHover(entry)
 	return name and ns.HOVER_BY_RECT[name] or false
 end
 
+-- The faded frames whose hover is only "the frame under the mouse is one of
+-- theirs": ns.IsEntryHovered's last case, for every group without a case of
+-- its own above it. Those are answered from the mouse's frame and its
+-- parents, worked out once (tickTables.FocusChain), not by each walking up
+-- from the mouse itself: asked of every faded frame, 137 here, as the mouse
+-- moves over the UI. The rest still ask ns.IsEntryHovered. Keep in step with it.
+tickTables.OWN_HOVER = { bars = true, sidebars = true, chat = true, buffs = true, quests = true, raidmanager = true,
+	minimap = true }
+function tickTables.FocusOnly(entry)
+	local group = entry.group
+	if PART_GROUPS[group] or tickTables.OWN_HOVER[group] or entry.shrunk or entry.parkedFullSize
+		or (ns.minimapUnderTest and entry.frame == Minimap) then
+		return false
+	end
+	local name = next(ns.HOVER_BY_RECT) and entry.frame.GetName and entry.frame:GetName()
+	return not (name and ns.HOVER_BY_RECT[name])
+end
+-- The mouse's frame and each of its parents, as a set (as IsInside walks
+-- them: up to and including a forbidden one). Once per frame drawn and focus.
+do
+	local chain, chainFocus, chainAt = {}, nil, -1
+	function tickTables.FocusChain(focus)
+		local now = GetTime()
+		if focus ~= chainFocus or now ~= chainAt then
+			chainFocus, chainAt = focus, now
+			wipe(chain)
+			local frame = focus
+			while frame do
+				chain[frame] = true
+				if IsForbidden(frame) then break end
+				frame = frame:GetParent()
+			end
+		end
+		return chain
+	end
+end
+-- One faded frame under the mouse (focus: MouseFocus()). The same answer as
+-- ns.IsEntryHovered, asked only of the frames it has a case of its own for.
+function tickTables.Hovered(entry, focus)
+	if tickTables.FocusOnly(entry) then
+		-- (Its last case: visible, and the mouse's frame inside it.)
+		return focus ~= nil and tickTables.FocusChain(focus)[entry.frame] == true
+			and ns.Flag(entry.frame:IsVisible()) and true or false
+	end
+	if focus == nil and not tickTables.WorldHover(entry) then
+		return false
+	end
+	return ns.IsEntryHovered(entry) and true or false
+end
+
 -- In CineMode, out of fights, with every frame settled, the frames' pass runs
 -- only a few times a second (Core.lua); these bring it on at once, as what it
 -- goes by changes: your target and focus, your auras, health and power
@@ -12357,13 +12407,10 @@ function ns.HoverProbe()
 	if not ns.db.mouseover then return false end -- (the mouse brings nothing up)
 	if ns.whyPicking then return true end -- (Inspect picking frames: as before)
 	local changed = false
-	local overWorld, WorldHover = not MouseFocus(), tickTables.WorldHover
+	local focus, Hovered = MouseFocus(), tickTables.Hovered
 	for _, entry in ipairs(ns.managed) do
 		entry.row = entry.row or ns.HoverRowFor(entry)
-		local over = false
-		if not overWorld or WorldHover(entry) then
-			over = ns.IsEntryHovered(entry) and true or false
-		end
+		local over = Hovered(entry, focus)
 		if over ~= (entry.hoverWas or false) then changed = true end
 		entry.hoverWas = over
 	end
@@ -12530,7 +12577,7 @@ function ns.UpdateFrames(cinematic, elapsed)
 			local over = entry.hoverWas
 			if not still or over == nil then
 				-- (Over the world: only the few that can be, tickTables.WorldHover.)
-				over = (focus ~= nil or tickTables.WorldHover(entry)) and ns.IsEntryHovered(entry) and true or false
+				over = tickTables.Hovered(entry, focus)
 				entry.hoverWas = over
 			end
 			if over then
