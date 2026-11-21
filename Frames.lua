@@ -4888,6 +4888,26 @@ do
 	local function CastIsOn(key)
 		return ns.IsCombatShowOn(key) or (targetIsOn and targetIsOn(key))
 	end
+	-- (A row's ticks for the list being worked out: kept for the fight when
+	-- tickNow.ticks is, see GetCombatShownFrames. Not closures, as above.)
+	local tickNow = {}
+	local function Ticked(key)
+		local ticks, placeLists, isOn = tickNow.ticks, tickNow.places, tickNow.isOn
+		if not ticks then
+			return ns.IsCineShowOn(key) or KeptHere(placeLists, key) or (isOn and isOn(key)) or false
+		end
+		if ticks.on[key] == nil then
+			ticks.cine[key] = ns.IsCineShowOn(key) or false
+			ticks.kept[key] = KeptHere(placeLists, key) or false
+			ticks.on[key] = ticks.cine[key] or ticks.kept[key] or (isOn(key) and true) or false
+		end
+		return ticks.on[key]
+	end
+	local function AlwaysOrKept(key)
+		local ticks = tickNow.ticks
+		if ticks and ticks.on[key] ~= nil then return ticks.cine[key] or ticks.kept[key] end
+		return ns.IsCineShowOn(key) or KeptHere(tickNow.places, key)
+	end
 	function GetCombatShownFrames()
 		local fight = InCombatLockdown() or ns.Flag(UnitAffectingCombat("player"))
 		-- (The Calm Timer after a fight is the fight still, for the ticks and the rules.)
@@ -4915,6 +4935,24 @@ do
 		-- (And the rows ticked for where you are.)
 		local placeLists = PlaceListsHere()
 		local shown = wipe(tickTables.combatShown)
+		-- In a fight, each row's ticks (Always, the place columns, In combat)
+		-- are worked out once and kept till it ends, or you move to another
+		-- kind of place or group: only your settings decide them, and one
+		-- changed mid-fight counts from its end. Rules and the fight's hold
+		-- are still asked every time. (Two thirds of this list's work, asked
+		-- again and again through each fight, 2026-11-21.)
+		local ticks = nil
+		if fight and isOn == ns.IsCombatShowOn then
+			local where = (placeLists[1] or "") .. (placeLists[2] or "")
+			ticks = tickTables.fightTicks
+			if not ticks or ticks.where ~= where then
+				ticks = { where = where, cine = {}, kept = {}, on = {} }
+				tickTables.fightTicks = ticks
+			end
+		else
+			tickTables.fightTicks = nil
+		end
+		tickNow.ticks, tickNow.places, tickNow.isOn = ticks, placeLists, isOn
 		-- Rows for gamepad mode only, and the ones they stand in for then.
 		local gamepad = ns.IsGamePadOn()
 		local facts = ns.RuleFacts(inCombat)
@@ -4923,13 +4961,13 @@ do
 			-- (A row's rule, when it has one that reads, decides instead of its ticks.)
 			local ticked = ns.RuleShows(item.key, facts)
 			if ticked == nil then
-				ticked = ns.IsCineShowOn(item.key) or KeptHere(placeLists, item.key) or (isOn and isOn(item.key))
+				ticked = Ticked(item.key)
 			end
 			-- (Your bars held back at a fight's start, Personal Resources page:
 			-- up only where Always or a place keeps them. The fight itself, not the
 			-- Calm Timer after it.)
 			if ticked and (fight or isOn == CastIsOn) and ns.FightHold(item.key)
-				and not (ns.IsCineShowOn(item.key) or KeptHere(placeLists, item.key)) then
+				and not AlwaysOrKept(item.key) then
 				ticked = false
 			end
 			if applies and ticked then
@@ -5016,6 +5054,7 @@ do
 	-- (A profile picked, Profiles.lua: worked out afresh next time.)
 	function ns.ForgetCombatShown()
 		keptShown = nil
+		tickTables.fightTicks = nil
 	end
 	-- (Only while the frames' pass is asking: in CineMode.)
 	-- (Not while the "in case" checks are slowed, ns.SlowChecks: the pass
@@ -12428,7 +12467,10 @@ do
 		QUEST_LOG_UPDATE = true }
 	-- (Core.lua's idle tick: these wake it, but don't keep it at the full pace after.)
 	ns.FRAMES_SOFT_WAKE = wake.soft
+	-- (A fight's end: the rows' ticks kept for it go, GetCombatShownFrames.)
+	pcall(wake.RegisterEvent, wake, "PLAYER_REGEN_ENABLED")
 	wake:SetScript("OnEvent", function(self, event)
+		if event == "PLAYER_REGEN_ENABLED" then tickTables.fightTicks = nil end
 		if self.soft[event] and InCombatLockdown() then return end
 		ns.framesWake = event
 	end)
