@@ -3818,7 +3818,7 @@ end
 -- cinematic and elapsed, waiting for the second half. (At low frame rates, with a
 -- tick due every frame, both halves still run in one.)
 local tickRest = {}
-local framesPass = { elapsed = 0, sinceFull = 0, fightWait = 0.125 } -- (sinceFull: seconds since the last whole pass)
+local framesPass = { elapsed = 0, sinceFull = 0, fightWait = 0.125, fightSettledWait = 0.5 } -- (sinceFull: seconds since the last whole pass)
 local IDLE_PASS = 0.5 -- (seconds: the frames pass out of CineMode, all settled)
 local CINE_IDLE_PASS = 0.25 -- (seconds: in CineMode, out of fights, all settled and nothing changed)
 local CINE_SLOW_PASS = 1 -- (seconds: the same, and the Calm Timer over with the settings closed, ns.SlowChecks)
@@ -4191,7 +4191,15 @@ local function OnUpdate(_, elapsed)
 	-- cooldowns wait for it, Frames.lua's wake.soft.)
 	-- (CINE_SLOW_PASS while the "in case" checks may slow, ns.SlowChecks: its
 	-- events still bring the pass at once.)
-	local wait = not immersive and (not fadeOn and IDLE_PASS or (fight and pass.fightWait
+	-- (In a fight once its fade in is done, every frame at its alpha: half a
+	-- second, pass.fightSettledWait. What's up for the fight stays up and
+	-- what's hidden stays hidden; what can change it (your target, a cast, the
+	-- mouse on or off a frame, a peek, a frame still fading) still brings the
+	-- pass at once. The timer is for what has no event: your target's range,
+	-- its plate going off screen. It ran 8 times a second, about a fifth of
+	-- our time in a fight, 2026-11-21.)
+	local wait = not immersive and (not fadeOn and IDLE_PASS or (fight and (ns.framesSettled and fight == pass.fight
+		and pass.fightSettledWait or pass.fightWait)
 		or (ns.SlowChecks() and CINE_SLOW_PASS or CINE_IDLE_PASS))) or nil
 	-- (Out of CineMode nothing it goes by needs the pass at once: kept to its
 	-- IDLE_PASS whatever comes, as before.)

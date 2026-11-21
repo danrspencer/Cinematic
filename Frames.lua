@@ -5019,10 +5019,13 @@ do
 	end
 	-- (Only while the frames' pass is asking: in CineMode.)
 	-- (Not while the "in case" checks are slowed, ns.SlowChecks: the pass
-	-- runs once a second then, and works the list out itself if it must.)
+	-- runs once a second then, and works the list out itself if it must. Nor
+	-- in a fight once every frame's settled: the pass runs every half second
+	-- then (Core.lua's framesPass.fightSettledWait), and the same.)
 	function ns.WarmCombatShown()
 		local now = GetTime()
-		if now - askedAt < 0.5 and not ns.SlowChecks() then
+		if now - askedAt < 0.5 and not ns.SlowChecks()
+			and not (ns.framesSettled and (InCombatLockdown() or ns.Flag(UnitAffectingCombat("player")))) then
 			Kept(now, SHOWN_HOLD)
 		end
 	end
