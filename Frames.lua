@@ -3452,9 +3452,19 @@ function ns.IsCombatShowOn(key)
 		if ns.LIST_DEFAULTS.combatShow[key] ~= nil then
 			return ns.LIST_DEFAULTS.combatShow[key]
 		end
-		for _, item in ipairs(ns.COMBAT_SHOW) do
-			if item.key == key then return item.default end
+		-- (Each row's own default, by key: it walked every row for each key
+		-- asked, two thirds of the combat list's work in a fight, 2026-11-21.
+		-- Made again as rows are added: other files' and supported addons' rows.)
+		local defaults = ns.combatDefaults -- (on ns: tickTables is made further down)
+		if not defaults or defaults.n ~= #ns.COMBAT_SHOW then
+			defaults = { n = #ns.COMBAT_SHOW, by = {} }
+			for i = #ns.COMBAT_SHOW, 1, -1 do -- (the first row with a key wins, as before)
+				local item = ns.COMBAT_SHOW[i]
+				defaults.by[item.key] = item.default
+			end
+			ns.combatDefaults = defaults
 		end
+		return defaults.by[key]
 	end
 	return on
 end
