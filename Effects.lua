@@ -4941,6 +4941,9 @@ ns.plates.Release = ReleasePlates
 -- (A profile showed it every tick for everyone, mostly finding no change.)
 -- (On ns.plates: this file's main chunk is at Lua's 200 locals.)
 ns.plates.SETTLED_EVERY = 0.5
+-- (2 s while the "in case" checks may slow, Core.lua's ns.SlowChecks: the
+-- events below, and a profile picked, still bring the pass at once.)
+ns.plates.SETTLED_SLOW = 2
 ns.plates.seen = {}
 function ns.plates.SameAsBefore(cinematic, now)
 	local seen = ns.plates.seen
@@ -4949,7 +4952,8 @@ function ns.plates.SameAsBefore(cinematic, now)
 	local place = ns.GetPlaceType() or false
 	local immersive = (ns.ChatCamImmersive and ns.ChatCamImmersive()) and true or false
 	local same = seen.cinematic == cinematic and seen.fight == fight and seen.target == target
-		and seen.place == place and seen.immersive == immersive and now - (seen.at or -math.huge) < ns.plates.SETTLED_EVERY
+		and seen.place == place and seen.immersive == immersive
+		and now - (seen.at or -math.huge) < (ns.SlowChecks() and ns.plates.SETTLED_SLOW or ns.plates.SETTLED_EVERY)
 	if not same then
 		seen.cinematic, seen.fight, seen.target, seen.place, seen.immersive, seen.at = cinematic, fight, target, place,
 			immersive, now

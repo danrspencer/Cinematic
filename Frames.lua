@@ -4519,6 +4519,10 @@ do
 	local factsBefore = {} -- (its values as last stamped: see the end of ns.RuleFacts)
 	local factsAt, factsFight, factsCameraAt -- (not in facts: Frames.lua walks its fields for changes)
 	local FACTS_HOLD = 0.1
+	-- (Held longer while the "in case" checks may slow, Core.lua's
+	-- ns.SlowChecks: the events below still work them out at once. What has
+	-- none, a distance, the room indoors, waits this long.)
+	local FACTS_SLOW_HOLD = 0.5
 	do
 		local factsWatch = CreateFrame("Frame")
 		for _, event in ipairs({ "PLAYER_TARGET_CHANGED", "PLAYER_MOUNT_DISPLAY_CHANGED", "ZONE_CHANGED",
@@ -4574,7 +4578,8 @@ do
 		facts.tipgather, facts.tipquest = tip and tip.tipgather or false, tip and tip.tipquest or false
 		facts.tipother = tip and tip.tipother or false
 		local fight = (InCombatLockdown() or ns.Flag(UnitAffectingCombat("player"))) and true or false
-		if factsAt and now >= factsAt and now - factsAt < FACTS_HOLD and fight == factsFight then
+		if factsAt and now >= factsAt and now - factsAt < (ns.SlowChecks() and FACTS_SLOW_HOLD or FACTS_HOLD)
+			and fight == factsFight then
 			facts.combat = inCombat
 			facts.nocombat = not inCombat and not facts.calm
 			-- (The camera words: as they are this frame.)
@@ -5013,9 +5018,11 @@ do
 		keptShown = nil
 	end
 	-- (Only while the frames' pass is asking: in CineMode.)
+	-- (Not while the "in case" checks are slowed, ns.SlowChecks: the pass
+	-- runs once a second then, and works the list out itself if it must.)
 	function ns.WarmCombatShown()
 		local now = GetTime()
-		if now - askedAt < 0.5 then
+		if now - askedAt < 0.5 and not ns.SlowChecks() then
 			Kept(now, SHOWN_HOLD)
 		end
 	end
@@ -10843,7 +10850,7 @@ function UpdateReadyOnly(elapsed, now)
 	-- (The game's Cooldown Manager off: nothing to do, once nothing's left
 	-- fading back. Asked as often as the icons are: its bars can be set to
 	-- show only in fights, and must be caught as they come up.)
-	if now - viewersAskedAt >= 0.1 then
+	if now - viewersAskedAt >= (ns.SlowChecks() and 0.5 or 0.1) then
 		viewersAskedAt = now
 		viewersUp = ns.CooldownViewersShown()
 	end
@@ -10856,7 +10863,9 @@ function UpdateReadyOnly(elapsed, now)
 	-- once, ns.readyPace.due.)
 	local pace = ns.readyPace
 	local fight = (InCombatLockdown() or ns.Flag(UnitAffectingCombat("player"))) and true or false
-	if pace.due or fight ~= pace.fight or now - readyCheckedAt >= (fight and 0.1 or 0.3) then
+	-- (Once a second while the "in case" checks may slow, ns.SlowChecks.)
+	if pace.due or fight ~= pace.fight
+		or now - readyCheckedAt >= (fight and 0.1 or (ns.SlowChecks() and 1 or 0.3)) then
 		pace.due, pace.fight = nil, fight
 		readyCheckedAt = now
 		wipe(readyTargets)

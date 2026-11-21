@@ -3821,6 +3821,7 @@ local tickRest = {}
 local framesPass = { elapsed = 0, sinceFull = 0, fightWait = 0.125 } -- (sinceFull: seconds since the last whole pass)
 local IDLE_PASS = 0.5 -- (seconds: the frames pass out of CineMode, all settled)
 local CINE_IDLE_PASS = 0.25 -- (seconds: in CineMode, out of fights, all settled and nothing changed)
+local CINE_SLOW_PASS = 1 -- (seconds: the same, and the Calm Timer over with the settings closed, ns.SlowChecks)
 
 -- The idle tick: with nothing moving (every frame settled, no fight, camera,
 -- move, fade or effect under way, the mouse and keys still), the tick runs
@@ -3887,6 +3888,33 @@ function ns.Pace()
 		end
 	end
 	return pace
+end
+-- Whether the "in case" re-checks may slow down: out of a fight, the Calm
+-- Timer after one run out, the settings window closed (a setting changed
+-- there counts at once), and no preview or demo. What changes in a fight is
+-- partly hidden from addons there (secret values, events held back), so
+-- every check keeps its full pace then. Out of one, the game's events bring
+-- each check on at once as before (your target, a cast, mount, zone, group,
+-- plates coming and going...); only the timers for what has no event (a
+-- distance, a setting changed by a command) wait longer. Once a frame.
+idleTick.slow = { at = -1, on = false }
+function ns.SlowChecks()
+	local slow, now = idleTick.slow, GetTime()
+	if slow.at ~= now then
+		slow.at = now
+		local why
+		if ns.db == nil then why = "loading"
+		elseif InCombatLockdown() or Flag(UnitAffectingCombat("player")) then why = "in a fight"
+		elseif (ns.InCalm and ns.InCalm()) or (ns.FightLingering and ns.FightLingering()) then why = "Calm Timer"
+		elseif ns.SettingsPanelShown() then why = "settings open"
+		elseif ns.previewRows or ns.layoutFadeUntil or ns.fadeDemo or ns.effectsDemo or ns.plateDemo then
+			why = "a preview or demo"
+		end
+		slow.on = why == nil
+		-- (/cine debug cpu: a frame's count each, on or what kept them off.)
+		if ns.profiling and ns.ProfileCount then ns.ProfileCount("slow checks " .. (why and ("off: " .. why) or "on")) end
+	end
+	return slow.on
 end
 -- Seconds the tick waits now: the pace's, and TICK at least; TICK while
 -- something of the tick's own is under way.
@@ -4161,7 +4189,10 @@ local function OnUpdate(_, elapsed)
 	-- fading, the mouse on or off a frame, your target, a cast or the fight
 	-- itself changing still bring it at once; health, power, auras and
 	-- cooldowns wait for it, Frames.lua's wake.soft.)
-	local wait = not immersive and (not fadeOn and IDLE_PASS or (fight and pass.fightWait or CINE_IDLE_PASS)) or nil
+	-- (CINE_SLOW_PASS while the "in case" checks may slow, ns.SlowChecks: its
+	-- events still bring the pass at once.)
+	local wait = not immersive and (not fadeOn and IDLE_PASS or (fight and pass.fightWait
+		or (ns.SlowChecks() and CINE_SLOW_PASS or CINE_IDLE_PASS))) or nil
 	-- (Out of CineMode nothing it goes by needs the pass at once: kept to its
 	-- IDLE_PASS whatever comes, as before.)
 	local woken = fadeOn and ns.framesWake
