@@ -400,10 +400,19 @@ end
 
 -- Each frame dressed again as it shows: windows the game rebuilds, bags it fills.
 local watched = {}
+-- (The game's own HookScript, from the frame's widget methods: an addon can put
+-- its own on a frame (Glass embeds AceHook-3.0 in the chat frames, whose
+-- HookScript takes (object, script, handler): "Usage: HookScript(object, ...)").)
+local function GameHookScript(frame)
+	local mt = getmetatable(frame)
+	local methods = mt and mt.__index
+	return type(methods) == "table" and methods.HookScript or frame.HookScript
+end
 local function Watch(frame, group)
-	if watched[frame] or not frame.HookScript then return end
+	local hook = not watched[frame] and GameHookScript(frame)
+	if not hook then return end
 	watched[frame] = group
-	frame:HookScript("OnShow", function(self)
+	hook(frame, "OnShow", function(self)
 		local color = ColorOf(group)
 		if color then DressFrame(self, group, color, true) end
 	end)
