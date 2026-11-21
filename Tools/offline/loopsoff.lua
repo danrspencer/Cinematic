@@ -73,59 +73,31 @@ if heal then
 	if rules then rules.healVision = rule end
 end
 
--- The settings pages made ahead (Options.lua's lazyPages) wait while
--- /cine debug loops measures (ns.loopAudit): their time swamped the loops
--- measured, 2026-11-20. Neither a new page started nor one under way stepped.
-local made = 0
+-- The settings pages aren't made ahead any more (Options.lua: lazyPages.StartAhead
+-- isn't started; made in the background after each login it was 30% of the
+-- addon's time for a minute, 2026-11-21). Each slow page is made when it's
+-- first opened or searched. (Its waiting while /cine debug loops measures,
+-- 2026-11-20, was checked here; it only applied to the made-ahead build.)
+local madeAhead, madeOpened = 0, 0
 local log = ns.Log
 ns.Log = function(kind, text, ...)
-	if kind == "load" and type(text) == "string" and text:find("made when first needed %(ahead") then made = made + 1 end
+	if kind == "load" and type(text) == "string" then
+		if text:find("made when first needed %(ahead") then madeAhead = madeAhead + 1 end
+		if text:find("made when first needed %(opened") then madeOpened = madeOpened + 1 end
+	end
 	return log(kind, text, ...)
 end
-local stepper -- (the builder's frame, as its loop is set)
-local setOnUpdate = ns.SetOnUpdate
-ns.SetOnUpdate = function(frame, fn, ...)
-	local info = debug.getinfo(2, "S")
-	if fn and info and info.short_src:find("Options%.lua") then stepper = frame end
-	return setOnUpdate(frame, fn, ...)
-end
-local ahead
-for _, ticker in ipairs(tickers) do
-	if ticker.from:find("Options%.lua") then ahead = ticker.fn end
-end
--- (The HUD's page starts it as it's made: as on opening the settings.)
-if not ahead and ns.MakeLazyPages then
-	ns.MakeLazyPages("opened")
+local function AheadTicker()
 	for _, ticker in ipairs(tickers) do
-		if ticker.from:find("Options%.lua") then ahead = ticker.fn end
+		if ticker.from:find("Options%.lua") then return ticker.fn end
 	end
 end
-Check("settings pages: the made-ahead ticker found", ahead ~= nil)
-if ahead then
-	local function Tick(n) for _ = 1, n do pcall(ahead) end end
-	ns.loopAudit = {}
-	Tick(12)
-	Check("settings pages: none started while loops measure", stepper == nil and made == 0,
-		("stepper %s, made %d"):format(tostring(stepper ~= nil), made))
-	ns.loopAudit = nil
-	Tick(6)
-	Check("settings pages: one starts once the measuring's over", stepper ~= nil)
-	if stepper then
-		local madeBefore = made
-		ns.loopAudit = {}
-		for _ = 1, 20 do
-			local step = stepper._scripts.OnUpdate
-			if step then pcall(step, stepper, 0.016) end
-		end
-		Check("settings pages: one under way waits while loops measure", made == madeBefore)
-		ns.loopAudit = nil
-		for _ = 1, 200 do
-			local step = stepper._scripts.OnUpdate
-			if not step then break end
-			pcall(step, stepper, 0.016)
-		end
-		Check("settings pages: it carries on after", made > madeBefore, ("made %d"):format(made))
-	end
+Check("settings pages: no made-ahead ticker at login", AheadTicker() == nil)
+if ns.MakeLazyPages then
+	ns.MakeLazyPages("opened")
+	Check("settings pages: opening makes them there and then", madeOpened > 0 and madeAhead == 0,
+		("opened %d, ahead %d"):format(madeOpened, madeAhead))
+	Check("settings pages: still no made-ahead ticker after", AheadTicker() == nil)
 end
 
 print(fails == 0 and "ALL PASS" or (fails .. " FAILED"))

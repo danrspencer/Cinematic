@@ -9519,8 +9519,10 @@ local function CreateCombatPanel()
 		end, content))
 	end
 	MakeHud = lazyPages.Add(canvas, "HUD", MakeBody)
-	-- (Made ahead at a quiet moment, with the other slow pages: lazyPages.StartAhead.)
-	lazyPages.StartAhead()
+	-- (Not made ahead any more, lazyPages.StartAhead: each slow page is made the
+	-- first time it's opened or searched. Made in the background after each
+	-- login it was 30% of the addon's time for a minute, with 57 ms frames,
+	-- a profile showed, 2026-11-21.)
 	-- (An icon for each section with rows on this client, as Section finds them.)
 	local function HasRows(key)
 		for _, item in ipairs(ns.COMBAT_SHOW) do
