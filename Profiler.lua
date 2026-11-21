@@ -44,13 +44,37 @@ end
 
 -- (parentName: the section it ran under, taken when it started: a call that
 -- stops across frames, a settings page made ahead, ends after its section did.)
+-- The slow calls (a section over SLOW_MS): when, what of it took the time,
+-- and how long after a fight's start or end, for the hitches (2026-11-21: up
+-- to 86 ms frames around fights, with only each part's worst to go by).
+local SLOW_MS, SLOW_KEEP, SLOW_PARTS = 8, 12, 5
+local function NoteSlow(name, ms, kb)
+	local kids = run.kids
+	table.sort(kids, function(a, b) return a[2] > b[2] end)
+	local parts = {}
+	for i = 1, math.min(#kids, SLOW_PARTS) do
+		parts[i] = ("%s %.1f"):format(kids[i][1], kids[i][2])
+	end
+	local now = GetTime()
+	local fight = run.fightAt and ("%s %.1f s before"):format(run.fightWhat, now - run.fightAt) or "no fight change yet"
+	local slow = run.slow
+	slow[#slow + 1] = { ms = ms, text = ("at %.1f s: %s %.1f ms, %s, %s (fight %s)%s: %s"):format(now - run.startedAt,
+		name, ms, InCombatLockdown() and "in combat" or "out of combat", ns.lastCinematic and "CineMode" or "normal UI",
+		fight, kb < 0 and (", memory %.0f KB: a collection ran in it"):format(kb) or "",
+		#parts > 0 and table.concat(parts, ", ") or "(no timed parts)") }
+	table.sort(slow, function(a, b) return a.ms > b.ms end)
+	slow[SLOW_KEEP + 1] = nil
+end
 local function Record(name, isSection, ms, kb, parentName)
 	local stat
 	if isSection then
 		stat = Stat(sections, name)
 		run.frameMs = run.frameMs + ms
+		if ms >= SLOW_MS then NoteSlow(name, ms, kb) end
+		wipe(run.kids)
 	else
 		if parentName == nil then return end
+		if ms >= 0.5 then run.kids[#run.kids + 1] = { name, ms } end
 		local parent = Stat(sections, parentName)
 		parent.children = parent.children or {}
 		stat = Stat(parent.children, name)
@@ -217,6 +241,14 @@ end
 
 local watcher = CreateFrame("Frame")
 watcher:Hide()
+-- (A fight's start and end, for the slow calls' lines.)
+watcher:RegisterEvent("PLAYER_REGEN_DISABLED")
+watcher:RegisterEvent("PLAYER_REGEN_ENABLED")
+watcher:SetScript("OnEvent", function(_, event)
+	if run then
+		run.fightAt, run.fightWhat = GetTime(), event == "PLAYER_REGEN_DISABLED" and "started" or "ended"
+	end
+end)
 
 local function Sorted(list)
 	local names = {}
@@ -288,6 +320,12 @@ local function BuildReport()
 				Add("    > %s: %.3f, -, %.2f, %.4f, %.2f, %.1f", childName, child.time / frames, child.calls / frames,
 					child.time / child.calls, child.max, child.kb / seconds)
 			end
+		end
+	end
+	if #run.slow > 0 then
+		Add("slow calls (over %d ms), slowest first; the fight's last start or end before it:", SLOW_MS)
+		for _, slow in ipairs(run.slow) do
+			Add("    %s", slow.text)
 		end
 	end
 	local countNames = {}
@@ -393,6 +431,7 @@ function ns.StartProfile(seconds, quiet, deep)
 		frames = 0, elapsed = 0, frameMs = 0, worst = 0, spikes = { [1] = 0, [5] = 0, [16] = 0 },
 		game = { addon = 0, overall = 0, app = 0 }, gameFrames = 0, gameSpikes = {},
 		startState = State(), quiet = quiet, deep = deep,
+		kids = {}, slow = {}, startedAt = GetTime(),
 	}
 	if deep then
 		WrapAll()

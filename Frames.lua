@@ -1743,8 +1743,24 @@ end
 do
 	local step, countBefore, rounds = 0, 0, 0
 	local NESTING_EVERY = 6 -- rounds
+	local part -- (this step's part, for /cine debug cpu's counts below)
+	local StepOnce
+	-- (Profiling: a step over 5 ms is counted by its part, so a slow one's
+	-- named; the profile only had the scan's worst, 61 ms, 2026-11-21.)
 	function ns.BuildManagedListStep()
+		if not ns.profiling then return StepOnce() end
+		local started = debugprofilestop()
+		local done = StepOnce()
+		local ms = debugprofilestop() - started
+		if ms > 5 and ns.ProfileCount then
+			ns.ProfileCount(("scan step over 5 ms: %s (%d managed), worst %.0f ms"):format(part or "?", #ns.managed,
+				math.floor(ms / 5) * 5))
+		end
+		return done
+	end
+	function StepOnce()
 		step = step + 1
+		part = "named frames"
 		if step == 1 then
 			countBefore = #ns.managed
 			for group, names in pairs(FRAME_GROUPS) do
@@ -1761,24 +1777,31 @@ do
 		end
 		local k = step - 1
 		if k <= #scanners then
+			part = "scanner " .. k
 			scanners[k]()
 			return false
 		end
 		k = k - #scanners
 		if k == 1 then
+			part = "top level frames"
 			ScanTopLevelFrames()
 		elseif k == 2 then
+			part = "addon frames"
 			ScanAddonFrames()
 		elseif k == 3 then
+			part = "issue reporter, bar art, detached"
 			FindIssueReporter()
 			FindBarArt()
 			ns.RefreshDetached()
 		elseif k == 4 then
+			part = "minimap header"
 			ns.FindMinimapHeader()
 		else
+			part = "buff collapse"
 			AddFrame(type(_G.BuffFrame) == "table" and _G.BuffFrame.CollapseAndExpandButton or nil, "buffcollapse")
 			rounds = rounds + 1
 			if #ns.managed ~= countBefore or rounds >= NESTING_EVERY then
+				part = "parents check (RecomputeNesting)"
 				rounds = 0
 				RecomputeNesting()
 			end
